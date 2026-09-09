@@ -1,0 +1,22 @@
+# --- Sistema operativo ---
+.DS_Store
+**/.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Editores / IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Build / output genérico ---
+build/
+dist/
+out/
+*.log
+
+# --- Variables de entorno / secretos ---
+.env
+.env.local
