@@ -1,0 +1,17 @@
+pre-commit:
+  parallel: false
+  jobs:
+    - name: format
+      glob: "*.go"
+      run: goimports -l -w {staged_files}
+      stage_fixed: true
+
+    - name: vet
+      glob: "*.go"
+      run: go vet ./...
+
+pre-push:
+  jobs:
+    - name: lint
+      glob: "*.go"
+      run: golangci-lint run
