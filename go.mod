@@ -1,3 +1,3 @@
-module github.com/emiliaduzac/lyc-tp-lox
+module tp-lox
 
 go 1.25.0
