@@ -30,8 +30,8 @@ A su vez, los tokens están compuestos por dos partes:
 > De uno o dos caracteres
 
 | caracter/es | nombre token |
-| / | SLASH | 
 | --- | --- |
+| / | SLASH | 
 | ! | BANG |
 | != | BANG_EQUAL |
 | = | EQUAL |

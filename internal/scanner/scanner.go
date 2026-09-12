@@ -1,6 +1,9 @@
 package scanner
 
-import "tp-lox/internal/token"
+import (
+	"fmt"
+	"tp-lox/internal/token"
+)
 
 type Scanner struct {
 	tokens  []token.Token
@@ -16,17 +19,20 @@ func NewScanner(source string) *Scanner {
 	}
 }
 
-// Scan escanea el string fuente y devuelve un slice de tokens.
-func (s *Scanner) Scan() []token.Token {
+// Scan escanea el string fuente y devuelve un slice de tokens y un error si encuentra un caracter inesperado.
+func (s *Scanner) Scan() ([]token.Token, error) {
 	for s.current < len(s.source) {
-		s.scanToken()
+		if err := s.scanToken(); err != nil {
+			return s.tokens, err
+		}
 	}
-
 	s.addToken(token.EOF, "")
-	return s.tokens
+	return s.tokens, nil
 }
 
-func (s *Scanner) scanToken() {
+// scanToken escanea un token del string fuente y lo agrega a la lista de tokens.
+// Devuelve error si encuentra un caracter inesperado.
+func (s *Scanner) scanToken() error {
 	currentChar := s.advance()
 
 	switch currentChar {
@@ -66,12 +72,14 @@ func (s *Scanner) scanToken() {
 	case '=':
 		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.EQUAL_EQUAL, "=="), *token.NewToken(token.EQUAL, "="))
 	case '>':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.GREATER_EQUAL, ">="), *token.NewToken(token.LESS, ">"))
+		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.GREATER_EQUAL, ">="), *token.NewToken(token.GREATER, ">"))
 	case '<':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.LESS_EQUAL, "<="), *token.NewToken(token.GREATER, "<"))
+		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.LESS_EQUAL, "<="), *token.NewToken(token.LESS, "<"))
 	default:
-		// Lanzar error? Igual faltan los que son literales, keywords, etc.
+		// faltan manejar los literales y palabras reservadas todavia
+		return fmt.Errorf("error: unexpected character: %c", currentChar)
 	}
+	return nil
 }
 
 func (s *Scanner) addToken(tokenType token.TokenType, lexeme string) {
