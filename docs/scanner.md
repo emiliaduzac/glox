@@ -5,7 +5,9 @@ Aún no es importante como se relacionan estos tokens, sino solamente saber iden
 
 Para eso, lo primero que debemos definir son los tokens que consideraremos válidos en nuestro lenguaje. Para eso, utilizamos
 la definición de Lox en el libro [Crafting Interpreters](https://craftinginterpreters.com/the-lox-language.html).
-
+A su vez, los tokens están compuestos por dos partes:
+- lexema: secuencia mínima de caracteres crudos que pueden significar algo
+- token: el lexema más la información de qué tipo de token es
 
 ### Tokens válidos
 
@@ -24,11 +26,11 @@ la definición de Lox en el libro [Crafting Interpreters](https://craftinginterp
 | ; | SEMICOLON |
 | * | STAR |
 | % | PERCENT |
-| / | SLASH | 
 
 > De uno o dos caracteres
 
 | caracter/es | nombre token |
+| / | SLASH | 
 | --- | --- |
 | ! | BANG |
 | != | BANG_EQUAL |
@@ -79,6 +81,7 @@ Cabe destacar que las palabras claves deben estar en mínuscula.
 | EOF |
 
 
+```
 Palabras que estaban en clase pero no en el libro:
 - %
 - 
@@ -88,3 +91,23 @@ Palabras que estan en el libro pero no en clase:
 - CLASS
 - SUPER
 - THIS
+```
+
+### Funcionamiento del scanner
+
+La gramática léxica es un análisis lineal, por lo que recorremos el codigo caracter por caracter. 
+El scanner está compuesto por:
+
+```go
+type Scanner struct {
+	tokens  []token.Token // lista de tokens escaneados
+	source  string        // código fuente a escanear
+	..
+}
+```
+
+A medida que vamos recorriendo los caracteres, tenemos que ir identificando su validez. 
+Aquellos tokens de único caracter son simples: los almacenamos en la lista y avanzamos con el siguiente.
+Cuando nos encontramos con un caracter que podrían ser tanto un token de único caracter como token de dos caracteres,
+debemos analizar también el caracter siguiente para detectar bajo que caso nos encontramos.
+
