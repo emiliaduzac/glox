@@ -1,4 +1,4 @@
-# Contributing
+# CONTRIBUTING
 
 ## Configuración del entorno de desarrollo
 
