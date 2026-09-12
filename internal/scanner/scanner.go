@@ -9,6 +9,7 @@ type Scanner struct {
 	tokens  []token.Token
 	source  string
 	current int
+	start   int
 }
 
 // NewScanner crea un nuevo scanner, a partir de un string fuente a escanear.
@@ -21,12 +22,13 @@ func NewScanner(source string) *Scanner {
 
 // Scan escanea el string fuente y devuelve un slice de tokens y un error si encuentra un caracter inesperado.
 func (s *Scanner) Scan() ([]token.Token, error) {
-	for s.current < len(s.source) {
+	for !s.isAtEnd() {
+		s.start = s.current
 		if err := s.scanToken(); err != nil {
 			return s.tokens, err
 		}
 	}
-	s.addToken(token.EOF, "")
+	s.addToken(token.EOF, "", nil)
 	return s.tokens, nil
 }
 
@@ -36,54 +38,66 @@ func (s *Scanner) scanToken() error {
 	currentChar := s.advance()
 
 	switch currentChar {
+	case ' ', '\r', '\t', '\n':
+		// Ignorar espacios en blanco y saltos de línea (no necesitamos avanzar el índice ya que el advance() ya lo hizo)
+
 	// Tokens de un solo caracter
 	case '(':
-		s.addToken(token.LEFT_PAREN, string(currentChar))
+		s.addToken(token.LEFT_PAREN, string(currentChar), nil)
 	case ')':
-		s.addToken(token.RIGHT_PAREN, string(currentChar))
+		s.addToken(token.RIGHT_PAREN, string(currentChar), nil)
 	case '{':
-		s.addToken(token.LEFT_BRACE, string(currentChar))
+		s.addToken(token.LEFT_BRACE, string(currentChar), nil)
 	case '}':
-		s.addToken(token.RIGHT_BRACE, string(currentChar))
+		s.addToken(token.RIGHT_BRACE, string(currentChar), nil)
 	case ',':
-		s.addToken(token.COMMA, string(currentChar))
+		s.addToken(token.COMMA, string(currentChar), nil)
 	case '.':
-		s.addToken(token.DOT, string(currentChar))
+		s.addToken(token.DOT, string(currentChar), nil)
 	case '-':
-		s.addToken(token.MINUS, string(currentChar))
+		s.addToken(token.MINUS, string(currentChar), nil)
 	case '+':
-		s.addToken(token.PLUS, string(currentChar))
+		s.addToken(token.PLUS, string(currentChar), nil)
 	case ';':
-		s.addToken(token.SEMICOLON, string(currentChar))
+		s.addToken(token.SEMICOLON, string(currentChar), nil)
 	case '*':
-		s.addToken(token.STAR, string(currentChar))
+		s.addToken(token.STAR, string(currentChar), nil)
 	case '%':
-		s.addToken(token.PERCENT, string(currentChar))
+		s.addToken(token.PERCENT, string(currentChar), nil)
 
 	// Tokens de uno o dos caracteres
 	case '/':
 		if s.isNext('/') {
 			s.advanceAllLine() // Comentario, ignorar hasta el final de la línea
 		} else {
-			s.addToken(token.SLASH, string(currentChar))
+			s.addToken(token.SLASH, string(currentChar), nil)
 		}
 	case '!':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.BANG_EQUAL, "!="), *token.NewToken(token.BANG, "!"))
+		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.BANG_EQUAL, "!=", nil), *token.NewToken(token.BANG, "!", nil))
 	case '=':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.EQUAL_EQUAL, "=="), *token.NewToken(token.EQUAL, "="))
+		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.EQUAL_EQUAL, "==", nil), *token.NewToken(token.EQUAL, "=", nil))
 	case '>':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.GREATER_EQUAL, ">="), *token.NewToken(token.GREATER, ">"))
+		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.GREATER_EQUAL, ">=", nil), *token.NewToken(token.GREATER, ">", nil))
 	case '<':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.LESS_EQUAL, "<="), *token.NewToken(token.LESS, "<"))
+		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.LESS_EQUAL, "<=", nil), *token.NewToken(token.LESS, "<", nil))
+
+	// Literales
+	case '"':
+		return s.findStringLiteral()
+
 	default:
 		// faltan manejar los literales y palabras reservadas todavia
-		return fmt.Errorf("error: unexpected character: %c", currentChar)
+		return fmt.Errorf("unexpected character: %c", currentChar)
 	}
 	return nil
 }
 
-func (s *Scanner) addToken(tokenType token.TokenType, lexeme string) {
-	s.tokens = append(s.tokens, token.Token{TokenType: tokenType, Lexeme: lexeme})
+func (s *Scanner) isAtEnd() bool {
+	return s.current >= len(s.source)
+}
+
+func (s *Scanner) addToken(tokenType token.TokenType, lexeme string, literal any) {
+	s.tokens = append(s.tokens, token.Token{TokenType: tokenType, Lexeme: lexeme, Literal: literal})
 }
 
 func (s *Scanner) advance() byte {
@@ -101,18 +115,35 @@ func (s *Scanner) advanceAllLine() {
 // isNext verifica si el siguiente caracter es el esperado.
 // Valida contra el indice actual ya que el advance() ya incrementó el índice.
 func (s *Scanner) isNext(expected byte) bool {
-	if s.current+1 >= len(s.source) {
+	if s.current >= len(s.source) {
 		return false
 	}
-	return s.source[s.current+1] == expected
+	return s.source[s.current] == expected
 }
 
 // addSingleOrDoubleCharToken agrega un token de uno o dos caracteres dependiendo de si el siguiente caracter es el esperado.
 func (s *Scanner) addSingleOrDoubleCharToken(nextExpected byte, doubleToken token.Token, singleToken token.Token) {
 	if s.isNext(nextExpected) {
 		s.advance()
-		s.addToken(doubleToken.GetTokenType(), doubleToken.GetLexeme())
+		s.addToken(doubleToken.GetTokenType(), doubleToken.GetLexeme(), nil)
 	} else {
-		s.addToken(singleToken.GetTokenType(), singleToken.GetLexeme())
+		s.addToken(singleToken.GetTokenType(), singleToken.GetLexeme(), nil)
 	}
+}
+
+// findStringLiteral busca un literal de cadena en el string fuente.
+// Devuelve error si encuentra un literal de cadena sin terminar.
+func (s *Scanner) findStringLiteral() error {
+	for !s.isAtEnd() && !s.isNext('"') && !s.isNext('\n') {
+		s.advance()
+	}
+	if s.isNext('"') {
+		s.advance() // comilla de cierre
+		lexeme := s.source[s.start:s.current]
+		literal := lexeme[1 : len(lexeme)-1]
+		s.addToken(token.STRING, lexeme, literal)
+	} else {
+		return fmt.Errorf("unterminated string")
+	}
+	return nil
 }

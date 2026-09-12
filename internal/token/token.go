@@ -71,13 +71,15 @@ var TokenKeyWords = map[string]TokenType{
 type Token struct {
 	TokenType TokenType
 	Lexeme    string
+	Literal   any
 }
 
 // NewToken crea un nuevo token con el tipo y lexema indicados
-func NewToken(tokenType TokenType, lexeme string) *Token {
+func NewToken(tokenType TokenType, lexeme string, literal any) *Token {
 	return &Token{
 		TokenType: tokenType,
 		Lexeme:    lexeme,
+		Literal:   literal,
 	}
 }
 
@@ -88,5 +90,10 @@ func (t Token) GetLexeme() string {
 
 // GetTokenType devuelve el tipo del token
 func (t Token) GetTokenType() TokenType {
+	return t.TokenType
+}
+
+// GetLiteral devuelve el literal del token
+func (t Token) GetLiteral() TokenType {
 	return t.TokenType
 }

@@ -106,8 +106,12 @@ type Scanner struct {
 }
 ```
 
-A medida que vamos recorriendo los caracteres, tenemos que ir identificando su validez. 
-Aquellos tokens de único caracter son simples: los almacenamos en la lista y avanzamos con el siguiente.
-Cuando nos encontramos con un caracter que podrían ser tanto un token de único caracter como token de dos caracteres,
+A medida que vamos recorriendo los caracteres, tenemos que ir identificando su validez:
+
+Aquellos **tokens de único caracter** son simples: los almacenamos en la lista y avanzamos con el siguiente.
+
+Cuando nos encontramos con un caracter que podrían ser tanto un **token de único caracter como token de dos caracteres**,
 debemos analizar también el caracter siguiente para detectar bajo que caso nos encontramos.
 
+Para los **literales que representan strings**, debemos seguir mirando caracteres hasta hallar la comilla de cierre. Todo el contenido
+hallado será parte del literal. Si no se encuentra una comilla de cierre, se considera un token inválido.
