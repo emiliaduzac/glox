@@ -80,13 +80,13 @@ Cabe destacar que las palabras claves deben estar en mínuscula.
 | EOF |
 
 
-// TODO: revisar que hacemos con estos casos:
+TO DO: revisar que hacemos con estos casos:
 ```
 Palabras que estaban en clase pero no en el libro:
 - %
 
 Palabras que estan en el libro pero no en clase:
-- . (dot)
+- DOT (.)
 - CLASS
 - SUPER
 - THIS
@@ -134,11 +134,13 @@ Entonces, resumiendo, para el caso donde nos encontramos con una letra, recorrem
 
 Finalmente, luego de leer todos los tokens del código fuente, se agrega por prolijidad un token `EOF`, indicando que no hay más contenido.
 
-7. **Errores**: como ya mencionamos, el trabajo del scanner es leer secuencialmente, caracter por caracter, y validar que los tokens sean válidos, es decir: que estén dentro de los aceptados por el lenguaje. También nombramos dos iteraciones para lograr esto: la que itera tokens (iteración inicial) y la que itera caracteres (iteración interna, para detectar tokens de varios caracteres). En esta implementación, apenas se encuentra un caracter inválido, se devuelve un error y se corta el escaneo, sin seguir buscando el resto de los tokens.
+7. **Errores**: como ya mencionamos, el trabajo del scanner es leer secuencialmente, caracter por caracter, y verificar que los tokens sean válidos, es decir: que estén dentro de los aceptados por el lenguaje. También nombramos dos iteraciones para lograr esto: la que itera tokens (iteración inicial) y la que itera caracteres (iteración interna, para detectar tokens de varios caracteres). En esta implementación, apenas se encuentra un caracter inválido, se devuelve un error y se corta el escaneo, sin seguir buscando el resto de los tokens.
 Ejemplo de errores:
 	- caracteres únicos no reconocidos (`@`, `#`, `$`, etc)
 	- cadenas que no finalizan con comillas (e.j: `"hello`)
 	- números que contienen más de un punto o finalizan con punto (e.j: `3.`, `12.12.12`). Vale la pena aclarar que, dado que el `.` es un token válido por sí mismo (`DOT`), y los números no pueden comenzar con `.`, la secuencia `.123` no es un error, sino que dos tokens consecutivos, `DOT` + `NUMBER`.
+ 
+TO DO: hacer que no corte en el primer error
 
 ### Tests
 
