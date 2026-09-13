@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"fmt"
+	"strconv"
 	"tp-lox/internal/token"
 )
 
@@ -75,13 +76,13 @@ func (s *Scanner) scanToken() error {
 			s.addToken(token.SLASH, string(currentChar), nil)
 		}
 	case '!':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.BANG_EQUAL, "!=", nil), *token.NewToken(token.BANG, "!", nil))
+		s.addSingleOrDoubleCharToken('=', token.BANG_EQUAL, token.BANG)
 	case '=':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.EQUAL_EQUAL, "==", nil), *token.NewToken(token.EQUAL, "=", nil))
+		s.addSingleOrDoubleCharToken('=', token.EQUAL_EQUAL, token.EQUAL)
 	case '>':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.GREATER_EQUAL, ">=", nil), *token.NewToken(token.GREATER, ">", nil))
+		s.addSingleOrDoubleCharToken('=', token.GREATER_EQUAL, token.GREATER)
 	case '<':
-		s.addSingleOrDoubleCharToken('=', *token.NewToken(token.LESS_EQUAL, "<=", nil), *token.NewToken(token.LESS, "<", nil))
+		s.addSingleOrDoubleCharToken('=', token.LESS_EQUAL, token.LESS)
 
 	// Literales
 	case '"':
@@ -98,7 +99,7 @@ func (s *Scanner) scanToken() error {
 	return nil
 }
 
-// isAtEnd verifica si el scanner llegó al final del string fuente.
+// isAtEnd verifica si el scanner llegó al final del string fuente (current ya no apunta a ningun caracter)
 func (s *Scanner) isAtEnd() bool {
 	return s.current >= len(s.source)
 }
@@ -132,26 +133,30 @@ func (s *Scanner) isNext(expected byte) bool {
 	return s.source[s.current] == expected
 }
 
+func (s *Scanner) getCurrentLexeme() string {
+	return s.source[s.start:s.current]
+}
+
 // addSingleOrDoubleCharToken agrega un token de uno o dos caracteres dependiendo de si el siguiente caracter es el esperado.
-func (s *Scanner) addSingleOrDoubleCharToken(nextExpected byte, doubleToken token.Token, singleToken token.Token) {
+func (s *Scanner) addSingleOrDoubleCharToken(nextExpected byte, doubleTokenType token.TokenType, singleTokenType token.TokenType) {
 	if s.isNext(nextExpected) {
 		s.advance()
-		s.addToken(doubleToken.GetTokenType(), doubleToken.GetLexeme(), nil)
+		s.addToken(doubleTokenType, s.getCurrentLexeme(), nil)
 	} else {
-		s.addToken(singleToken.GetTokenType(), singleToken.GetLexeme(), nil)
+		s.addToken(singleTokenType, s.getCurrentLexeme(), nil)
 	}
 }
 
 // findStringLiteral busca un literal de cadena en el string fuente.
 // Devuelve error si encuentra un literal de cadena sin terminar.
 func (s *Scanner) findStringLiteral() error {
-	for !s.isAtEnd() && !s.isNext('"') && !s.isNext('\n') {
+	for !s.isAtEnd() && !s.isNext('"') {
 		s.advance()
 	}
 
 	if s.isNext('"') {
 		s.advance() // comilla de cierre
-		lexeme := s.source[s.start:s.current]
+		lexeme := s.getCurrentLexeme()
 		literal := lexeme[1 : len(lexeme)-1]
 		s.addToken(token.STRING, lexeme, literal)
 	} else {
@@ -179,7 +184,11 @@ func (s *Scanner) findNumberLiteral() error {
 		return fmt.Errorf("invalid number format: an not end with a decimal point")
 	}
 
-	lexeme := s.source[s.start:s.current]
-	s.addToken(token.NUMBER, lexeme, lexeme)
+	lexeme := s.getCurrentLexeme()
+	literal, err := strconv.ParseFloat(lexeme, 64)
+	if err != nil {
+		return fmt.Errorf("invalid number format: %w", err)
+	}
+	s.addToken(token.NUMBER, lexeme, literal)
 	return nil
 }

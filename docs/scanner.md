@@ -115,11 +115,17 @@ A medida que vamos recorriendo los caracteres en un loop, tenemos que ir identif
 
 2. Cuando nos encontramos con un caracter que podrían ser tanto un **token de único caracter como token de dos caracteres**, debemos analizar también el caracter siguiente para detectar bajo que caso nos encontramos.
 Si el siguiente caracter _no_ compone un token de dos caracteres, se maneja como un token simple.
-Si el siguiente caracter _si_ compone un token de dos caracteres, se avanza el puntero `current` en el loop interno y se obtiene el token de dos caracteres, almacenandolo en la lista de tokens.
+Si el siguiente caracter _si_ compone un token de dos caracteres, se avanza el puntero `current` y se obtiene el token de dos caracteres, almacenandolo en la lista de tokens.
 
-3. Para los **literales que representan strings**, debemos seguir mirando caracteres hasta hallar la comilla de cierre. Aquí es donde nos sirve mantener `start` fijo al inicio del lexema. Se irán leyendo caracteres hasta el final, y gracias a `start` y `current` podemos obtener todo el lexema actual: `s.source[s.start : s.current]`. Si no se encuentra una comilla de cierre, se devuelve un error.
+3. Para los **literales que representan strings**, debemos seguir mirando caracteres hasta hallar la comilla de cierre. Aquí es donde nos sirve mantener `start` fijo al inicio del lexema. Se irán leyendo caracteres hasta el final, y gracias a `start` y `current` podemos obtener todo el lexema actual: `s.source[s.start : s.current]`. Si no se encuentra una comilla de cierre, se devuelve un error. 
+Detalles a destacar:
+- Lox soporta los strings multi-linea.
+- El token contiene el lexema (string fuente, incluyendo las comillas) y un literal (string fuente sin comillas)
 
-4. Para los **literales que representan números** se maneja de la siguiente forma: una vez que detectamos que el primer caracter de un  lexema es un dígito, comenzamos a leer los siguientes caracteres en el loop interno. Para ser considerado un número solo pueden seguir números o un punto para marcar decimales. Aquí hay que tener en cuenta que solo puede haber _un_ punto (no más), ni tampoco puede ser el último caracter del lexema. Finalmente se obtiene el lexema válido de la misma manera que con los strings: `s.source[s.start : s.current]`.
+4. Para los **literales que representan números** se maneja de la siguiente forma: una vez que detectamos que el primer caracter de un lexema es un dígito, comenzamos a leer los siguientes caracteres en el loop interno. Para ser considerado un número solo pueden seguir números o un punto para marcar decimales. Finalmente se obtiene el lexema válido de la misma manera que con los strings: `s.source[s.start : s.current]`.
+A destacar:
+- Solo puede haber _un_ punto (no más), ni tampoco puede ser el último caracter del lexema.
+- El token contiene el lexema (string fuente) y un literal (string ya convertido a número). Del libro _Crafting Interpreters_: "All numbers in Lox are floating point at runtime".
 
 5. **literales identificadores**: a completar.
 
