@@ -3,8 +3,7 @@
 La responsabilidad del scanner es tomar código fuente y traducirlo a tokens, es un análisis léxico. 
 Aún no es importante como se relacionan estos tokens, sino solamente saber identificar cuales son válidos.
 
-Para eso, lo primero que debemos definir son los tokens que consideraremos válidos en nuestro lenguaje. Para eso, utilizamos
-la definición de Lox en el libro [Crafting Interpreters](https://craftinginterpreters.com/the-lox-language.html).
+Para eso, lo primero que debemos definir son los tokens que consideraremos válidos en nuestro lenguaje. Para eso, utilizamos la definición de Lox en el libro [Crafting Interpreters](https://craftinginterpreters.com/the-lox-language.html).
 A su vez, los tokens están compuestos por dos partes:
 - lexema: secuencia mínima de caracteres crudos que pueden significar algo
 - token: el lexema más la información de qué tipo de token es
@@ -119,15 +118,17 @@ Si el siguiente caracter _si_ compone un token de dos caracteres, se avanza el p
 
 3. Para los **literales que representan strings**, debemos seguir mirando caracteres hasta hallar la comilla de cierre. Aquí es donde nos sirve mantener `start` fijo al inicio del lexema. Se irán leyendo caracteres hasta el final, y gracias a `start` y `current` podemos obtener todo el lexema actual: `s.source[s.start : s.current]`. Si no se encuentra una comilla de cierre, se devuelve un error. 
 Detalles a destacar:
+- Los strings comienzan y terminan con `"` (comillas dobles), no simples (`'`).
 - Lox soporta los strings multi-linea.
 - El token contiene el lexema (string fuente, incluyendo las comillas) y un literal (string fuente sin comillas)
 
 4. Para los **literales que representan números** se maneja de la siguiente forma: una vez que detectamos que el primer caracter de un lexema es un dígito, comenzamos a leer los siguientes caracteres en el loop interno. Para ser considerado un número solo pueden seguir números o un punto para marcar decimales. Finalmente se obtiene el lexema válido de la misma manera que con los strings: `s.source[s.start : s.current]`.
 A destacar:
 - Solo puede haber _un_ punto (no más), ni tampoco puede ser el último caracter del lexema.
-- El token contiene el lexema (string fuente) y un literal (string ya convertido a número). Del libro _Crafting Interpreters_: "All numbers in Lox are floating point at runtime".
+- El token contiene el lexema (string fuente) y un literal (string ya convertido a número). Del libro _Crafting Interpreters: "All numbers in Lox are floating point at runtime"._
 
-5. **literales identificadores**: a completar.
+5. **Identificadores y palabras clave**: tanto los identificadores o palabras clave comienzan con letras. Además, los identificadores pueden comenzar con un guión bajo (`_`) y continuar con números. Siguiendo el _principio de maximal munch_, debemos leer la secuencia completa antes de distinguir si se trata de un **identificador** o **una palabra clave**. Esto evita que definamos una secuencia como palabra clave antes de leerla por completa. Por ejemplo, si nos encontramos con `true`, antes de asignarla como un token key word `TRUE`, debemos asegurarnos que no siga ningún otro caracter que la convierta en un identificador, como por ejemplo `truemanshow`.
+Entonces, resumiendo, para el caso donde nos encontramos con una letra, recorremos los caracteres hasta llegar al final de la misma (fin de la secuencia `source` completa, o por ejemplo un espacio u otro caracter no soportado). Una vez leída la secuencia completa, chequeamos si el lexema hallado es una palabra clave. Si lo es, le asignamos el token que corresponda. Si no, le asignamos el token `IDENTIFIER`.
 
 6. **Casos particulares**: tanto los saltos de línea, como los espacios en blanco y comentarios son ignorados.
 

@@ -84,15 +84,16 @@ func (s *Scanner) scanToken() error {
 	case '<':
 		s.addSingleOrDoubleCharToken('=', token.LESS_EQUAL, token.LESS)
 
-	// Literales
+	// Literales cadena
 	case '"':
 		return s.findStringLiteral()
 
 	default:
-		if s.isDigit(currentChar) {
+		if s.isDigit(currentChar) { // Literales numericos
 			return s.findNumberLiteral()
+		} else if s.isAlphaOrUnderscore(currentChar) { // Identificadores y palabras clave
+			s.findIdentifierOrKeyword()
 		} else {
-			// faltan manejar los literales identifiers todavia
 			return fmt.Errorf("unexpected character: %c", currentChar)
 		}
 	}
@@ -106,6 +107,10 @@ func (s *Scanner) isAtEnd() bool {
 
 func (s *Scanner) isDigit(c byte) bool {
 	return c >= '0' && c <= '9'
+}
+
+func (s *Scanner) isAlphaOrUnderscore(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
 }
 
 func (s *Scanner) addToken(tokenType token.TokenType, lexeme string, literal any) {
@@ -191,4 +196,19 @@ func (s *Scanner) findNumberLiteral() error {
 	}
 	s.addToken(token.NUMBER, lexeme, literal)
 	return nil
+}
+
+// findIdentifierOrKeyword busca un identificador o palabra clave en el string fuente.
+func (s *Scanner) findIdentifierOrKeyword() {
+	// Avanzamos mientras el caracter actual sea alfanumérico o un guion bajo
+	for !s.isAtEnd() && (s.isAlphaOrUnderscore(s.source[s.current]) || s.isDigit(s.source[s.current])) {
+		s.advance()
+	}
+
+	lexeme := s.getCurrentLexeme()
+	if tokenType, ok := token.TokenKeyWords[lexeme]; ok {
+		s.addToken(tokenType, lexeme, nil)
+	} else {
+		s.addToken(token.IDENTIFIER, lexeme, nil)
+	}
 }
