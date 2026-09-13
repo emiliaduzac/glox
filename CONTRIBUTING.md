@@ -5,8 +5,8 @@
 1. Clonar el repositorio:
 
 ```bash
-git clone git@github.com:emiliaduzac/lyc-tp-lox.git
-cd lyc-tp-lox
+git clone git@github.com:emiliaduzac/glox.git
+cd glox
 ```
 
 2. Instalar las herramientas de desarrollo:
