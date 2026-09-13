@@ -2,7 +2,7 @@
 Repositorio para el trabajo práctico de la materia Lenguajes y Compiladores.
 
 Implementación de una variante propia del lenguaje [Lox](https://craftinginterpreters.com/), combinando las dos
-aproximaciones vistas en clase. Desarrollado en Go.
+aproximaciones vistas en clase. Desarrollado en [Go](https://go.dev/).
 
 ## Tabla de contenidos
 - [Integrantes](#integrantes)

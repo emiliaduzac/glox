@@ -15,8 +15,10 @@ type Scanner struct {
 // NewScanner crea un nuevo scanner, a partir de un string fuente a escanear.
 func NewScanner(source string) *Scanner {
 	return &Scanner{
-		tokens: []token.Token{},
-		source: source,
+		tokens:  []token.Token{},
+		source:  source,
+		current: 0,
+		start:   0,
 	}
 }
 
@@ -86,14 +88,23 @@ func (s *Scanner) scanToken() error {
 		return s.findStringLiteral()
 
 	default:
-		// faltan manejar los literales y palabras reservadas todavia
-		return fmt.Errorf("unexpected character: %c", currentChar)
+		if s.isDigit(currentChar) {
+			return s.findNumberLiteral()
+		} else {
+			// faltan manejar los literales identifiers todavia
+			return fmt.Errorf("unexpected character: %c", currentChar)
+		}
 	}
 	return nil
 }
 
+// isAtEnd verifica si el scanner llegó al final del string fuente.
 func (s *Scanner) isAtEnd() bool {
 	return s.current >= len(s.source)
+}
+
+func (s *Scanner) isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
 }
 
 func (s *Scanner) addToken(tokenType token.TokenType, lexeme string, literal any) {
@@ -137,6 +148,7 @@ func (s *Scanner) findStringLiteral() error {
 	for !s.isAtEnd() && !s.isNext('"') && !s.isNext('\n') {
 		s.advance()
 	}
+
 	if s.isNext('"') {
 		s.advance() // comilla de cierre
 		lexeme := s.source[s.start:s.current]
@@ -145,5 +157,29 @@ func (s *Scanner) findStringLiteral() error {
 	} else {
 		return fmt.Errorf("unterminated string")
 	}
+	return nil
+}
+
+func (s *Scanner) findNumberLiteral() error {
+	foundDot := false
+	// Avanzamos mientras el caracter actual sea un dígito o un punto decimal
+	for !s.isAtEnd() && (s.isDigit(s.source[s.current]) || s.isNext('.')) {
+		c := s.advance()
+		// Si encontramos un punto decimal, verificamos si ya habíamos encontrado uno antes
+		if c == '.' {
+			if foundDot {
+				return fmt.Errorf("invalid number format: multiple decimal points")
+			}
+			foundDot = true
+		}
+	}
+
+	// Verificamos que el ultimo caracter leído no sea un punto decimal
+	if s.source[s.current-1] == '.' {
+		return fmt.Errorf("invalid number format: an not end with a decimal point")
+	}
+
+	lexeme := s.source[s.start:s.current]
+	s.addToken(token.NUMBER, lexeme, lexeme)
 	return nil
 }

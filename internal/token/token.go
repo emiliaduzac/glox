@@ -94,6 +94,6 @@ func (t Token) GetTokenType() TokenType {
 }
 
 // GetLiteral devuelve el literal del token
-func (t Token) GetLiteral() TokenType {
-	return t.TokenType
+func (t Token) GetLiteral() any {
+	return t.Literal
 }

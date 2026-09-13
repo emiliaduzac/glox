@@ -102,16 +102,27 @@ El scanner está compuesto por:
 type Scanner struct {
 	tokens  []token.Token // lista de tokens escaneados
 	source  string        // código fuente a escanear
-	..
+	current int 		  // índice del caracter que el scanner está a punto de leer
+	start   int 		  // índice del primer caracter del token actual
 }
 ```
 
-A medida que vamos recorriendo los caracteres, tenemos que ir identificando su validez:
+A medida que vamos recorriendo los caracteres en un loop, tenemos que ir identificando su validez. Para hacerlo, el scanner cuenta con dos loops:
+- loop inicial: identifica tokens (en `Scan`)
+- loop interno: itera caracteres (en `scanToken`)
 
-Aquellos **tokens de único caracter** son simples: los almacenamos en la lista y avanzamos con el siguiente.
+1. Aquellos **tokens de único caracter** son simples: al detectarlo lo almacenamos en la lista de tokens y continuamos con la siguiente iteración del loop inicial.
 
-Cuando nos encontramos con un caracter que podrían ser tanto un **token de único caracter como token de dos caracteres**,
-debemos analizar también el caracter siguiente para detectar bajo que caso nos encontramos.
+2. Cuando nos encontramos con un caracter que podrían ser tanto un **token de único caracter como token de dos caracteres**, debemos analizar también el caracter siguiente para detectar bajo que caso nos encontramos.
+Si el siguiente caracter _no_ compone un token de dos caracteres, se maneja como un token simple.
+Si el siguiente caracter _si_ compone un token de dos caracteres, se avanza el puntero `current` en el loop interno y se obtiene el token de dos caracteres, almacenandolo en la lista de tokens.
 
-Para los **literales que representan strings**, debemos seguir mirando caracteres hasta hallar la comilla de cierre. Todo el contenido
-hallado será parte del literal. Si no se encuentra una comilla de cierre, se considera un token inválido.
+3. Para los **literales que representan strings**, debemos seguir mirando caracteres hasta hallar la comilla de cierre. Aquí es donde nos sirve mantener `start` fijo al inicio del lexema. Se irán leyendo caracteres hasta el final, y gracias a `start` y `current` podemos obtener todo el lexema actual: `s.source[s.start : s.current]`. Si no se encuentra una comilla de cierre, se devuelve un error.
+
+4. Para los **literales que representan números** se maneja de la siguiente forma: una vez que detectamos que el primer caracter de un  lexema es un dígito, comenzamos a leer los siguientes caracteres en el loop interno. Para ser considerado un número solo pueden seguir números o un punto para marcar decimales. Aquí hay que tener en cuenta que solo puede haber _un_ punto (no más), ni tampoco puede ser el último caracter del lexema. Finalmente se obtiene el lexema válido de la misma manera que con los strings: `s.source[s.start : s.current]`.
+
+5. **literales identificadores**: a completar.
+
+6. **Casos particulares**: tanto los saltos de línea, como los espacios en blanco y comentarios son ignorados.
+
+Finalmente, luego de leer todos los tokens del código fuente, se agrega por prolijidad un token `EOF`, indicando que no hay más contenido.
