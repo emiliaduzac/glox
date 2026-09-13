@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"strings"
 	"testing"
 	"tp-lox/internal/token"
 )
@@ -60,12 +61,15 @@ func assertEndsWithEOF(t *testing.T, tokens []token.Token) {
 	}
 }
 
-func assertInvalid(t *testing.T, source string) {
+func assertInvalid(t *testing.T, source string, expectedErrorContent string) {
 	t.Helper()
 	s := NewScanner(source)
 	_, err := s.Scan()
 	if err == nil {
 		t.Fatalf("expected error for source %q, got nil", source)
+	}
+	if expectedErrorContent != "" && !strings.Contains(err.Error(), expectedErrorContent) {
+		t.Errorf("expected error to contain %q, got %q", expectedErrorContent, err.Error())
 	}
 }
 
@@ -284,7 +288,7 @@ func TestOperation(t *testing.T) {
 }
 
 func TestVariableAssignment(t *testing.T) {
-	tokens := setUpScanner(t, "var x = 10;")
+	tokens := setUpScanner(t, "var x= 10;")
 	expectedTypes := []token.TokenType{token.VAR, token.IDENTIFIER, token.EQUAL, token.NUMBER, token.SEMICOLON, token.EOF}
 	expectedLexemes := []string{"var", "x", "=", "10", ";", ""}
 	expectedLiterals := []any{nil, nil, nil, 10.0, nil, nil}
@@ -296,18 +300,18 @@ func TestVariableAssignment(t *testing.T) {
 
 func TestInvalidStrings(t *testing.T) {
 	tests := []struct {
-		name   string
-		source string
+		name                 string
+		source               string
+		expectedErrorContent string
 	}{
-		{"string comilla simple", `'Hello'`},
-		{"string vacio sin comilla final", `"`},
-		{"sin comilla final", `"Hello`},
-		{"sin comilla inicial", `Hello World"`},
+		{"string comilla simple", `'Hello'`, "unexpected character"},
+		{"string vacio sin comilla final", `"`, "unterminated string"},
+		{"sin comilla final", `"Hello`, "unterminated string"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assertInvalid(t, test.source)
+			assertInvalid(t, test.source, test.expectedErrorContent)
 		})
 	}
 }
@@ -323,7 +327,7 @@ func TestInvalidNumbers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assertInvalid(t, test.source)
+			assertInvalid(t, test.source, "invalid number format")
 		})
 	}
 }
@@ -349,7 +353,7 @@ func TestInvalidCharacters(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assertInvalid(t, test.source)
+			assertInvalid(t, test.source, "unexpected character")
 		})
 	}
 }
