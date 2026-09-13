@@ -11,6 +11,7 @@ aproximaciones vistas en clase. Desarrollado en [Go](https://go.dev/).
 ## Integrantes
 - [Emilia Duzac](https://github.com/emiliaduzac) - 110307
 - [Marcos Navarro](https://github.com/NVRar) - 106974
+- [Comandos y ejecución](#comandos-y-ejecución)
 
 ## Documentación de la implementación
 
@@ -20,3 +21,25 @@ para facilitar su lectura y comprensión. Toda la documentación técnica se enc
 > Indice de documentación
 
 - [Scanner](docs/scanner.md)
+
+## Comandos y ejecución
+
+### Tests
+
+> Para ejecutar **todos** los tests del proyecto:
+
+```bash
+go test ./...
+```
+
+> Para ejecutar los tests de **un paquete en particular** (por ejemplo, el scanner):
+
+```bash
+go test ./internal/scanner
+```
+
+> Para ver el detalle de cada test ejecutado (nombre y resultado individual):
+
+```bash
+go test -v ./...
+```

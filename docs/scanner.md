@@ -40,7 +40,7 @@ A su vez, los tokens están compuestos por dos partes:
 | < | LESS |
 | <= | LESS_EQUAL |
 
-En caso de encontrar el token `//` es considerado un comentario, y el contenido que lo acompañe será descartado.
+En caso de encontrar el token `//` es considerado un comentario, y el contenido que lo acompañe será descartado. Los comentarios soportados por Lox son de única linea, no de bloque (`/* ... */`).
 
 > Literales
 

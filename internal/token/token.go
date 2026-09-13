@@ -1,5 +1,8 @@
 package token
 
+import "fmt"
+
+// TOKEN TYPES
 type TokenType int
 
 const (
@@ -68,6 +71,24 @@ var TokenKeyWords = map[string]TokenType{
 	"while":  WHILE,
 }
 
+func (t TokenType) String() string {
+	names := [...]string{
+		"LEFT_PAREN", "RIGHT_PAREN", "LEFT_BRACE", "RIGHT_BRACE",
+		"COMMA", "DOT", "MINUS", "PLUS", "SEMICOLON", "STAR", "PERCENT",
+		"SLASH", "BANG", "BANG_EQUAL", "EQUAL", "EQUAL_EQUAL",
+		"GREATER", "GREATER_EQUAL", "LESS", "LESS_EQUAL",
+		"IDENTIFIER", "STRING", "NUMBER",
+		"AND", "CLASS", "ELSE", "FALSE", "FUN", "FOR", "IF", "NIL", "OR",
+		"PRINT", "RETURN", "SUPER", "THIS", "TRUE", "VAR", "WHILE",
+		"EOF",
+	}
+	if int(t) < 0 || int(t) >= len(names) {
+		return fmt.Sprintf("UNKNOWN(%d)", int(t))
+	}
+	return names[t]
+}
+
+// TOKEN
 type Token struct {
 	TokenType TokenType
 	Lexeme    string
@@ -82,18 +103,6 @@ func NewToken(tokenType TokenType, lexeme string, literal any) *Token {
 		Literal:   literal,
 	}
 }
-
-// GetLexeme devuelve el lexema del token
-func (t Token) GetLexeme() string {
-	return t.Lexeme
-}
-
-// GetTokenType devuelve el tipo del token
-func (t Token) GetTokenType() TokenType {
-	return t.TokenType
-}
-
-// GetLiteral devuelve el literal del token
-func (t Token) GetLiteral() any {
-	return t.Literal
+func (t Token) String() string {
+	return "TokenType: " + t.TokenType.String() + ", Lexeme: " + t.Lexeme + ", Literal: " + fmt.Sprintf("%v", t.Literal)
 }
