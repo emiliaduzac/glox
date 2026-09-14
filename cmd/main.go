@@ -7,6 +7,13 @@ import (
 	"tp-lox/internal/scanner"
 )
 
+// sysexits.h error codes
+const (
+	EX_USAGE   = 64 // The command was used incorrectly
+	EX_DATAERR = 65 // The input data was incorrect in some way
+	EX_NOINPUT = 66 // An input file (not a system file) did not exist or was not readable
+)
+
 type Lox struct{}
 
 func newLox() *Lox {
@@ -18,7 +25,7 @@ func (l *Lox) start() {
 
 	if len(args) > 2 {
 		fmt.Fprintln(os.Stderr, "usage: lox [script]")
-		os.Exit(64)
+		os.Exit(EX_USAGE)
 	} else if len(args) == 2 {
 		l.runFile(args[1])
 	} else {
@@ -27,7 +34,15 @@ func (l *Lox) start() {
 }
 
 func (l *Lox) runFile(path string) {
-	fmt.Printf("-- Running in file mode: %s --\n", path)
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error reading file: %v\n", err)
+		os.Exit(EX_NOINPUT)
+	}
+	err = l.run(string(bytes))
+	if err != nil {
+		os.Exit(EX_DATAERR)
+	}
 }
 
 func (l *Lox) runPrompt() {
@@ -36,22 +51,24 @@ func (l *Lox) runPrompt() {
 
 	for bfScanner.Scan() {
 		line := bfScanner.Text()
-		l.run(line)
+		_ = l.run(line)
 		fmt.Print("> ")
 	}
 }
 
-func (l *Lox) run(source string) {
+func (l *Lox) run(source string) error {
 	scanner := scanner.NewScanner(source)
 	tokens, err := scanner.Scan()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		return
+		return err
 	}
 
 	for _, token := range tokens {
+		// por ahora siempre modo scanning
 		fmt.Println(token)
 	}
+	return nil
 }
 
 func main() {
