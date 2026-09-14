@@ -44,7 +44,7 @@ Seguir [conventional commits](https://www.conventionalcommits.org/).
 ```
 <tipo>(<ámbito>): <descripción>
 
-feat(lexer): tokenize string literals
+feat: tokenize string literals
 fix(parser): recover from panic on unexpected token
 chore: add lefthook and setup
 ```

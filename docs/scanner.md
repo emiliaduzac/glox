@@ -80,7 +80,7 @@ Cabe destacar que las palabras claves deben estar en mínuscula.
 | EOF |
 
 
-TO DO: revisar que hacemos con estos casos:
+TO DO: revisar que hacemos con estos casos. No me acuerdo si en clase dijo priorizar lo del libro o lo de clase, pero lo importante es que documentemos la decision. Mientras tanto el scanner toma todos.
 ```
 Palabras que estaban en clase pero no en el libro:
 - %
@@ -132,8 +132,6 @@ Entonces, resumiendo, para el caso donde nos encontramos con una letra, recorrem
 
 6. **Casos particulares**: tanto los saltos de línea, como los espacios en blanco y comentarios son ignorados.
 
-Finalmente, luego de leer todos los tokens del código fuente, se agrega por prolijidad un token `EOF`, indicando que no hay más contenido.
-
 7. **Errores**: como ya mencionamos, el trabajo del scanner es leer secuencialmente, caracter por caracter, y verificar que los tokens sean válidos, es decir: que estén dentro de los aceptados por el lenguaje. También nombramos dos iteraciones para lograr esto: la que itera tokens (iteración inicial) y la que itera caracteres (iteración interna, para detectar tokens de varios caracteres). En esta implementación, apenas se encuentra un caracter inválido, se devuelve un error y se corta el escaneo, sin seguir buscando el resto de los tokens.
 Ejemplo de errores:
 	- caracteres únicos no reconocidos (`@`, `#`, `$`, etc)
@@ -142,9 +140,11 @@ Ejemplo de errores:
  
 TO DO: hacer que no corte en el primer error
 
+Finalmente, luego de leer todos los tokens del código fuente, se agrega por prolijidad un token `EOF`, indicando que no hay más contenido.
+
 ### Tests
 
-El scanner cuenta con un conjunto de tests unitarios (`scanner_test.go`) cubriendo tanto los casos válidos como inválidos. 
+El scanner cuenta con un conjunto de tests unitarios ([`scanner_test.go`](../internal/scanner/scanner_test.go)) cubriendo tanto los casos válidos como inválidos. 
 Para ejecutarlos: 
 
 ```bash
