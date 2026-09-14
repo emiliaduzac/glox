@@ -9,7 +9,10 @@ aproximaciones vistas en clase. Desarrollado en [Go](https://go.dev/).
 
 - [Integrantes](#integrantes)
 - [Documentación de la implementación](#documentación-de-la-implementación)
-- [Comandos y ejecución](#comandos-y-ejecución)
+- [Cómo correr lox](#cómo-correr-lox)
+- [Tests unitarios](#tests-unitarios)
+- [Tests de la cátedra](#tests-de-la-cátedra)
+- [Benchmarks](#benchmarks)
 
 ## Integrantes
 
@@ -25,9 +28,13 @@ para facilitar su lectura y comprensión. Toda la documentación técnica se enc
 
 - [Scanner](docs/scanner.md)
 
-## Comandos y ejecución
+## Cómo correr lox
 
-### Tests
+TBD
+
+## Tests unitarios
+
+Durante el desarrollo, fuimos agregando tests unitarios de cada componente de la implementación, para validar su funcionamiento. Es decir: validar que el scanner escanee como se espera, que el parser se comporte como se espera, etc.
 
 > Para ejecutar **todos** los tests del proyecto:
 
@@ -46,3 +53,11 @@ go test ./internal/scanner
 ```bash
 go test -v ./...
 ```
+
+## Tests de la cátedra
+
+TBD
+
+## Benchmarks
+
+TBD
