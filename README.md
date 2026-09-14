@@ -30,7 +30,19 @@ para facilitar su lectura y comprensión. Toda la documentación técnica se enc
 
 ## Cómo correr lox
 
-TBD
+Lox se puede ejecutar de dos formas:
+
+1. Ejecutando un archivo
+
+```bash
+go run ./cmd <archivo.lox>
+```
+
+2. De forma interactiva (REPL)
+
+```bash
+go run ./cmd
+```
 
 ## Tests unitarios
 
