@@ -103,6 +103,12 @@ func NewToken(tokenType TokenType, lexeme string, literal any) *Token {
 		Literal:   literal,
 	}
 }
+
 func (t Token) String() string {
-	return "TokenType: " + t.TokenType.String() + ", Lexeme: " + t.Lexeme + ", Literal: " + fmt.Sprintf("%v", t.Literal)
+	if t.TokenType == IDENTIFIER {
+		return fmt.Sprintf("%s<%s>", t.TokenType, t.Lexeme)
+	} else if t.Literal != nil {
+		return fmt.Sprintf("%s<%v>", t.TokenType, t.Literal)
+	}
+	return t.TokenType.String()
 }
