@@ -79,19 +79,6 @@ Cabe destacar que las palabras claves deben estar en mínuscula.
 | --- |
 | EOF |
 
-
-TO DO: revisar que hacemos con estos casos. No me acuerdo si en clase dijo priorizar lo del libro o lo de clase, pero lo importante es que documentemos la decision. Mientras tanto el scanner toma todos.
-```
-Palabras que estaban en clase pero no en el libro:
-- %
-
-Palabras que estan en el libro pero no en clase:
-- DOT (.)
-- CLASS
-- SUPER
-- THIS
-```
-
 ### Funcionamiento del scanner
 
 La gramática léxica es un análisis lineal, por lo que recorremos el codigo caracter por caracter. 
@@ -138,8 +125,6 @@ Ejemplo de errores:
 	- cadenas que no finalizan con comillas (e.j: `"hello`)
 	- números que contienen más de un punto o finalizan con punto (e.j: `3.`, `12.12.12`). Vale la pena aclarar que, dado que el `.` es un token válido por sí mismo (`DOT`), y los números no pueden comenzar con `.`, la secuencia `.123` no es un error, sino que dos tokens consecutivos, `DOT` + `NUMBER`.
  
-TO DO: hacer que no corte en el primer error
-
 Finalmente, luego de leer todos los tokens del código fuente, se agrega por prolijidad un token `EOF`, indicando que no hay más contenido.
 
 ### Tests
