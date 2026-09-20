@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/token"
 )
@@ -11,7 +12,7 @@ type Parser struct {
 	current int
 }
 
-// NewScanner crea un nuevo scanner, a partir de una lista de tokens generados por el scanner.
+// NewParser crea un nuevo parser, a partir de una lista de tokens generados por el scanner.
 func NewParser(tokens []token.Token) *Parser {
 	return &Parser{
 		tokens:  tokens,
@@ -27,6 +28,9 @@ func (p *Parser) Parse() {
 	}
 }
 
+// expression es el punto de entrada para parsear una expresión. Comienza el proceso
+// de llamadas recursivas para parsear la expresión completa, siguiendo la jerarquía de
+// precedencia de operadores.
 func (p *Parser) expression() (expression.Expr, error) {
 	return p.equality()
 }
@@ -135,12 +139,12 @@ func (p *Parser) primary() (expression.Expr, error) {
 			return nil, err
 		}
 		if !p.isInTokenTypes(token.RIGHT_PAREN) {
-			return nil, fmt.Errorf("expected ')' after expression")
+			return nil, errors.NewLoxError(p.getCurrent().Line, "expected ')' after expression")
 		}
 		return expression.NewGrouping(expr), nil
 	}
 
-	return nil, fmt.Errorf("expected expression, got %s", p.getCurrent().Lexeme)
+	return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected expression, got %s", p.getCurrent().Lexeme))
 }
 
 // isAtEnd indica si el token actual es el
@@ -159,6 +163,7 @@ func (p *Parser) isInTokenTypes(types ...token.TokenType) bool {
 	return false
 }
 
+// isTokenType verifica si el token actual es del tipo de token pasado como argumento
 func (p *Parser) isTokenType(t token.TokenType) bool {
 	return p.getCurrent().TokenType == t
 }
