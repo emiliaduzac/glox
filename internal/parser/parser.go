@@ -20,12 +20,12 @@ func NewParser(tokens []token.Token) *Parser {
 	}
 }
 
-func (p *Parser) Parse() {
-	// place holder para el pre commit
-	_, err := p.expression()
+func (p *Parser) Parse() (expression.Expr, error) {
+	expression, err := p.expression()
 	if err != nil {
-		fmt.Println("Error al parsear la expresión:", err)
+		return nil, err
 	}
+	return expression, nil
 }
 
 // expression es el punto de entrada para parsear una expresión. Comienza el proceso
@@ -144,7 +144,7 @@ func (p *Parser) primary() (expression.Expr, error) {
 		return expression.NewGrouping(expr), nil
 	}
 
-	return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected expression, got %s", p.getCurrent().Lexeme))
+	return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected expression, got `%s`", p.getCurrent().Lexeme))
 }
 
 // isAtEnd indica si el token actual es el

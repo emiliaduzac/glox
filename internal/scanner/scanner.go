@@ -99,7 +99,7 @@ func (s *Scanner) scanToken() error {
 		} else if s.isAlphaOrUnderscore(currentChar) { // Identificadores y palabras clave
 			s.findIdentifierOrKeyword()
 		} else {
-			return errors.NewLoxError(s.line, fmt.Sprintf("unexpected character: %c", currentChar))
+			return errors.NewLoxError(s.line, fmt.Sprintf("unexpected character: `%c`", currentChar))
 		}
 	}
 	return nil
@@ -200,7 +200,7 @@ func (s *Scanner) findNumberLiteral() error {
 	lexeme := s.getCurrentLexeme()
 	literal, err := strconv.ParseFloat(lexeme, 64)
 	if err != nil {
-		return errors.NewLoxError(s.line, fmt.Sprintf("invalid number format: %v", err))
+		return errors.NewLoxError(s.line, fmt.Sprintf("invalid number format: `%v`", err))
 	}
 	s.addToken(token.NUMBER, lexeme, literal)
 	return nil

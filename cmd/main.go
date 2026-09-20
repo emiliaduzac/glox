@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"tp-lox/internal/expression"
+	"tp-lox/internal/parser"
 	"tp-lox/internal/scanner"
 )
 
@@ -86,10 +88,19 @@ func (l *Lox) run(source string) error {
 		return err
 	}
 
-	for _, token := range tokens {
-		// por ahora siempre modo scanning
-		fmt.Println(token)
+	// for _, token := range tokens {
+	// 	// por ahora siempre modo scanning
+	// 	fmt.Println(token)
+	// }
+
+	parser := parser.NewParser(tokens)
+	expr, err := parser.Parse()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return err
 	}
+
+	fmt.Println(expression.String(expr))
 	return nil
 }
 
