@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,39 +11,21 @@ import (
 	"tp-lox/internal/scanner"
 )
 
-// sysexits.h error codes
-const (
-	EX_OK      = 0
-	EX_USAGE   = 64 // The command was used incorrectly
-	EX_DATAERR = 65 // The input data was incorrect in some way
-	EX_NOINPUT = 66 // An input file (not a system file) did not exist or was not readable
-)
-
-// manejo gracefull de SIGINT (Ctrl+C)
-func gracefulShutdown(sigChan chan os.Signal, done chan struct{}) {
-	signal.Notify(sigChan, os.Interrupt)
-	go func() {
-		select {
-		case <-sigChan:
-			fmt.Println()
-			os.Exit(EX_OK)
-		case <-done:
-			return
-		}
-	}()
+type Lox struct {
+	mode int
 }
 
-type Lox struct{}
-
-func newLox() *Lox {
-	return &Lox{}
+func newLox(mode int) *Lox {
+	return &Lox{
+		mode: mode,
+	}
 }
 
 func (l *Lox) start() {
-	args := os.Args
+	args := flag.Args()
 
 	if len(args) > 2 {
-		fmt.Fprintln(os.Stderr, "usage: lox [script]")
+		fmt.Fprintln(os.Stderr, "usage: lox [--scanning|--parsing] [script]")
 		os.Exit(EX_USAGE)
 	} else if len(args) == 2 {
 		l.runFile(args[1])
@@ -88,10 +71,12 @@ func (l *Lox) run(source string) error {
 		return err
 	}
 
-	// for _, token := range tokens {
-	// 	// por ahora siempre modo scanning
-	// 	fmt.Println(token)
-	// }
+	if l.mode == ScanningMode {
+		for _, token := range tokens {
+			fmt.Println(token)
+		}
+		return nil
+	}
 
 	parser := parser.NewParser(tokens)
 	expr, err := parser.Parse()
@@ -105,6 +90,20 @@ func (l *Lox) run(source string) error {
 }
 
 func main() {
-	lox := newLox()
+	scanningFlag := flag.Bool("scanning", false, "corre solo el scanner, muestra los tokens")
+	parsingFlag := flag.Bool("parsing", false, "corre el scanner y el parser, muestra el AST")
+	flag.Parse()
+
+	var mode int
+	switch {
+	case *scanningFlag:
+		mode = ScanningMode
+	case *parsingFlag:
+		mode = ParsingMode
+	default:
+		mode = FullMode
+	}
+
+	lox := newLox(mode)
 	lox.start()
 }

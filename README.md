@@ -46,6 +46,18 @@ go run ./cmd <archivo.lox>
 go run ./cmd
 ```
 
+Si se quiere especificar el modo (como `--scanning` o `--parsing`):
+
+```bash
+go run ./cmd --<mode>
+```
+
+Para ver todos los modos:
+
+```bash
+go run ./cmd --help
+```
+
 ## Tests unitarios
 
 Durante el desarrollo, fuimos agregando tests unitarios de cada componente de la implementación, para validar su funcionamiento. Es decir: validar que el scanner escanee como se espera, que el parser se comporte como se espera, etc.
