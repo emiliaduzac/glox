@@ -95,7 +95,7 @@ func (p *Parser) factor() (expression.Expr, error) {
 		return nil, err
 	}
 
-	for p.isInTokenTypes(token.SLASH, token.STAR) {
+	for p.isInTokenTypes(token.SLASH, token.STAR, token.PERCENT) {
 		operator := p.getPrevious()
 		right, err := p.unary()
 		if err != nil {
@@ -144,7 +144,7 @@ func (p *Parser) primary() (expression.Expr, error) {
 		return expression.NewGrouping(expr), nil
 	}
 
-	return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected expression, got `%s`", p.getCurrent().Lexeme))
+	return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected expression, got `%s` instead", p.getCurrent().Lexeme))
 }
 
 // isAtEnd indica si el token actual es el

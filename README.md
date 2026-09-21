@@ -91,6 +91,6 @@ TBD
 ## To Dos
 
 - [ ] Manejar errores: la verdad que me confunde un poco como hace el libro y como hace la versión de clase. No me termina de quedar claro, por ejemplo en el scanner, si tenemos que leer todos los tokens, mostrar el error y seguir leyendo o cortar con el primer error.
-- [ ] Parser
+- [X] Parser - expressions
 - [ ] Interpreter
-- [ ]
+- [ ] Parser - statements
