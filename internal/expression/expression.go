@@ -67,14 +67,30 @@ func NewGrouping(expression Expr) *Grouping {
 
 func (g *Grouping) Expression() {}
 
+func stringLiteral(value any) string {
+	switch v := value.(type) {
+	case string:
+		return fmt.Sprintf("\"%s\"", v)
+	case bool:
+		if v {
+			return "TRUE"
+		}
+		return "FALSE"
+	case nil:
+		return "NIL"
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
 func String(expr Expr) string {
 	switch e := expr.(type) {
 	case *Literal:
-		return fmt.Sprintf("%v", e.Value)
+		return fmt.Sprintf("<%v>", stringLiteral(e.Value))
 	case *Unary:
-		return fmt.Sprintf("(%s %s)", e.Operator.Lexeme, String(e.Right))
+		return fmt.Sprintf("(%s %s)", e.Operator.TokenType, String(e.Right))
 	case *Binary:
-		return fmt.Sprintf("(%s %s %s)", String(e.Left), e.Operator.Lexeme, String(e.Right))
+		return fmt.Sprintf("(%s %s %s)", String(e.Left), e.Operator.TokenType, String(e.Right))
 	case *Grouping:
 		return fmt.Sprintf("(group %s)", String(e.Expr))
 	default:
