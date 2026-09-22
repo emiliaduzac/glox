@@ -19,6 +19,17 @@ func setUpParser(t *testing.T, tokens []token.Token) expression.Expr {
 	return expr
 }
 
+func setUpParserExpectError(t *testing.T, tokens []token.Token) error {
+	t.Helper()
+	tokens = append(tokens, *token.NewToken(token.EOF, "", nil, 1))
+	s := NewParser(tokens)
+	_, err := s.Parse()
+	if err == nil {
+		t.Fatalf("expected an error, got none")
+	}
+	return err
+}
+
 func assertLiteral(t *testing.T, expr expression.Expr, expectedValue any) {
 	t.Helper()
 
@@ -56,6 +67,14 @@ func assertBinary(t *testing.T, expr expression.Expr, expectedOperator token.Tok
 	}
 	assertLiteral(t, binary.Left, expectedLeft)
 	assertLiteral(t, binary.Right, expectedRight)
+}
+
+func assertString(t *testing.T, expr expression.Expr, expected string) {
+	t.Helper()
+
+	if got := expression.String(expr); got != expected {
+		t.Errorf("expected %q, got %q", expected, got)
+	}
 }
 
 // TESTS -- Casos base válidos
@@ -222,6 +241,223 @@ func TestParseGrouping(t *testing.T) {
 }
 
 // TESTS -- Casos de asociatividad y precedencia de operadores
-func TestPrecedence(t *testing.T) {
 
+func TestPrecedenceEquality(t *testing.T) {
+	tests := []struct {
+		name     string
+		tokens   []token.Token
+		expected string
+	}{
+		{
+			"comparison es prioritario que equality",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.LESS, "<", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				*token.NewToken(token.LESS, "<", nil, 1),
+				*token.NewToken(token.NUMBER, "4", 4.0, 1),
+			},
+			"((<1> LESS <2>) EQUAL_EQUAL (<3> LESS <4>))",
+		},
+		{
+			"asociatividad izquierda",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+			},
+			"((<1> EQUAL_EQUAL <2>) EQUAL_EQUAL <3>)",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expr := setUpParser(t, test.tokens)
+			assertString(t, expr, test.expected)
+		})
+	}
+}
+
+func TestPrecedenceComparison(t *testing.T) {
+	tests := []struct {
+		name     string
+		tokens   []token.Token
+		expected string
+	}{
+		{
+			"term es mas prioritario que comparison",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.LESS, "<", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+				*token.NewToken(token.NUMBER, "4", 4.0, 1),
+			},
+			"((<1> PLUS <2>) LESS (<3> PLUS <4>))",
+		},
+		{
+			"asociatividad izquierda",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.LESS, "<", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.LESS, "<", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+			},
+			"((<1> LESS <2>) LESS <3>)",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expr := setUpParser(t, test.tokens)
+			assertString(t, expr, test.expected)
+		})
+	}
+}
+
+func TestPrecedenceTerm(t *testing.T) {
+	tests := []struct {
+		name     string
+		tokens   []token.Token
+		expected string
+	}{
+		{
+			"factor es mas prioritario que term",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.STAR, "*", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+			},
+			"(<1> PLUS (<2> STAR <3>))",
+		},
+		{
+			"asociatividad izquierda",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.MINUS, "-", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.MINUS, "-", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+			},
+			"((<1> MINUS <2>) MINUS <3>)",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expr := setUpParser(t, test.tokens)
+			assertString(t, expr, test.expected)
+		})
+	}
+}
+
+func TestPrecedenceFactor(t *testing.T) {
+	tests := []struct {
+		name     string
+		tokens   []token.Token
+		expected string
+	}{
+		{
+			"unary es as prioritario que factor",
+			[]token.Token{
+				*token.NewToken(token.MINUS, "-", nil, 1),
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.STAR, "*", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			},
+			"((MINUS <1>) STAR <2>)",
+		},
+		{
+			"asociatividad izquierda",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.STAR, "*", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.SLASH, "/", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+			},
+			"((<1> STAR <2>) SLASH <3>)",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expr := setUpParser(t, test.tokens)
+			assertString(t, expr, test.expected)
+		})
+	}
+}
+
+func TestPrecedenceGrouping(t *testing.T) {
+	tests := []struct {
+		name     string
+		tokens   []token.Token
+		expected string
+	}{
+		{
+			"grouping rompe la precedencia default",
+			[]token.Token{
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+				*token.NewToken(token.STAR, "*", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+			},
+			"((group (<1> PLUS <2>)) STAR <3>)",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expr := setUpParser(t, test.tokens)
+			assertString(t, expr, test.expected)
+		})
+	}
+}
+
+// TESTS -- Casos de error
+
+func TestParseErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		tokens []token.Token
+	}{
+		{
+			"parentesis sin cerrar (expresion incompleta)",
+			[]token.Token{
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			},
+		},
+		{
+			"token inesperado",
+			[]token.Token{
+				*token.NewToken(token.PLUS, "+", nil, 1),
+			},
+		},
+		{
+			"falta operando derecho (expresion incompleta)",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_ = setUpParserExpectError(t, test.tokens)
+		})
+	}
 }
