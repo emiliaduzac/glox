@@ -93,14 +93,16 @@ type Token struct {
 	TokenType TokenType
 	Lexeme    string
 	Literal   any
+	Line      int
 }
 
 // NewToken crea un nuevo token con el tipo y lexema indicados
-func NewToken(tokenType TokenType, lexeme string, literal any) *Token {
+func NewToken(tokenType TokenType, lexeme string, literal any, line int) *Token {
 	return &Token{
 		TokenType: tokenType,
 		Lexeme:    lexeme,
 		Literal:   literal,
+		Line:      line,
 	}
 }
 

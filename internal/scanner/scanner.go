@@ -3,6 +3,7 @@ package scanner
 import (
 	"fmt"
 	"strconv"
+	"tp-lox/internal/errors"
 	"tp-lox/internal/token"
 )
 
@@ -11,6 +12,7 @@ type Scanner struct {
 	source  string
 	current int
 	start   int
+	line    int
 }
 
 // NewScanner crea un nuevo scanner, a partir de un string fuente a escanear.
@@ -20,6 +22,7 @@ func NewScanner(source string) *Scanner {
 		source:  source,
 		current: 0,
 		start:   0,
+		line:    1,
 	}
 }
 
@@ -41,7 +44,9 @@ func (s *Scanner) scanToken() error {
 	currentChar := s.advance()
 
 	switch currentChar {
-	case ' ', '\r', '\t', '\n':
+	case '\n':
+		s.line++
+	case ' ', '\r', '\t':
 		// Ignorar espacios en blanco y saltos de línea (no necesitamos avanzar el índice ya que el advance() ya lo hizo)
 
 	// Tokens de un solo caracter
@@ -94,7 +99,7 @@ func (s *Scanner) scanToken() error {
 		} else if s.isAlphaOrUnderscore(currentChar) { // Identificadores y palabras clave
 			s.findIdentifierOrKeyword()
 		} else {
-			return fmt.Errorf("unexpected character: %c", currentChar)
+			return errors.NewLoxError(s.line, fmt.Sprintf("unexpected character: `%c`", currentChar))
 		}
 	}
 	return nil
@@ -114,7 +119,7 @@ func (s *Scanner) isAlphaOrUnderscore(c byte) bool {
 }
 
 func (s *Scanner) addToken(tokenType token.TokenType, lexeme string, literal any) {
-	s.tokens = append(s.tokens, token.Token{TokenType: tokenType, Lexeme: lexeme, Literal: literal})
+	s.tokens = append(s.tokens, token.Token{TokenType: tokenType, Lexeme: lexeme, Literal: literal, Line: s.line})
 }
 
 func (s *Scanner) advance() byte {
@@ -156,6 +161,9 @@ func (s *Scanner) addSingleOrDoubleCharToken(nextExpected byte, doubleTokenType 
 // Devuelve error si encuentra un literal de cadena sin terminar.
 func (s *Scanner) findStringLiteral() error {
 	for !s.isAtEnd() && !s.isNext('"') {
+		if s.source[s.current] == '\n' {
+			s.line++
+		}
 		s.advance()
 	}
 
@@ -165,7 +173,7 @@ func (s *Scanner) findStringLiteral() error {
 		literal := lexeme[1 : len(lexeme)-1]
 		s.addToken(token.STRING, lexeme, literal)
 	} else {
-		return fmt.Errorf("unterminated string")
+		return errors.NewLoxError(s.line, "unterminated string")
 	}
 	return nil
 }
@@ -178,7 +186,7 @@ func (s *Scanner) findNumberLiteral() error {
 		// Si encontramos un punto decimal, verificamos si ya habíamos encontrado uno antes
 		if c == '.' {
 			if foundDot {
-				return fmt.Errorf("invalid number format: multiple decimal points")
+				return errors.NewLoxError(s.line, "invalid number format: multiple decimal points")
 			}
 			foundDot = true
 		}
@@ -186,13 +194,13 @@ func (s *Scanner) findNumberLiteral() error {
 
 	// Verificamos que el ultimo caracter leído no sea un punto decimal
 	if s.source[s.current-1] == '.' {
-		return fmt.Errorf("invalid number format: an not end with a decimal point")
+		return errors.NewLoxError(s.line, "invalid number format: cannot end with a decimal point")
 	}
 
 	lexeme := s.getCurrentLexeme()
 	literal, err := strconv.ParseFloat(lexeme, 64)
 	if err != nil {
-		return fmt.Errorf("invalid number format: %w", err)
+		return errors.NewLoxError(s.line, fmt.Sprintf("invalid number format: `%v`", err))
 	}
 	s.addToken(token.NUMBER, lexeme, literal)
 	return nil

@@ -13,7 +13,7 @@ aproximaciones vistas en clase. Desarrollado en [Go](https://go.dev/).
 - [Tests unitarios](#tests-unitarios)
 - [Tests de la cátedra](#tests-de-la-cátedra)
 - [Benchmarks](#benchmarks)
-- [To Dos]
+- [To Dos](#to-dos)
 
 ## Integrantes
 
@@ -28,6 +28,7 @@ para facilitar su lectura y comprensión. Toda la documentación técnica se enc
 > Indice de documentación
 
 - [Scanner](docs/scanner.md)
+- [Parser](docs/parser.md)
 
 ## Cómo correr lox
 
@@ -43,6 +44,18 @@ go run ./cmd <archivo.lox>
 
 ```bash
 go run ./cmd
+```
+
+Si se quiere especificar el modo (como `--scanning` o `--parsing`):
+
+```bash
+go run ./cmd --<mode>
+```
+
+Para ver todos los modos:
+
+```bash
+go run ./cmd --help
 ```
 
 ## Tests unitarios
@@ -75,9 +88,9 @@ TBD
 
 TBD
 
-## To Dos
+## To Dos
 
 - [ ] Manejar errores: la verdad que me confunde un poco como hace el libro y como hace la versión de clase. No me termina de quedar claro, por ejemplo en el scanner, si tenemos que leer todos los tokens, mostrar el error y seguir leyendo o cortar con el primer error.
-- [ ] Parser
+- [X] Parser - expressions
 - [ ] Interpreter
-- [ ]
+- [ ] Parser - statements
