@@ -24,11 +24,11 @@ func newLox(mode int) *Lox {
 func (l *Lox) start() {
 	args := flag.Args()
 
-	if len(args) > 2 {
-		fmt.Fprintln(os.Stderr, "usage: lox [--scanning|--parsing] [script]")
+	if len(args) > 1 {
+		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing] [script]")
 		os.Exit(EX_USAGE)
-	} else if len(args) == 2 {
-		l.runFile(args[1])
+	} else if len(args) == 1 {
+		l.runFile(args[0])
 	} else {
 		l.runPrompt()
 	}
