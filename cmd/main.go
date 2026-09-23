@@ -7,17 +7,20 @@ import (
 	"os"
 	"os/signal"
 	"tp-lox/internal/expression"
+	"tp-lox/internal/interpreter"
 	"tp-lox/internal/parser"
 	"tp-lox/internal/scanner"
 )
 
 type Lox struct {
-	mode int
+	mode        int
+	interpreter *interpreter.Interpreter
 }
 
 func newLox(mode int) *Lox {
 	return &Lox{
-		mode: mode,
+		mode:        mode,
+		interpreter: interpreter.NewInterpreter(),
 	}
 }
 
@@ -85,7 +88,16 @@ func (l *Lox) run(source string) error {
 		return err
 	}
 
-	fmt.Println(expression.String(expr))
+	if l.mode == ParsingMode {
+		fmt.Println(expression.String(expr))
+		return nil
+	}
+
+	err = l.interpreter.Interpret(expr)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return err
+	}
 	return nil
 }
 
