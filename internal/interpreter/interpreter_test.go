@@ -17,6 +17,13 @@ func assertValue(t *testing.T, got any, expected any) {
 	}
 }
 
+func assertNoError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestEvaluateLiterals(t *testing.T) {
 	in := setUpInterpreter(t)
 
@@ -94,5 +101,30 @@ func TestStringify(t *testing.T) {
 
 	t.Run("Stringify boolean false value", func(t *testing.T) {
 		assertValue(t, Stringify(false), "false")
+	})
+}
+
+func TestEvaluateGrouping(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Evaluate grouping with literal", func(t *testing.T) {
+		expression := expression.NewGrouping(expression.NewLiteral(99))
+		value, err := in.Evaluate(expression)
+		assertNoError(t, err)
+		assertValue(t, value, 99)
+	})
+
+	t.Run("Evaluate gruped string literal", func(t *testing.T) {
+		expression := expression.NewGrouping(expression.NewLiteral("Hello"))
+		value, err := in.Evaluate(expression)
+		assertNoError(t, err)
+		assertValue(t, value, "Hello")
+	})
+
+	t.Run("Evaluate nested grouping with literal", func(t *testing.T) {
+		expression := expression.NewGrouping(expression.NewGrouping(expression.NewGrouping(expression.NewLiteral(88))))
+		value, err := in.Evaluate(expression)
+		assertNoError(t, err)
+		assertValue(t, value, 88)
 	})
 }

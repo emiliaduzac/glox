@@ -15,6 +15,8 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 	switch e := expr.(type) {
 	case *expression.Literal:
 		return e.Value, nil
+	case *expression.Grouping:
+		return in.Evaluate(e.Expr)
 	default:
 		return nil, nil
 	}
