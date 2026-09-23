@@ -20,11 +20,18 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 	}
 }
 
+func Stringify(value any) string {
+	if value == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%v", value)
+}
+
 func (in *Interpreter) Interpret(expr expression.Expr) error {
 	val, err := in.Evaluate(expr)
 	if err != nil {
 		return err
 	}
-	fmt.Println(val)
+	fmt.Println(Stringify(val))
 	return nil
 }

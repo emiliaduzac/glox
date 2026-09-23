@@ -74,3 +74,25 @@ func TestEvaluateLiterals(t *testing.T) {
 		assertValue(t, value, nil)
 	})
 }
+
+func TestStringify(t *testing.T) {
+	t.Run("Stringify nil value", func(t *testing.T) {
+		assertValue(t, Stringify(nil), "nil")
+	})
+
+	t.Run("Stringify integer value", func(t *testing.T) {
+		assertValue(t, Stringify(99), "99")
+	})
+
+	t.Run("Stringify string value", func(t *testing.T) {
+		assertValue(t, Stringify("Hello"), "Hello")
+	})
+
+	t.Run("Stringify boolean true value", func(t *testing.T) {
+		assertValue(t, Stringify(true), "true")
+	})
+
+	t.Run("Stringify boolean false value", func(t *testing.T) {
+		assertValue(t, Stringify(false), "false")
+	})
+}
