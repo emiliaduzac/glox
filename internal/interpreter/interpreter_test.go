@@ -931,3 +931,123 @@ func TestEvaluateBinaryGreater(t *testing.T) {
 		assertError(t, err)
 	})
 }
+
+func TestEvaluateBinaryGreaterEqual(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Greater equal than with two positive numbers when true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(5.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Greater equal than with two positive numbers when false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(5.0),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(10.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Greater equal than with two equal positive numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(10.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Greater equal than with negative numbers when true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-5.0),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(-10.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Greater equal than with two equal negative numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-10.0),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(-10.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Greater equal than with negative numbers when false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-10.0),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(-5.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Error when left operand is not a number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("a"),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(10.0),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when right operand is not a number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral("a"),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when comparing strings", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("a"),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral("b"),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when comparing booleans", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(false),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when comparing nil values", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.GREATER_EQUAL, ">=", nil, 1),
+			expression.NewLiteral(nil),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+}
