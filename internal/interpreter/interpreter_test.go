@@ -320,6 +320,12 @@ func TestEvaluateUnaryBang(t *testing.T) {
 		_, err := in.Evaluate(expr)
 		assertError(t, err)
 	})
+
+	t.Run("Error when unary operator is unknown", func(t *testing.T) {
+		expr := expression.NewUnary(*token.NewToken(token.EOF, "EOF", nil, 1), expression.NewLiteral(10.0))
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
 }
 
 func TestEvaluateBinary(t *testing.T) {
@@ -348,6 +354,16 @@ func TestEvaluateBinary(t *testing.T) {
 			expression.NewLiteral(10.0),
 			*token.NewToken(token.PLUS, "+", nil, 1),
 			rightErr,
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when binary operator is unknown", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.EOF, "EOF", nil, 1),
+			expression.NewLiteral(20.0),
 		)
 		_, err := in.Evaluate(expr)
 		assertError(t, err)
