@@ -251,3 +251,143 @@ func TestEvaluateUnaryBang(t *testing.T) {
 		assertError(t, err)
 	})
 }
+
+func TestEvaluateBinary(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Propagates error from left operand", func(t *testing.T) {
+		leftErr := expression.NewUnary(
+			*token.NewToken(token.MINUS, "-", nil, 1),
+			expression.NewLiteral("invalid"),
+		)
+		expr := expression.NewBinary(
+			leftErr,
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral(10.0),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Propagates error from right operand", func(t *testing.T) {
+		rightErr := expression.NewUnary(
+			*token.NewToken(token.MINUS, "-", nil, 1),
+			expression.NewLiteral("invalid"),
+		)
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			rightErr,
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+}
+
+func TestEvaluateBinaryPlus(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Sum of two positive numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(11.0),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral(22.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 33.0)
+	})
+
+	t.Run("Sum of negative numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-10.0),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral(-5.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, -15.0)
+	})
+
+	t.Run("Sum of positive and negative number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral(-3.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 7.0)
+	})
+
+	t.Run("Sum of a negative number and a positive number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-7.0),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral(2.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, -5.0)
+	})
+
+	t.Run("Concatenation of two strings", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("Hello "),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral("world"),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, "Hello world")
+	})
+
+	t.Run("Concatenation with empty string", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(""),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral("abc"),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, "abc")
+	})
+
+	t.Run("Error when adding string and number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("a"),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral(1.0),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when adding number and string", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(1.0),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral("a"),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when adding incompatible types", func(t *testing.T) {
+		exprBool := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral(false),
+		)
+		_, err := in.Evaluate(exprBool)
+		assertError(t, err)
+
+		exprNil := expression.NewBinary(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			expression.NewLiteral(nil),
+		)
+		_, err = in.Evaluate(exprNil)
+		assertError(t, err)
+	})
+}
