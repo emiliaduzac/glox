@@ -237,6 +237,21 @@ func TestIsEqual(t *testing.T) {
 	})
 }
 
+func TestCheckNumberOperand(t *testing.T) {
+	op := *token.NewToken(token.MINUS, "-", nil, 1)
+
+	t.Run("Operand is a number", func(t *testing.T) {
+		num, err := checkNumberOperand(op, 10.0)
+		assertNoError(t, err)
+		assertValue(t, num, 10.0)
+	})
+
+	t.Run("Operand is not a number", func(t *testing.T) {
+		_, err := checkNumberOperand(op, "not a number")
+		assertError(t, err)
+	})
+}
+
 func TestCheckNumberOperands(t *testing.T) {
 	op := *token.NewToken(token.PLUS, "+", nil, 1)
 

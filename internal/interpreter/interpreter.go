@@ -37,9 +37,9 @@ func (in *Interpreter) evaluateUnary(expr *expression.Unary) (any, error) {
 
 	switch expr.Operator.TokenType {
 	case token.MINUS:
-		num, ok := right.(float64)
-		if !ok {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operand must be a number")
+		num, err := checkNumberOperand(expr.Operator, right)
+		if err != nil {
+			return nil, err
 		}
 		return -num, nil
 	case token.BANG:
@@ -155,6 +155,14 @@ func isEqual(a, b any) bool {
 		return false
 	}
 	return a == b
+}
+
+func checkNumberOperand(operator token.Token, operand any) (float64, error) {
+	num, ok := operand.(float64)
+	if !ok {
+		return 0, errors.NewLoxError(operator.Line, "operand must be a number")
+	}
+	return num, nil
 }
 
 func checkNumberOperands(operator token.Token, left, right any) (float64, float64, error) {
