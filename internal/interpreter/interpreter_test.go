@@ -33,6 +33,24 @@ func assertError(t *testing.T, err error) {
 	}
 }
 
+type unsupportedExpr struct{}
+
+func (u unsupportedExpr) Expression() {}
+
+func TestEvaluateUnsupportedExpression(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Error when expression is nil", func(t *testing.T) {
+		_, err := in.Evaluate(nil)
+		assertError(t, err)
+	})
+
+	t.Run("Error when expression type is unknown", func(t *testing.T) {
+		_, err := in.Evaluate(unsupportedExpr{})
+		assertError(t, err)
+	})
+}
+
 func TestEvaluateLiterals(t *testing.T) {
 	in := setUpInterpreter(t)
 

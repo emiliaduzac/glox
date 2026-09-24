@@ -25,7 +25,7 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 	case *expression.Binary:
 		return in.evaluateBinary(e)
 	default:
-		return nil, nil
+		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown expression: %T", expr))
 	}
 }
 
