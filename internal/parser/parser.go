@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
+	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
 )
 
@@ -20,12 +21,59 @@ func NewParser(tokens []token.Token) *Parser {
 	}
 }
 
-func (p *Parser) Parse() (expression.Expr, error) {
-	expression, err := p.expression()
+func (p *Parser) Parse() ([]statements.Stmt, error) {
+	statements := []statements.Stmt{}
+	for !p.isAtEnd() {
+		stmt, err := p.statement()
+		if err != nil {
+			return nil, err
+		}
+		statements = append(statements, stmt)
+	}
+	return statements, nil
+}
+
+func (p *Parser) statement() (statements.Stmt, error) {
+	if p.isInTokenTypes(token.PRINT) {
+		stmt, err := p.printStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	}
+
+	stmt, err := p.expressionStatement()
 	if err != nil {
 		return nil, err
 	}
-	return expression, nil
+	return stmt, nil
+}
+
+func (p *Parser) printStatement() (statements.Stmt, error) {
+	expr, err := p.getStatement()
+	if err != nil {
+		return nil, err
+	}
+	return statements.NewPrintStmt(expr), nil
+}
+
+func (p *Parser) expressionStatement() (statements.Stmt, error) {
+	expr, err := p.getStatement()
+	if err != nil {
+		return nil, err
+	}
+	return statements.NewExpressionStmt(expr), nil
+}
+
+func (p *Parser) getStatement() (expression.Expr, error) {
+	expr, err := p.expression()
+	if err != nil {
+		return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("error parsing expression: %v", err))
+	}
+	if !p.isInTokenTypes(token.SEMICOLON) {
+		return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected ';' after value, got `%s` instead", p.getCurrent().Lexeme))
+	}
+	return expr, nil
 }
 
 // expression es el punto de entrada para parsear una expresión. Comienza el proceso
