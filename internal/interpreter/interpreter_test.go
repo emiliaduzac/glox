@@ -671,3 +671,154 @@ func TestEvaluateBinarySlash(t *testing.T) {
 		assertError(t, err)
 	})
 }
+
+func TestEvaluateBinaryPercent(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Modulo of two positive numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(3.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 1.0)
+	})
+
+	t.Run("Modulo with negative dividend", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-10.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(3.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, -1.0)
+	})
+
+	t.Run("Exact modulo", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(5.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 0.0)
+	})
+
+	t.Run("Modulo with negative divisor", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(-3.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 1.0)
+	})
+
+	t.Run("Modulo of two negative numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-10.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(-3.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, -1.0)
+	})
+
+	t.Run("Zero modulo positive number produces zero", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(0.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(5.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 0.0)
+	})
+
+	t.Run("Modulo of floating point numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(5.5),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(2.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 1.5)
+	})
+
+	t.Run("Modulo by zero produces NaN", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(0.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+
+		num, ok := val.(float64)
+		if !ok || !math.IsNaN(num) {
+			t.Errorf("expected NaN, got %v", val)
+		}
+	})
+
+	t.Run("Zero modulo zero produces NaN", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(0.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(0.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+
+		num, ok := val.(float64)
+		if !ok || !math.IsNaN(num) {
+			t.Errorf("expected NaN, got %v", val)
+		}
+	})
+
+	t.Run("Error when left operand is not a number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("a"),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(10.0),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when right operand is not a number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral("a"),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when operands are booleans", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(false),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when operands are nil", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.PERCENT, "%", nil, 1),
+			expression.NewLiteral(nil),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+}
