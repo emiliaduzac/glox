@@ -3,6 +3,7 @@ package interpreter
 import (
 	"testing"
 	"tp-lox/internal/expression"
+	"tp-lox/internal/token"
 )
 
 func setUpInterpreter(t *testing.T) *Interpreter {
@@ -21,6 +22,13 @@ func assertNoError(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func assertError(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected error, got nil")
 	}
 }
 
@@ -126,5 +134,120 @@ func TestEvaluateGrouping(t *testing.T) {
 		value, err := in.Evaluate(expression)
 		assertNoError(t, err)
 		assertValue(t, value, 88)
+	})
+}
+
+func TestIsTruthy(t *testing.T) {
+	t.Run("Nil is falsy", func(t *testing.T) {
+		assertValue(t, isTruthy(nil), false)
+	})
+
+	t.Run("False is falsy", func(t *testing.T) {
+		assertValue(t, isTruthy(false), false)
+	})
+
+	t.Run("True is truthy", func(t *testing.T) {
+		assertValue(t, isTruthy(true), true)
+	})
+
+	t.Run("Zero number is truthy", func(t *testing.T) {
+		assertValue(t, isTruthy(0.0), true)
+	})
+
+	t.Run("Positive number is truthy", func(t *testing.T) {
+		assertValue(t, isTruthy(88.0), true)
+	})
+
+	t.Run("Empty string is truthy", func(t *testing.T) {
+		assertValue(t, isTruthy(""), true)
+	})
+
+	t.Run("Non-empty string is truthy", func(t *testing.T) {
+		assertValue(t, isTruthy("hello"), true)
+	})
+}
+
+func TestEvaluateUnaryMinus(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Negate positive number", func(t *testing.T) {
+		expr := expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral(77.0))
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, -77.0)
+	})
+
+	t.Run("Negate negative number", func(t *testing.T) {
+		expr := expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral(-77.0))
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 77.0)
+	})
+
+	t.Run("Negate zero", func(t *testing.T) {
+		expr := expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral(0.0))
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 0.0)
+	})
+
+	t.Run("Error when negating string", func(t *testing.T) {
+		expr := expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral("hello"))
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when negating boolean", func(t *testing.T) {
+		expr := expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral(true))
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when negating nil", func(t *testing.T) {
+		expr := expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral(nil))
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+}
+
+func TestEvaluateUnaryBang(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Bang boolean values", func(t *testing.T) {
+		exprTrue := expression.NewUnary(*token.NewToken(token.BANG, "!", nil, 1), expression.NewLiteral(true))
+		val, err := in.Evaluate(exprTrue)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+
+		exprFalse := expression.NewUnary(*token.NewToken(token.BANG, "!", nil, 1), expression.NewLiteral(false))
+		val, err = in.Evaluate(exprFalse)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Bang nil", func(t *testing.T) {
+		expr := expression.NewUnary(*token.NewToken(token.BANG, "!", nil, 1), expression.NewLiteral(nil))
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Bang truthy non-booleans", func(t *testing.T) {
+		exprZero := expression.NewUnary(*token.NewToken(token.BANG, "!", nil, 1), expression.NewLiteral(0.0))
+		val, err := in.Evaluate(exprZero)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+
+		exprStr := expression.NewUnary(*token.NewToken(token.BANG, "!", nil, 1), expression.NewLiteral(""))
+		val, err = in.Evaluate(exprStr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Propagates error from inner expression", func(t *testing.T) {
+		inner := expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral("hello"))
+		expr := expression.NewUnary(*token.NewToken(token.BANG, "!", nil, 1), inner)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
 	})
 }
