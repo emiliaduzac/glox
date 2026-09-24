@@ -72,6 +72,13 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 			}
 		}
 		return nil, errors.NewLoxError(expr.Operator.Line, "operands must be two numbers or two strings")
+	case token.MINUS:
+		leftNum, okLeft := left.(float64)
+		rightNum, okRight := right.(float64)
+		if !okLeft || !okRight {
+			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		}
+		return leftNum - rightNum, nil
 	default:
 		return nil, errors.NewLoxError(expr.Operator.Line, fmt.Sprintf("unknown binary operator: %s", expr.Operator.Lexeme))
 	}
