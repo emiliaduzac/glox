@@ -468,3 +468,80 @@ func TestEvaluateBinaryMinus(t *testing.T) {
 		assertError(t, err)
 	})
 }
+
+func TestEvaluateBinaryStar(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Multiplication of two positive numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(5.0),
+			*token.NewToken(token.STAR, "*", nil, 1),
+			expression.NewLiteral(4.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 20.0)
+	})
+
+	t.Run("Multiplication of negative numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-2.0),
+			*token.NewToken(token.STAR, "*", nil, 1),
+			expression.NewLiteral(-5.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, 10.0)
+	})
+
+	t.Run("Multiplication with negative result", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(5.0),
+			*token.NewToken(token.STAR, "*", nil, 1),
+			expression.NewLiteral(-10.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, -50.0)
+	})
+
+	t.Run("Error when left operand is not a number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("a"),
+			*token.NewToken(token.STAR, "*", nil, 1),
+			expression.NewLiteral(10.0),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when right operand is not a number", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(10.0),
+			*token.NewToken(token.STAR, "*", nil, 1),
+			expression.NewLiteral("a"),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when operands are booleans", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.STAR, "*", nil, 1),
+			expression.NewLiteral(false),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+
+	t.Run("Error when operands are nil", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.STAR, "*", nil, 1),
+			expression.NewLiteral(nil),
+		)
+		_, err := in.Evaluate(expr)
+		assertError(t, err)
+	})
+}
