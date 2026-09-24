@@ -144,10 +144,13 @@ func (p *Parser) primary() (expression.Expr, error) {
 		return expression.NewGrouping(expr), nil
 	}
 
+	if p.isTokenType(token.EOF) {
+		return nil, errors.NewLoxError(p.getCurrent().Line, "expected expression, got EOF instead")
+	}
 	return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected expression, got `%s` instead", p.getCurrent().Lexeme))
 }
 
-// isAtEnd indica si el token actual es el
+// isAtEnd indica si el token actual es el último.
 func (p *Parser) isAtEnd() bool {
 	return p.tokens[p.current].TokenType == token.EOF
 }

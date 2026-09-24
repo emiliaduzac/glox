@@ -1,6 +1,6 @@
 ## Parser
 
-Luego del anális léxico que hicimos en el scanner (identificar nuestros tokens válidos), pasamos a un análisis sintáctico (armar estructuras con los tokens identificados). Es decir: armar expresiones válidas, con los tokens válidos.
+Luego del análisis léxico que hicimos en el scanner (identificar nuestros tokens válidos), pasamos a un análisis sintáctico (armar estructuras con los tokens identificados). Es decir: armar expresiones válidas, con los tokens válidos.
 
 Responsabilidades del parser:
 
@@ -68,3 +68,18 @@ primary    → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
 2. **equality es la de menor precedencia**: es lo último que se resuelve, hasta no tener ambos lados de una comparación ya resueltos, no se compara nada.
 
 Para **resolver** una expresión, el proceso va de arriba hacia abajo: **Recursive Descent Parser**. Es decir: de menor a mayor precedencia: `expression → equality → comparison → term → factor → unary → primary`, y el árbol se arma de izquierda a derecha a medida que se desciende y se vuelve.
+
+Como se evalúa dicho árbol será explicado en la implementación del interpreter: [interpreter.md](interpreter.md).
+
+### Manejo de errores
+
+Al encontrarse con un error, el parser devuelve un error detallado explicando la linea y error hallado, sin seguir parseando el resto de tokens. Todos se generan en `primary()`, que es el último nivel de la tabla de precedencia: si ningún nivel anterior pudo consumir el token, ahí es donde se sabe que no hay una expresión válida.
+
+### Tests
+
+Para testear la correcta detección de las expresiones por parte del parser, definimos tests unitarios buscando cubrir la mayoría de casos posibles: ([`parser_test.go`](../internal/parser/parser_test.go)).
+Para ejecutarlos: 
+
+```bash
+go test ./internal/parser
+```
