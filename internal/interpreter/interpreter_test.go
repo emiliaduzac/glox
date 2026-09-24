@@ -168,6 +168,57 @@ func TestIsTruthy(t *testing.T) {
 	})
 }
 
+func TestIsEqual(t *testing.T) {
+	t.Run("Nil equals nil", func(t *testing.T) {
+		assertValue(t, isEqual(nil, nil), true)
+	})
+
+	t.Run("Nil does not equal non-nil", func(t *testing.T) {
+		assertValue(t, isEqual(nil, false), false)
+		assertValue(t, isEqual(nil, 0.0), false)
+		assertValue(t, isEqual(nil, ""), false)
+		assertValue(t, isEqual(false, nil), false)
+		assertValue(t, isEqual(0.0, nil), false)
+		assertValue(t, isEqual("", nil), false)
+	})
+
+	t.Run("Same numbers are equal", func(t *testing.T) {
+		assertValue(t, isEqual(11.0, 11.0), true)
+		assertValue(t, isEqual(-10.0, -10.0), true)
+		assertValue(t, isEqual(0.0, 0.0), true)
+	})
+
+	t.Run("Different numbers are not equal", func(t *testing.T) {
+		assertValue(t, isEqual(11.0, 10.0), false)
+		assertValue(t, isEqual(-5.0, 5.0), false)
+	})
+
+	t.Run("Same strings are equal", func(t *testing.T) {
+		assertValue(t, isEqual("hello", "hello"), true)
+		assertValue(t, isEqual("", ""), true)
+	})
+
+	t.Run("Different strings are not equal", func(t *testing.T) {
+		assertValue(t, isEqual("hello", "world"), false)
+	})
+
+	t.Run("Same booleans are equal", func(t *testing.T) {
+		assertValue(t, isEqual(true, true), true)
+		assertValue(t, isEqual(false, false), true)
+	})
+
+	t.Run("Different booleans are not equal", func(t *testing.T) {
+		assertValue(t, isEqual(true, false), false)
+	})
+
+	t.Run("Different types are not equal without coercion", func(t *testing.T) {
+		assertValue(t, isEqual(42.0, "42.0"), false)
+		assertValue(t, isEqual(0.0, false), false)
+		assertValue(t, isEqual("", false), false)
+		assertValue(t, isEqual(true, 1.0), false)
+	})
+}
+
 func TestEvaluateUnaryMinus(t *testing.T) {
 	in := setUpInterpreter(t)
 
@@ -1278,5 +1329,130 @@ func TestEvaluateBinaryLessEqual(t *testing.T) {
 		)
 		_, err := in.Evaluate(expr)
 		assertError(t, err)
+	})
+}
+
+func TestEvaluateBinaryEqualEqual(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Equal numbers when true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(42.0),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral(42.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Equal numbers when false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(42.0),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral(10.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Equal negative numbers", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(-10.0),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral(-10.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Equal strings when true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("hello"),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral("hello"),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Equal strings when false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("hello"),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral("world"),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Equal booleans when true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral(true),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Equal booleans when false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral(false),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Equal nil with nil", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral(nil),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Equal nil with non-nil produces false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral(0.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Equal with different types produces false without error", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(42.0),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral("42.0"),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Equal boolean and number produces false without error", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			expression.NewLiteral(1.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
 	})
 }

@@ -129,6 +129,8 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
 		}
 		return leftNum <= rightNum, nil
+	case token.EQUAL_EQUAL:
+		return isEqual(left, right), nil
 	default:
 		return nil, errors.NewLoxError(expr.Operator.Line, fmt.Sprintf("unknown binary operator: %s", expr.Operator.Lexeme))
 	}
@@ -149,6 +151,16 @@ func Stringify(value any) string {
 		return "nil"
 	}
 	return fmt.Sprintf("%v", value)
+}
+
+func isEqual(a, b any) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil {
+		return false
+	}
+	return a == b
 }
 
 func (in *Interpreter) Interpret(expr expression.Expr) error {
