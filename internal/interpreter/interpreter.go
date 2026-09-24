@@ -131,6 +131,8 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 		return leftNum <= rightNum, nil
 	case token.EQUAL_EQUAL:
 		return isEqual(left, right), nil
+	case token.BANG_EQUAL:
+		return !isEqual(left, right), nil
 	default:
 		return nil, errors.NewLoxError(expr.Operator.Line, fmt.Sprintf("unknown binary operator: %s", expr.Operator.Lexeme))
 	}

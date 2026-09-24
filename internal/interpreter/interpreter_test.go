@@ -1456,3 +1456,137 @@ func TestEvaluateBinaryEqualEqual(t *testing.T) {
 		assertValue(t, val, false)
 	})
 }
+
+func TestEvaluateBinaryBangEqual(t *testing.T) {
+	in := setUpInterpreter(t)
+
+	t.Run("Bang equal numbers when false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(42.0),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(42.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Bang equal numbers when true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(42.0),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(10.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Bang equal negative numbers", func(t *testing.T) {
+		exprEqual := expression.NewBinary(
+			expression.NewLiteral(-10.0),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(-10.0),
+		)
+		val, err := in.Evaluate(exprEqual)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+
+		exprDiff := expression.NewBinary(
+			expression.NewLiteral(-10.0),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(-5.0),
+		)
+		val, err = in.Evaluate(exprDiff)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Bang equal strings when false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("hello"),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral("hello"),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Bang equal strings when true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral("hello"),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral("world"),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Bang equal booleans when false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(true),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Bang equal booleans when true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(false),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Bang equal nil with nil produces false", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(nil),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, false)
+	})
+
+	t.Run("Bang equal nil with non-nil produces true", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(0.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Bang equal with different types produces true without error", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(42.0),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral("42.0"),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+
+	t.Run("Bang equal boolean and number produces true without error", func(t *testing.T) {
+		expr := expression.NewBinary(
+			expression.NewLiteral(true),
+			*token.NewToken(token.BANG_EQUAL, "!=", nil, 1),
+			expression.NewLiteral(1.0),
+		)
+		val, err := in.Evaluate(expr)
+		assertNoError(t, err)
+		assertValue(t, val, true)
+	})
+}
