@@ -237,6 +237,32 @@ func TestIsEqual(t *testing.T) {
 	})
 }
 
+func TestCheckNumberOperands(t *testing.T) {
+	op := *token.NewToken(token.PLUS, "+", nil, 1)
+
+	t.Run("Both operands are numbers", func(t *testing.T) {
+		left, right, err := checkNumberOperands(op, 10.0, 20.0)
+		assertNoError(t, err)
+		assertValue(t, left, 10.0)
+		assertValue(t, right, 20.0)
+	})
+
+	t.Run("Left operand is not a number", func(t *testing.T) {
+		_, _, err := checkNumberOperands(op, "not a number", 20.0)
+		assertError(t, err)
+	})
+
+	t.Run("Right operand is not a number", func(t *testing.T) {
+		_, _, err := checkNumberOperands(op, 10.0, "not a number")
+		assertError(t, err)
+	})
+
+	t.Run("Neither operand is a number", func(t *testing.T) {
+		_, _, err := checkNumberOperands(op, "a", "b")
+		assertError(t, err)
+	})
+}
+
 func TestEvaluateUnaryMinus(t *testing.T) {
 	in := setUpInterpreter(t)
 

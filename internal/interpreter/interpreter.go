@@ -74,59 +74,51 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 		}
 		return nil, errors.NewLoxError(expr.Operator.Line, "operands must be two numbers or two strings")
 	case token.MINUS:
-		leftNum, okLeft := left.(float64)
-		rightNum, okRight := right.(float64)
-		if !okLeft || !okRight {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		if err != nil {
+			return nil, err
 		}
 		return leftNum - rightNum, nil
 	case token.STAR:
-		leftNum, okLeft := left.(float64)
-		rightNum, okRight := right.(float64)
-		if !okLeft || !okRight {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		if err != nil {
+			return nil, err
 		}
 		return leftNum * rightNum, nil
 	case token.SLASH:
-		leftNum, okLeft := left.(float64)
-		rightNum, okRight := right.(float64)
-		if !okLeft || !okRight {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		if err != nil {
+			return nil, err
 		}
 		return leftNum / rightNum, nil
 	case token.PERCENT:
-		leftNum, okLeft := left.(float64)
-		rightNum, okRight := right.(float64)
-		if !okLeft || !okRight {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		if err != nil {
+			return nil, err
 		}
 		return math.Mod(leftNum, rightNum), nil
 	case token.GREATER:
-		leftNum, okLeft := left.(float64)
-		rightNum, okRight := right.(float64)
-		if !okLeft || !okRight {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		if err != nil {
+			return nil, err
 		}
 		return leftNum > rightNum, nil
 	case token.GREATER_EQUAL:
-		leftNum, okLeft := left.(float64)
-		rightNum, okRight := right.(float64)
-		if !okLeft || !okRight {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		if err != nil {
+			return nil, err
 		}
 		return leftNum >= rightNum, nil
 	case token.LESS:
-		leftNum, okLeft := left.(float64)
-		rightNum, okRight := right.(float64)
-		if !okLeft || !okRight {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		if err != nil {
+			return nil, err
 		}
 		return leftNum < rightNum, nil
 	case token.LESS_EQUAL:
-		leftNum, okLeft := left.(float64)
-		rightNum, okRight := right.(float64)
-		if !okLeft || !okRight {
-			return nil, errors.NewLoxError(expr.Operator.Line, "operands must be numbers")
+		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		if err != nil {
+			return nil, err
 		}
 		return leftNum <= rightNum, nil
 	case token.EQUAL_EQUAL:
@@ -163,6 +155,15 @@ func isEqual(a, b any) bool {
 		return false
 	}
 	return a == b
+}
+
+func checkNumberOperands(operator token.Token, left, right any) (float64, float64, error) {
+	leftNum, okLeft := left.(float64)
+	rightNum, okRight := right.(float64)
+	if !okLeft || !okRight {
+		return 0, 0, errors.NewLoxError(operator.Line, "operands must be numbers")
+	}
+	return leftNum, rightNum, nil
 }
 
 func (in *Interpreter) Interpret(expr expression.Expr) error {
