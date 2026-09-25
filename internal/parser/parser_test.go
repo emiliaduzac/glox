@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"strings"
 	"testing"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
@@ -9,9 +10,11 @@ import (
 
 // HELPERS
 
+var printToken = *token.NewToken(token.PRINT, "print", nil, 1)
+var semicolonToken = *token.NewToken(token.SEMICOLON, ";", nil, 1)
+
 func setUpParser(t *testing.T, tokens []token.Token) []statements.Stmt {
 	t.Helper()
-	tokens = append(tokens, *token.NewToken(token.SEMICOLON, ";", nil, 1))
 	tokens = append(tokens, *token.NewToken(token.EOF, "", nil, 1))
 	s := NewParser(tokens)
 	stmts, err := s.Parse()
@@ -21,16 +24,17 @@ func setUpParser(t *testing.T, tokens []token.Token) []statements.Stmt {
 	return stmts
 }
 
-func setUpParserExpectError(t *testing.T, tokens []token.Token) error {
+func setUpParserExpectError(t *testing.T, tokens []token.Token, expectedErrorContent string) {
 	t.Helper()
-	tokens = append(tokens, *token.NewToken(token.SEMICOLON, ";", nil, 1))
 	tokens = append(tokens, *token.NewToken(token.EOF, "", nil, 1))
 	s := NewParser(tokens)
 	_, err := s.Parse()
 	if err == nil {
 		t.Fatalf("expected an error, got none")
 	}
-	return err
+	if !strings.Contains(err.Error(), expectedErrorContent) {
+		t.Errorf("expected error to contain %q, got %q", expectedErrorContent, err.Error())
+	}
 }
 
 func assertExpressionStatement(t *testing.T, stmts []statements.Stmt) expression.Expr {
@@ -55,7 +59,7 @@ func assertPrintStatement(t *testing.T, stmts []statements.Stmt) expression.Expr
 	}
 	stmtExpr, ok := stmts[0].(*statements.PrintStmt)
 	if !ok {
-		t.Fatalf("expected an PrintStmt, got %T", stmts[0])
+		t.Fatalf("expected a PrintStmt, got %T", stmts[0])
 	}
 	if stmtExpr.Expr == nil {
 		t.Fatalf("expected a non nil expression in PrintStmt")
@@ -125,10 +129,20 @@ func TestParseLiterals(t *testing.T) {
 		{"nil", token.NewToken(token.NIL, "nil", nil, 1), nil},
 	}
 
+	// Como expression statements
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			stmts := setUpParser(t, []token.Token{*test.token})
+		t.Run(test.name+"_expr", func(t *testing.T) {
+			stmts := setUpParser(t, []token.Token{*test.token, semicolonToken})
 			expr := assertExpressionStatement(t, stmts)
+			assertLiteral(t, expr, test.expected)
+		})
+	}
+
+	// Como print statements
+	for _, test := range tests {
+		t.Run(test.name+"_prt", func(t *testing.T) {
+			stmts := setUpParser(t, []token.Token{printToken, *test.token, semicolonToken})
+			expr := assertPrintStatement(t, stmts)
 			assertLiteral(t, expr, test.expected)
 		})
 	}
@@ -155,10 +169,23 @@ func TestParseUnary(t *testing.T) {
 		},
 	}
 
+	// Como expression statements
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			stmts := setUpParser(t, test.tokens)
+		t.Run(test.name+"_expr", func(t *testing.T) {
+			tokens := append(test.tokens, semicolonToken)
+			stmts := setUpParser(t, tokens)
 			expr := assertExpressionStatement(t, stmts)
+			assertUnary(t, expr, test.operator, test.expected)
+		})
+	}
+
+	// Como print statements
+	for _, test := range tests {
+		t.Run(test.name+"_prt", func(t *testing.T) {
+			tokens := append([]token.Token{printToken}, test.tokens...)
+			tokens = append(tokens, semicolonToken)
+			stmts := setUpParser(t, tokens)
+			expr := assertPrintStatement(t, stmts)
 			assertUnary(t, expr, test.operator, test.expected)
 		})
 	}
@@ -251,10 +278,23 @@ func TestParseBinary(t *testing.T) {
 		},
 	}
 
+	// Como expression statements
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			stmts := setUpParser(t, test.tokens)
+		t.Run(test.name+"_expr", func(t *testing.T) {
+			tokens := append(test.tokens, semicolonToken)
+			stmts := setUpParser(t, tokens)
 			expr := assertExpressionStatement(t, stmts)
+			assertBinary(t, expr, test.operator, test.left, test.right)
+		})
+	}
+
+	// Como print statements
+	for _, test := range tests {
+		t.Run(test.name+"_prt", func(t *testing.T) {
+			tokens := append([]token.Token{printToken}, test.tokens...)
+			tokens = append(tokens, semicolonToken)
+			stmts := setUpParser(t, tokens)
+			expr := assertPrintStatement(t, stmts)
 			assertBinary(t, expr, test.operator, test.left, test.right)
 		})
 	}
@@ -265,15 +305,30 @@ func TestParseGrouping(t *testing.T) {
 		*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
 		*token.NewToken(token.NUMBER, "123", 123.0, 1),
 		*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+		semicolonToken,
 	}
 
-	stmts := setUpParser(t, tokens)
-	expr := assertExpressionStatement(t, stmts)
-	grouping, ok := expr.(*expression.Grouping)
-	if !ok {
-		t.Fatalf("expected a Grouping expression, got %T", expr)
-	}
-	assertLiteral(t, grouping.Expr, 123.0)
+	// Como expression statements
+	t.Run("grouping_expr", func(t *testing.T) {
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		grouping, ok := expr.(*expression.Grouping)
+		if !ok {
+			t.Fatalf("expected a Grouping expression, got %T", expr)
+		}
+		assertLiteral(t, grouping.Expr, 123.0)
+	})
+
+	// Como print statements
+	t.Run("grouping_prt", func(t *testing.T) {
+		stmts := setUpParser(t, append([]token.Token{printToken}, tokens...))
+		expr := assertPrintStatement(t, stmts)
+		grouping, ok := expr.(*expression.Grouping)
+		if !ok {
+			t.Fatalf("expected a Grouping expression, got %T", expr)
+		}
+		assertLiteral(t, grouping.Expr, 123.0)
+	})
 }
 
 // TESTS -- Casos de asociatividad y precedencia de operadores
@@ -294,6 +349,7 @@ func TestPrecedenceEquality(t *testing.T) {
 				*token.NewToken(token.NUMBER, "3", 3.0, 1),
 				*token.NewToken(token.LESS, "<", nil, 1),
 				*token.NewToken(token.NUMBER, "4", 4.0, 1),
+				semicolonToken,
 			},
 			"((<1> LESS <2>) EQUAL_EQUAL (<3> LESS <4>))",
 		},
@@ -305,11 +361,13 @@ func TestPrecedenceEquality(t *testing.T) {
 				*token.NewToken(token.NUMBER, "2", 2.0, 1),
 				*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
 				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
 			},
 			"((<1> EQUAL_EQUAL <2>) EQUAL_EQUAL <3>)",
 		},
 	}
 
+	// Como expression statements
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
@@ -335,6 +393,7 @@ func TestPrecedenceComparison(t *testing.T) {
 				*token.NewToken(token.NUMBER, "3", 3.0, 1),
 				*token.NewToken(token.PLUS, "+", nil, 1),
 				*token.NewToken(token.NUMBER, "4", 4.0, 1),
+				semicolonToken,
 			},
 			"((<1> PLUS <2>) LESS (<3> PLUS <4>))",
 		},
@@ -346,11 +405,13 @@ func TestPrecedenceComparison(t *testing.T) {
 				*token.NewToken(token.NUMBER, "2", 2.0, 1),
 				*token.NewToken(token.LESS, "<", nil, 1),
 				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
 			},
 			"((<1> LESS <2>) LESS <3>)",
 		},
 	}
 
+	// Como expression statements
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
@@ -374,6 +435,7 @@ func TestPrecedenceTerm(t *testing.T) {
 				*token.NewToken(token.NUMBER, "2", 2.0, 1),
 				*token.NewToken(token.STAR, "*", nil, 1),
 				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
 			},
 			"(<1> PLUS (<2> STAR <3>))",
 		},
@@ -385,11 +447,13 @@ func TestPrecedenceTerm(t *testing.T) {
 				*token.NewToken(token.NUMBER, "2", 2.0, 1),
 				*token.NewToken(token.MINUS, "-", nil, 1),
 				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
 			},
 			"((<1> MINUS <2>) MINUS <3>)",
 		},
 	}
 
+	// Como expression statements
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
@@ -412,6 +476,7 @@ func TestPrecedenceFactor(t *testing.T) {
 				*token.NewToken(token.NUMBER, "1", 1.0, 1),
 				*token.NewToken(token.STAR, "*", nil, 1),
 				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				semicolonToken,
 			},
 			"((MINUS <1>) STAR <2>)",
 		},
@@ -423,11 +488,13 @@ func TestPrecedenceFactor(t *testing.T) {
 				*token.NewToken(token.NUMBER, "2", 2.0, 1),
 				*token.NewToken(token.SLASH, "/", nil, 1),
 				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
 			},
 			"((<1> STAR <2>) SLASH <3>)",
 		},
 	}
 
+	// Como expression statements
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
@@ -453,11 +520,13 @@ func TestPrecedenceGrouping(t *testing.T) {
 				*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
 				*token.NewToken(token.STAR, "*", nil, 1),
 				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
 			},
 			"((group (<1> PLUS <2>)) STAR <3>)",
 		},
 	}
 
+	// Como expression statements
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
@@ -471,34 +540,74 @@ func TestPrecedenceGrouping(t *testing.T) {
 
 func TestParseErrors(t *testing.T) {
 	tests := []struct {
-		name   string
-		tokens []token.Token
+		name                 string
+		tokens               []token.Token
+		expectedErrorContent string
 	}{
 		{
 			"parentesis sin cerrar (expresion incompleta)",
 			[]token.Token{
 				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
 				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				semicolonToken,
 			},
+			"expected ')'",
 		},
 		{
 			"token inesperado",
 			[]token.Token{
 				*token.NewToken(token.PLUS, "+", nil, 1),
+				semicolonToken,
 			},
+			"expected expression, got `+`",
 		},
 		{
 			"falta operando derecho (expresion incompleta)",
 			[]token.Token{
 				*token.NewToken(token.NUMBER, "1", 1.0, 1),
 				*token.NewToken(token.PLUS, "+", nil, 1),
+				semicolonToken,
 			},
+			"expected expression, got `;`",
+		},
+		{
+			"print sin ';'",
+			[]token.Token{
+				printToken,
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			},
+			"expected ';' after statement",
+		},
+		{
+			"expression statement sin ';'",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			},
+			"expected ';' after statement",
+		},
+		{
+			"print sin expresion",
+			[]token.Token{
+				printToken,
+				semicolonToken,
+			},
+			"expected expression, got `;`",
+		},
+		{
+			"print de print",
+			[]token.Token{
+				printToken,
+				printToken,
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				semicolonToken,
+			},
+			"expected expression, got `print`",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_ = setUpParserExpectError(t, test.tokens)
+			setUpParserExpectError(t, test.tokens, test.expectedErrorContent)
 		})
 	}
 }
