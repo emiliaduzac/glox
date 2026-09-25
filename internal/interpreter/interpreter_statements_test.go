@@ -44,6 +44,27 @@ func TestExecuteExpressionStatement(t *testing.T) {
 	})
 }
 
+func TestExecutePrintStatement(t *testing.T) {
+	in := SetUpInterpreter(t)
+
+	t.Run("Print a string literal", func(t *testing.T) {
+		stmt := statements.NewPrintStmt(expression.NewLiteral("Hello"))
+		out := CaptureOutput(t, func() {
+			AssertNoError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "Hello\n")
+	})
+
+	t.Run("Print a binary expression", func(t *testing.T) {
+		op := *token.NewToken(token.PLUS, "+", nil, 1)
+		stmt := statements.NewPrintStmt(expression.NewBinary(expression.NewLiteral(1.0), op, expression.NewLiteral(2.0)))
+		out := CaptureOutput(t, func() {
+			AssertNoError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "3\n")
+	})
+}
+
 func TestExecutePrintStatementErrors(t *testing.T) {
 	in := SetUpInterpreter(t)
 
