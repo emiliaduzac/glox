@@ -5,6 +5,7 @@ import (
 	"math"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
+	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
 )
 
@@ -14,6 +15,42 @@ func NewInterpreter() *Interpreter {
 	return &Interpreter{}
 }
 
+func (in *Interpreter) Interpret([]statements.Stmt) error {
+	for _, stmt := range []statements.Stmt{} {
+		val, err := in.Execute(stmt)
+		if err != nil {
+			return err
+		}
+		fmt.Println(Stringify(val))
+	}
+
+	return nil
+}
+
+// execute ejecuta una sentencia y devuelve su valor.
+func (in *Interpreter) Execute(stmt statements.Stmt) (any, error) {
+	switch s := stmt.(type) {
+	case *statements.PrintStmt:
+		val, err := in.Evaluate(s.Expr)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println(Stringify(val))
+		return val, nil
+
+	case *statements.ExpressionStmt:
+		val, err := in.Evaluate(s.Expr)
+		if err != nil {
+			return nil, err
+		}
+		return val, nil
+
+	default:
+		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
+	}
+}
+
+// Evaluate evalúa una expresión y devuelve su valor.
 func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 	switch e := expr.(type) {
 	case *expression.Literal:
@@ -172,13 +209,4 @@ func checkNumberOperands(operator token.Token, left, right any) (float64, float6
 		return 0, 0, errors.NewLoxError(operator.Line, "operands must be numbers")
 	}
 	return leftNum, rightNum, nil
-}
-
-func (in *Interpreter) Interpret(expr expression.Expr) error {
-	val, err := in.Evaluate(expr)
-	if err != nil {
-		return err
-	}
-	fmt.Println(Stringify(val))
-	return nil
 }

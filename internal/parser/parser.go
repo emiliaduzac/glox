@@ -68,7 +68,7 @@ func (p *Parser) expressionStatement() (statements.Stmt, error) {
 func (p *Parser) getStatement() (expression.Expr, error) {
 	expr, err := p.expression()
 	if err != nil {
-		return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("error parsing expression: %v", err))
+		return nil, err
 	}
 	if !p.isInTokenTypes(token.SEMICOLON) {
 		return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected ';' after value, got `%s` instead", p.getCurrent().Lexeme))
