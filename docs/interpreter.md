@@ -1,6 +1,6 @@
 ## Interpreter
 
-El interpreter tiene la responsabilidad de recorrer el **AST** generado por el parser. La idea es que evalúe las expresiones de forma recursiva. Según el libro se espera que lo haga en un **recorrido post-order**, es decir primero los hijos para luego operar sobre los resultados de estos.
+El interpreter tiene la responsabilidad de recorrer el **AST** generado por el parser. La idea es que evalúe las expresiones de los statements de forma recursiva. Según el libro se espera que lo haga en un **recorrido post-order**, es decir primero los hijos para luego operar sobre los resultados de estos.
 
 ### Mapeo de tipos en Glox
 
@@ -33,9 +33,17 @@ Acá es que también debemos manejar "a mano" el caso `default` y estar atentos 
 
 Si por ejemplo llega un `true < false`, no se crashea con `panic`, sino que se retorna un error con el número de línea informativo. 
 
+### Statements
+
+Una vez incorporados los statements, el interpreter ya no solo se encarga de evaluar expresiones, sino también ejecutar sentencias.
+
+El interpreter pasa a recibir una lista de sentencias y ejecutarlas una por una. Esto puede o no producir un efecto secundario, pero a diferencia de una expresión, **no produce un valor**, por eso `Execute` devuelve solo un `error`. 
+Por ejemplo en los `print statements` se evalúa la expresión y se imprime su resultado, mientras que en las `var statements` se almacenará el resultado en memoria, etc.
+
 ### Tests
 
-Quisimos dejar plasmado comportamiento en test de las diferentes expresiones, y los casos de cada una de ellas.
+Quisimos dejar plasmado comportamiento en test de las diferentes expresiones y sentencias, y los casos de cada una de ellas. Hay archivos de test separados para que sea más fácil leerlos, y también para seguir la línea de implementación. 
+Para correr todos los tests del interpreter:
 
 ```bash
 go test ./internal/interpreter

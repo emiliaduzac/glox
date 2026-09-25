@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"tp-lox/internal/expression"
 	"tp-lox/internal/interpreter"
 	"tp-lox/internal/parser"
 	"tp-lox/internal/scanner"
+	"tp-lox/internal/statements"
 )
 
 type Lox struct {
@@ -82,18 +82,20 @@ func (l *Lox) run(source string) error {
 	}
 
 	parser := parser.NewParser(tokens)
-	expr, err := parser.Parse()
+	stmts, err := parser.Parse()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return err
 	}
 
 	if l.mode == ParsingMode {
-		fmt.Println(expression.String(expr))
+		for _, stmt := range stmts {
+			fmt.Println(statements.String(stmt))
+		}
 		return nil
 	}
 
-	err = l.interpreter.Interpret(expr)
+	err = l.interpreter.Interpret(stmts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return err
