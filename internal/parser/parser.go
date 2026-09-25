@@ -22,15 +22,15 @@ func NewParser(tokens []token.Token) *Parser {
 }
 
 func (p *Parser) Parse() ([]statements.Stmt, error) {
-	statements := []statements.Stmt{}
+	stmts := []statements.Stmt{}
 	for !p.isAtEnd() {
 		stmt, err := p.statement()
 		if err != nil {
 			return nil, err
 		}
-		statements = append(statements, stmt)
+		stmts = append(stmts, stmt)
 	}
-	return statements, nil
+	return stmts, nil
 }
 
 func (p *Parser) statement() (statements.Stmt, error) {
@@ -71,7 +71,10 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 		return nil, err
 	}
 	if !p.isInTokenTypes(token.SEMICOLON) {
-		return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected ';' after value, got `%s` instead", p.getCurrent().Lexeme))
+		if p.isTokenType(token.EOF) {
+			return nil, errors.NewLoxError(p.getCurrent().Line, "expected ';' after statement, got EOF instead")
+		}
+		return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected ';' after statement, got `%s` instead", p.getCurrent().Lexeme))
 	}
 	return expr, nil
 }

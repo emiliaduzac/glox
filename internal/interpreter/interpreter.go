@@ -15,38 +15,37 @@ func NewInterpreter() *Interpreter {
 	return &Interpreter{}
 }
 
-func (in *Interpreter) Interpret([]statements.Stmt) error {
-	for _, stmt := range []statements.Stmt{} {
-		val, err := in.Execute(stmt)
+func (in *Interpreter) Interpret(stmts []statements.Stmt) error {
+	for _, stmt := range stmts {
+		err := in.Execute(stmt)
 		if err != nil {
 			return err
 		}
-		fmt.Println(Stringify(val))
 	}
 
 	return nil
 }
 
-// execute ejecuta una sentencia y devuelve su valor.
-func (in *Interpreter) Execute(stmt statements.Stmt) (any, error) {
+// Execute ejecuta una sentencia.
+func (in *Interpreter) Execute(stmt statements.Stmt) error {
 	switch s := stmt.(type) {
 	case *statements.PrintStmt:
 		val, err := in.Evaluate(s.Expr)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		fmt.Println(Stringify(val))
-		return val, nil
+		return nil
 
 	case *statements.ExpressionStmt:
-		val, err := in.Evaluate(s.Expr)
+		_, err := in.Evaluate(s.Expr)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return val, nil
+		return nil
 
 	default:
-		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
+		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}
 }
 
