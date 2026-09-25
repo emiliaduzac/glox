@@ -104,7 +104,6 @@ type PrintStmt struct {
 	Expr expression.Expr
 }
 func (p *PrintStmt) Statement() {}
-
 ```
 
 - **Print Statements**: evalúa una expresión y muestra su resultado por pantalla. Solo puede recibir expresiones, no otros statements.
@@ -126,3 +125,7 @@ factor      → unary ( ( "/" | "*" | "%" ) unary )* ;
 unary       → ( "!" | "-" ) unary | primary ;
 primary     → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
 ```
+
+#### Manejo de errores
+
+Al incorporar statements surge un nuevo error: toda sentencia debe terminar en `;`. Si falta, el parser lanza un error indicando qué encontró en su lugar.
