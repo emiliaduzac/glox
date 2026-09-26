@@ -106,3 +106,50 @@ func TestInterpret(t *testing.T) {
 		AssertError(t, err)
 	})
 }
+
+func TestExecuteVarStatement(t *testing.T) {
+	in := SetUpInterpreter(t)
+
+	t.Run("Declare variable with initializer", func(t *testing.T) {
+		token := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+		stmt := statements.NewVarStmt(token, expression.NewLiteral(18.0))
+		AssertNoError(t, in.Execute(stmt))
+		val, err := in.Evaluate(expression.NewVariable(token))
+		AssertNoError(t, err)
+		AssertValue(t, val, 18.0)
+	})
+
+	t.Run("Declare variable witout initializer defaults to nil", func(t *testing.T) {
+		token := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+		stmt := statements.NewVarStmt(token, nil)
+		AssertNoError(t, in.Execute(stmt))
+		val, err := in.Evaluate(expression.NewVariable(token))
+		AssertNoError(t, err)
+		AssertValue(t, val, nil)
+	})
+
+	t.Run("Redeclare variable with different type", func(t *testing.T) {
+		token := *token.NewToken(token.IDENTIFIER, "a", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(token, expression.NewLiteral(10.0))))
+		AssertNoError(t, in.Execute(statements.NewVarStmt(token, expression.NewLiteral("Hello"))))
+
+		val, err := in.Evaluate(expression.NewVariable(token))
+		AssertNoError(t, err)
+		AssertValue(t, val, "Hello")
+	})
+
+	t.Run("Error when initializer expression is invalid", func(t *testing.T) {
+		token := *token.NewToken(token.IDENTIFIER, "invalid", nil, 1)
+		stmt := statements.NewVarStmt(token, invalidExpr())
+
+		AssertError(t, in.Execute(stmt))
+		_, err := in.Evaluate(expression.NewVariable(token))
+		AssertError(t, err)
+	})
+
+	t.Run("Error when evaluating undeclared variable", func(t *testing.T) {
+		token := *token.NewToken(token.IDENTIFIER, "undeclared", nil, 1)
+		_, err := in.Evaluate(expression.NewVariable(token))
+		AssertError(t, err)
+	})
+}
