@@ -2,15 +2,14 @@ package statements
 
 import (
 	"fmt"
-	"go/token"
 	"tp-lox/internal/expression"
+	"tp-lox/internal/token"
 )
 
 type Stmt interface {
 	Statement()
 }
 
-// Expression Statements
 type ExpressionStmt struct {
 	Expr expression.Expr
 }
@@ -23,7 +22,6 @@ func NewExpressionStmt(expr expression.Expr) *ExpressionStmt {
 
 func (e *ExpressionStmt) Statement() {}
 
-// Print Statements
 type PrintStmt struct {
 	Expr expression.Expr
 }
@@ -36,18 +34,19 @@ func NewPrintStmt(expr expression.Expr) *PrintStmt {
 
 func (p *PrintStmt) Statement() {}
 
-type VariableStmt struct {
+type VarStmt struct {
 	Name        token.Token
 	Initializer expression.Expr
 }
 
-func NewVariableStmt(expr expression.Expr) *VariableStmt {
-	return &VariableStmt{
+func NewVarStmt(name token.Token, expr expression.Expr) *VarStmt {
+	return &VarStmt{
+		Name:        name,
 		Initializer: expr,
 	}
 }
 
-func (p *VariableStmt) Statement() {}
+func (p *VarStmt) Statement() {}
 
 func String(s Stmt) string {
 	switch s := s.(type) {
@@ -55,6 +54,11 @@ func String(s Stmt) string {
 		return fmt.Sprintf("(print %s)", expression.String(s.Expr))
 	case *ExpressionStmt:
 		return fmt.Sprintf("(expr %s)", expression.String(s.Expr))
+	case *VarStmt:
+		if s.Initializer == nil {
+			return fmt.Sprintf("(var %s)", s.Name.String())
+		}
+		return fmt.Sprintf("(var %s %s)", s.Name.String(), expression.String(s.Initializer))
 	}
 	return fmt.Sprintf("unknown statement: %T", s)
 }

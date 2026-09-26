@@ -24,13 +24,28 @@ func NewParser(tokens []token.Token) *Parser {
 func (p *Parser) Parse() ([]statements.Stmt, error) {
 	stmts := []statements.Stmt{}
 	for !p.isAtEnd() {
-		stmt, err := p.statement()
+		stmt, err := p.declaration()
 		if err != nil {
 			return nil, err
 		}
 		stmts = append(stmts, stmt)
 	}
 	return stmts, nil
+}
+
+func (p *Parser) declaration() (statements.Stmt, error) {
+	if p.isInTokenTypes(token.VAR) {
+		stmt, err := p.varDeclaration()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	}
+	stmt, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+	return stmt, nil
 }
 
 func (p *Parser) statement() (statements.Stmt, error) {
@@ -65,6 +80,34 @@ func (p *Parser) expressionStatement() (statements.Stmt, error) {
 	return statements.NewExpressionStmt(expr), nil
 }
 
+func (p *Parser) varDeclaration() (statements.Stmt, error) {
+	if !p.isInTokenTypes(token.IDENTIFIER) {
+		return nil, errors.NewLoxError(p.getLine(), fmt.Sprintf("expected identifier after 'var', got `%s` instead", p.getLexeme()))
+	}
+
+	varName := p.getPrevious()
+
+	var initializer expression.Expr
+	if p.isInTokenTypes(token.EQUAL) {
+		var err error
+		initializer, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		initializer = nil
+	}
+
+	if !p.isInTokenTypes(token.SEMICOLON) {
+		if p.isTokenType(token.EOF) {
+			return nil, errors.NewLoxError(p.getLine(), "expected ';' after variable declaration, got EOF instead")
+		}
+		return nil, errors.NewLoxError(p.getLine(), fmt.Sprintf("expected ';' after variable declaration, got `%s` instead", p.getLexeme()))
+	}
+
+	return statements.NewVarStmt(varName, initializer), nil
+}
+
 func (p *Parser) getStatement() (expression.Expr, error) {
 	expr, err := p.expression()
 	if err != nil {
@@ -72,9 +115,9 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 	}
 	if !p.isInTokenTypes(token.SEMICOLON) {
 		if p.isTokenType(token.EOF) {
-			return nil, errors.NewLoxError(p.getCurrent().Line, "expected ';' after statement, got EOF instead")
+			return nil, errors.NewLoxError(p.getLine(), "expected ';' after statement, got EOF instead")
 		}
-		return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected ';' after statement, got `%s` instead", p.getCurrent().Lexeme))
+		return nil, errors.NewLoxError(p.getLine(), fmt.Sprintf("expected ';' after statement, got `%s` instead", p.getLexeme()))
 	}
 	return expr, nil
 }
@@ -181,24 +224,30 @@ func (p *Parser) primary() (expression.Expr, error) {
 	if p.isInTokenTypes(token.NIL) {
 		return expression.NewLiteral(nil), nil
 	}
+
 	if p.isInTokenTypes(token.NUMBER, token.STRING) {
 		return expression.NewLiteral(p.getPrevious().Literal), nil
 	}
+
 	if p.isInTokenTypes(token.LEFT_PAREN) {
 		expr, err := p.expression()
 		if err != nil {
 			return nil, err
 		}
 		if !p.isInTokenTypes(token.RIGHT_PAREN) {
-			return nil, errors.NewLoxError(p.getCurrent().Line, "expected ')' after expression")
+			return nil, errors.NewLoxError(p.getLine(), "expected ')' after expression")
 		}
 		return expression.NewGrouping(expr), nil
 	}
 
-	if p.isTokenType(token.EOF) {
-		return nil, errors.NewLoxError(p.getCurrent().Line, "expected expression, got EOF instead")
+	if p.isInTokenTypes(token.IDENTIFIER) {
+		return expression.NewVariable(p.getPrevious()), nil
 	}
-	return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected expression, got `%s` instead", p.getCurrent().Lexeme))
+
+	if p.isTokenType(token.EOF) {
+		return nil, errors.NewLoxError(p.getLine(), "expected expression, got EOF instead")
+	}
+	return nil, errors.NewLoxError(p.getLine(), fmt.Sprintf("expected expression, got `%s` instead", p.getLexeme()))
 }
 
 // isAtEnd indica si el token actual es el último.
@@ -228,6 +277,14 @@ func (p *Parser) getCurrent() token.Token {
 
 func (p *Parser) getPrevious() token.Token {
 	return p.tokens[p.current-1]
+}
+
+func (p *Parser) getLine() int {
+	return p.getCurrent().Line
+}
+
+func (p *Parser) getLexeme() string {
+	return p.getCurrent().Lexeme
 }
 
 // advance avanza al siguiente token y devuelve el token consumido

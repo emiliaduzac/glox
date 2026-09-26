@@ -101,6 +101,8 @@ func String(expr Expr) string {
 		return fmt.Sprintf("(%s %s %s)", String(e.Left), e.Operator.TokenType, String(e.Right))
 	case *Grouping:
 		return fmt.Sprintf("(group %s)", String(e.Expr))
+	case *Variable:
+		return fmt.Sprintf("<%s>", e.Name.Lexeme)
 	default:
 		return ""
 	}
