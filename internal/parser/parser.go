@@ -82,7 +82,7 @@ func (p *Parser) expressionStatement() (statements.Stmt, error) {
 
 func (p *Parser) varDeclaration() (statements.Stmt, error) {
 	if !p.isInTokenTypes(token.IDENTIFIER) {
-		return nil, errors.NewLoxError(p.getLine(), fmt.Sprintf("expected identifier after 'var', got `%s` instead", p.getLexeme()))
+		return nil, p.expectedError("identifier after 'var'")
 	}
 
 	varName := p.getPrevious()
@@ -99,10 +99,7 @@ func (p *Parser) varDeclaration() (statements.Stmt, error) {
 	}
 
 	if !p.isInTokenTypes(token.SEMICOLON) {
-		if p.isTokenType(token.EOF) {
-			return nil, errors.NewLoxError(p.getLine(), "expected ';' after variable declaration, got EOF instead")
-		}
-		return nil, errors.NewLoxError(p.getLine(), fmt.Sprintf("expected ';' after variable declaration, got `%s` instead", p.getLexeme()))
+		return nil, p.expectedError("';' after variable declaration")
 	}
 
 	return statements.NewVarStmt(varName, initializer), nil
@@ -114,10 +111,7 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 		return nil, err
 	}
 	if !p.isInTokenTypes(token.SEMICOLON) {
-		if p.isTokenType(token.EOF) {
-			return nil, errors.NewLoxError(p.getLine(), "expected ';' after statement, got EOF instead")
-		}
-		return nil, errors.NewLoxError(p.getLine(), fmt.Sprintf("expected ';' after statement, got `%s` instead", p.getLexeme()))
+		return nil, p.expectedError("';' after statement")
 	}
 	return expr, nil
 }
@@ -244,10 +238,7 @@ func (p *Parser) primary() (expression.Expr, error) {
 		return expression.NewVariable(p.getPrevious()), nil
 	}
 
-	if p.isTokenType(token.EOF) {
-		return nil, errors.NewLoxError(p.getLine(), "expected expression, got EOF instead")
-	}
-	return nil, errors.NewLoxError(p.getLine(), fmt.Sprintf("expected expression, got `%s` instead", p.getLexeme()))
+	return nil, p.expectedError("expression")
 }
 
 // isAtEnd indica si el token actual es el último.
@@ -285,6 +276,14 @@ func (p *Parser) getLine() int {
 
 func (p *Parser) getLexeme() string {
 	return p.getCurrent().Lexeme
+}
+
+func (p *Parser) expectedError(expected string) error {
+	got := fmt.Sprintf("`%s`", p.getLexeme())
+	if p.isTokenType(token.EOF) {
+		got = "EOF"
+	}
+	return errors.NewLoxError(p.getLine(), fmt.Sprintf("expected %s, got %s instead", expected, got))
 }
 
 // advance avanza al siguiente token y devuelve el token consumido
