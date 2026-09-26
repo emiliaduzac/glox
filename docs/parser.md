@@ -16,7 +16,7 @@ Siguiendo el orden en el que se explican en el libro y en clase, en el parser pr
 
 Las expresiones son maneras de **producir valores**. Sumar, restar, concatenar, etc. El problema es que solo generan un valor, pero **no hacemos nada con él**.
 
-Tenemos 4 expresiones válidas en Lox: **literales**, **unarias**, **binarias** y **grupos** (definidas en [`expression.go`](../internal/expression/expression.go)), y basadas en la definición del [libro](https://craftinginterpreters.com/representing-code.html). Como a su vez, estas pueden estar compuestas de más expresiones, debemos poder soportar la recursividad al definirlas.
+Tenemos varias expresiones válidas en Lox: **literales**, **unarias**, **binarias**, **grupos** y **variables** (definidas en [`expression.go`](../internal/expression/expression.go)), y basadas en la definición que el [libro](https://craftinginterpreters.com/representing-code.html) va dando a medida que avanzan los capitulos (y se incorporan nuevas expresiones). Como a su vez, estas pueden estar compuestas de más expresiones, debemos poder soportar la recursividad al definirlas.
 
 Como Go no tiene clases y herencias, utilizamos la siguiente estratégia:
 
@@ -65,7 +65,7 @@ factor     → unary ( ( "/" | "*" | "%" ) unary )* ;
 
 unary      → ( "!" | "-" ) unary | primary ;
 
-primary    → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+primary    → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
 ```
 
 1. **primary es la de mayor precedencia**: si se cruza con un número, por ejemplo, se resuelve inmediatamente.
@@ -108,12 +108,16 @@ func (p *PrintStmt) Statement() {}
 
 - **Print Statements**: evalúa una expresión y muestra su resultado por pantalla. Solo puede recibir expresiones, no otros statements.
 - **Expression Statements**: expresiones seguidas de `;`. Son expresiones que pueden tener efectos secundarios. Cuando se la llama a la expresión suelta, se evalúa, los efectos secundarios (si los hay) se producen, y el valor resultante se descarta.
+- **Var statements**: declara una variable nueva en el entorno actual, que puede o no tener un valor inicial. Como Expr es una interfaz, nil ya es un valor válido para ese campo, por lo que no necesitamos ningún `Optional` ni similares para poder declarar el valor inicial (ya que Go no tiene `Optionals`).
 
 Se expande nuestra gramática:
 
 ```
-program     → statement* EOF ;
+program     → declaration* EOF ;
+declaration → varDecl | statement ;
 statement   → exprStmt | printStmt ;
+
+varDecl     → "var" IDENTIFIER ( "=" expression )? ";" ;
 exprStmt    → expression ";" ;
 printStmt   → "print" expression ";" ;
 
@@ -123,7 +127,7 @@ comparison  → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term        → factor ( ( "-" | "+" ) factor )* ;
 factor      → unary ( ( "/" | "*" | "%" ) unary )* ;
 unary       → ( "!" | "-" ) unary | primary ;
-primary     → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" ;
+primary     → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
 ```
 
 #### Manejo de errores

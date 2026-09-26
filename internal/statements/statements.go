@@ -2,6 +2,7 @@ package statements
 
 import (
 	"fmt"
+	"go/token"
 	"tp-lox/internal/expression"
 )
 
@@ -34,6 +35,19 @@ func NewPrintStmt(expr expression.Expr) *PrintStmt {
 }
 
 func (p *PrintStmt) Statement() {}
+
+type VariableStmt struct {
+	Name        token.Token
+	Initializer expression.Expr
+}
+
+func NewVariableStmt(expr expression.Expr) *VariableStmt {
+	return &VariableStmt{
+		Initializer: expr,
+	}
+}
+
+func (p *VariableStmt) Statement() {}
 
 func String(s Stmt) string {
 	switch s := s.(type) {
