@@ -153,3 +153,59 @@ func TestExecuteVarStatement(t *testing.T) {
 		AssertError(t, err)
 	})
 }
+
+func TestExecuteBlockStatement(t *testing.T) {
+	t.Run("Empty block executes successfully", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewBlockStmt([]statements.Stmt{})
+		AssertNoError(t, in.Execute(stmt))
+	})
+
+	t.Run("Block local variable is inaccessible outside block", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokLocal := *token.NewToken(token.IDENTIFIER, "localOnly", nil, 1)
+		innerVar := statements.NewVarStmt(tokLocal, expression.NewLiteral(42.0))
+		blockStmt := statements.NewBlockStmt([]statements.Stmt{innerVar})
+
+		AssertNoError(t, in.Execute(blockStmt))
+
+		_, err := in.Evaluate(expression.NewVariable(tokLocal))
+		AssertErrorMessage(t, err, "undefined variable 'localOnly'")
+	})
+
+	t.Run("Block mutates outer variable and persists outside", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokCount := *token.NewToken(token.IDENTIFIER, "count", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tokCount, expression.NewLiteral(1.0))))
+
+		assignStmt := statements.NewExpressionStmt(expression.NewAssign(tokCount, expression.NewLiteral(2.0)))
+		blockStmt := statements.NewBlockStmt([]statements.Stmt{assignStmt})
+
+		AssertNoError(t, in.Execute(blockStmt))
+
+		val, err := in.Evaluate(expression.NewVariable(tokCount))
+		AssertNoError(t, err)
+		AssertValue(t, val, 2.0)
+	})
+
+	t.Run("Runtime error inside block restores previous environment", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokG := *token.NewToken(token.IDENTIFIER, "globalVar", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tokG, expression.NewLiteral("survives"))))
+
+		tokL := *token.NewToken(token.IDENTIFIER, "temp", nil, 1)
+		localStmt := statements.NewVarStmt(tokL, expression.NewLiteral(99.0))
+		failingStmt := statements.NewExpressionStmt(invalidExpr())
+		blockStmt := statements.NewBlockStmt([]statements.Stmt{localStmt, failingStmt})
+
+		err := in.Execute(blockStmt)
+		AssertError(t, err)
+
+		val, err := in.Evaluate(expression.NewVariable(tokG))
+		AssertNoError(t, err)
+		AssertValue(t, val, "survives")
+
+		_, err = in.Evaluate(expression.NewVariable(tokL))
+		AssertErrorMessage(t, err, "undefined variable 'temp'")
+	})
+}

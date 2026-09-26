@@ -59,9 +59,28 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 		}
 		in.environment.Define(s.Name.Lexeme, value)
 		return nil
+	case *statements.BlockStmt:
+		return in.ExecuteBlock(s.Statements, environment.NewEnclosedEnvironment(in.environment))
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}
+}
+
+func (in *Interpreter) ExecuteBlock(stmts []statements.Stmt, env *environment.Environment) error {
+	previous := in.environment
+	in.environment = env
+	defer func() {
+		in.environment = previous
+	}()
+
+	for _, stmt := range stmts {
+		err := in.Execute(stmt)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Evaluate evalúa una expresión y devuelve su valor.
