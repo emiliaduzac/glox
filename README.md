@@ -96,7 +96,7 @@ TBD
 - [X] Interpreter - expressions
 - [X] Parser - statements
 - [X] Interpreter - statements
-- [ ] Estado
+- [X] Estado
 - [ ] Control de flujo
 - [ ] Funciones
 

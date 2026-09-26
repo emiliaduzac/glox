@@ -12,6 +12,7 @@ import (
 
 var printToken = *token.NewToken(token.PRINT, "print", nil, 1)
 var semicolonToken = *token.NewToken(token.SEMICOLON, ";", nil, 1)
+var varToken = *token.NewToken(token.VAR, "var", nil, 1)
 
 func setUpParser(t *testing.T, tokens []token.Token) []statements.Stmt {
 	t.Helper()
@@ -67,6 +68,21 @@ func assertPrintStatement(t *testing.T, stmts []statements.Stmt) expression.Expr
 	return stmtExpr.Expr
 }
 
+func assertVariableStatement(t *testing.T, stmts []statements.Stmt, expectedName string) expression.Expr {
+	t.Helper()
+	if len(stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(stmts))
+	}
+	stmtVar, ok := stmts[0].(*statements.VarStmt)
+	if !ok {
+		t.Fatalf("expected a VariableStmt, got %T", stmts[0])
+	}
+	if stmtVar.Name.Lexeme != expectedName {
+		t.Errorf("expected variable name %q, got %q", expectedName, stmtVar.Name.Lexeme)
+	}
+	return stmtVar.Initializer
+}
+
 func assertLiteral(t *testing.T, expr expression.Expr, expectedValue any) {
 	t.Helper()
 
@@ -110,6 +126,17 @@ func assertString(t *testing.T, expr expression.Expr, expected string) {
 	t.Helper()
 
 	if got := expression.String(expr); got != expected {
+		t.Errorf("expected %q, got %q", expected, got)
+	}
+}
+
+func assertStatementString(t *testing.T, stmts []statements.Stmt, expected string) {
+	t.Helper()
+
+	if len(stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(stmts))
+	}
+	if got := statements.String(stmts[0]); got != expected {
 		t.Errorf("expected %q, got %q", expected, got)
 	}
 }
@@ -331,6 +358,135 @@ func TestParseGrouping(t *testing.T) {
 	})
 }
 
+func TestParseVariables(t *testing.T) {
+	nonInitializedVar := []token.Token{
+		varToken,
+		*token.NewToken(token.IDENTIFIER, "x", nil, 1),
+		semicolonToken,
+	}
+
+	t.Run("non_initialized_var", func(t *testing.T) {
+		stmts := setUpParser(t, nonInitializedVar)
+		expr := assertVariableStatement(t, stmts, "x")
+		if expr != nil {
+			t.Errorf("expected nil initializer, got %v", expr)
+		}
+	})
+
+	initializedVar := []token.Token{
+		varToken,
+		*token.NewToken(token.IDENTIFIER, "x", nil, 1),
+		*token.NewToken(token.EQUAL, "=", nil, 1),
+		*token.NewToken(token.NUMBER, "42", 42.0, 1),
+		semicolonToken,
+	}
+
+	t.Run("initialized_var", func(t *testing.T) {
+		stmts := setUpParser(t, initializedVar)
+		expr := assertVariableStatement(t, stmts, "x")
+		assertLiteral(t, expr, 42.0)
+	})
+}
+
+func TestParseAssignment(t *testing.T) {
+
+	t.Run("Simple assignment", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a <5>)")
+	})
+
+	t.Run("Assignment with binary expression on right", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			*token.NewToken(token.NUMBER, "3", 3.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a (<5> PLUS <3>))")
+	})
+}
+
+func TestParseBlock(t *testing.T) {
+	t.Run("Empty block", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block)")
+	})
+
+	t.Run("Block with statements", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			varToken,
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			semicolonToken,
+			printToken,
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			semicolonToken,
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (var IDENTIFIER<a> <1>) (print <a>))")
+	})
+
+	t.Run("Block with expression statement", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			semicolonToken,
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (expr (<1> PLUS <2>)))")
+	})
+
+	t.Run("Nested blocks", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (block))")
+	})
+
+	t.Run("Deeply nested blocks with declaration", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			varToken,
+			*token.NewToken(token.IDENTIFIER, "x", nil, 1),
+			semicolonToken,
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (block (block (var IDENTIFIER<x>))))")
+	})
+}
+
 // TESTS -- Casos de asociatividad y precedencia de operadores
 
 func TestPrecedenceEquality(t *testing.T) {
@@ -536,6 +692,38 @@ func TestPrecedenceGrouping(t *testing.T) {
 	}
 }
 
+func TestPrecedenceAssignment(t *testing.T) {
+	t.Run("Assignment is right associative", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a (= b <5>))")
+	})
+
+	t.Run("Assignment has lower precedence than equality", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a (<b> EQUAL_EQUAL <5>))")
+	})
+}
+
 // TESTS -- Casos de error
 
 func TestParseErrors(t *testing.T) {
@@ -602,6 +790,74 @@ func TestParseErrors(t *testing.T) {
 				semicolonToken,
 			},
 			"expected expression, got `print`",
+		},
+		{
+			"var sin identificador",
+			[]token.Token{
+				varToken,
+				semicolonToken,
+			},
+			"expected identifier after 'var', got `;`",
+		},
+		{
+			"var con '=' sin expresion",
+			[]token.Token{
+				varToken,
+				*token.NewToken(token.IDENTIFIER, "x", nil, 1),
+				*token.NewToken(token.EQUAL, "=", nil, 1),
+				semicolonToken,
+			},
+			"expected expression, got `;`",
+		},
+		{
+			"invalid assignment target on arithmetic expression",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.EQUAL, "=", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
+			},
+			"invalid assignment target",
+		},
+		{
+			"invalid assignment target on grouped variable",
+			[]token.Token{
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+				*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+				*token.NewToken(token.EQUAL, "=", nil, 1),
+				*token.NewToken(token.NUMBER, "5", 5.0, 1),
+				semicolonToken,
+			},
+			"invalid assignment target",
+		},
+		{
+			"unclosed empty block",
+			[]token.Token{
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			},
+			"expected '}' after block",
+		},
+		{
+			"unclosed block with declaration",
+			[]token.Token{
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				varToken,
+				*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+				semicolonToken,
+			},
+			"expected '}' after block",
+		},
+		{
+			"unclosed nested block",
+			[]token.Token{
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			},
+			"expected '}' after block",
 		},
 	}
 

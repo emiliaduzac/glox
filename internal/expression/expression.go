@@ -9,7 +9,6 @@ type Expr interface {
 	Expression()
 }
 
-// Literal
 type Literal struct {
 	Value any
 }
@@ -22,7 +21,6 @@ func NewLiteral(value any) *Literal {
 
 func (l *Literal) Expression() {}
 
-// Unary
 type Unary struct {
 	Operator token.Token
 	Right    Expr
@@ -37,7 +35,6 @@ func NewUnary(operator token.Token, right Expr) *Unary {
 
 func (u *Unary) Expression() {}
 
-// Binary
 type Binary struct {
 	Left     Expr
 	Operator token.Token
@@ -54,7 +51,6 @@ func NewBinary(left Expr, operator token.Token, right Expr) *Binary {
 
 func (b *Binary) Expression() {}
 
-// Grouping
 type Grouping struct {
 	Expr Expr
 }
@@ -66,6 +62,32 @@ func NewGrouping(expression Expr) *Grouping {
 }
 
 func (g *Grouping) Expression() {}
+
+type Variable struct {
+	Name token.Token
+}
+
+func NewVariable(name token.Token) *Variable {
+	return &Variable{
+		Name: name,
+	}
+}
+
+func (v *Variable) Expression() {}
+
+type Assign struct {
+	Name  token.Token
+	Value Expr
+}
+
+func NewAssign(name token.Token, value Expr) *Assign {
+	return &Assign{
+		Name:  name,
+		Value: value,
+	}
+}
+
+func (a *Assign) Expression() {}
 
 func stringLiteral(value any) string {
 	switch v := value.(type) {
@@ -93,6 +115,10 @@ func String(expr Expr) string {
 		return fmt.Sprintf("(%s %s %s)", String(e.Left), e.Operator.TokenType, String(e.Right))
 	case *Grouping:
 		return fmt.Sprintf("(group %s)", String(e.Expr))
+	case *Variable:
+		return fmt.Sprintf("<%s>", e.Name.Lexeme)
+	case *Assign:
+		return fmt.Sprintf("(= %s %s)", e.Name.Lexeme, String(e.Value))
 	default:
 		return ""
 	}

@@ -24,13 +24,28 @@ func NewParser(tokens []token.Token) *Parser {
 func (p *Parser) Parse() ([]statements.Stmt, error) {
 	stmts := []statements.Stmt{}
 	for !p.isAtEnd() {
-		stmt, err := p.statement()
+		stmt, err := p.declaration()
 		if err != nil {
 			return nil, err
 		}
 		stmts = append(stmts, stmt)
 	}
 	return stmts, nil
+}
+
+func (p *Parser) declaration() (statements.Stmt, error) {
+	if p.isInTokenTypes(token.VAR) {
+		stmt, err := p.varDeclaration()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	}
+	stmt, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+	return stmt, nil
 }
 
 func (p *Parser) statement() (statements.Stmt, error) {
@@ -40,6 +55,13 @@ func (p *Parser) statement() (statements.Stmt, error) {
 			return nil, err
 		}
 		return stmt, nil
+	}
+	if p.isInTokenTypes(token.LEFT_BRACE) {
+		stmts, err := p.block()
+		if err != nil {
+			return nil, err
+		}
+		return statements.NewBlockStmt(stmts), nil
 	}
 
 	stmt, err := p.expressionStatement()
@@ -65,16 +87,56 @@ func (p *Parser) expressionStatement() (statements.Stmt, error) {
 	return statements.NewExpressionStmt(expr), nil
 }
 
+func (p *Parser) block() ([]statements.Stmt, error) {
+	var statements []statements.Stmt
+
+	for !p.isTokenType(token.RIGHT_BRACE) && !p.isAtEnd() {
+		decl, err := p.declaration()
+		if err != nil {
+			return nil, err
+		}
+		statements = append(statements, decl)
+	}
+
+	if !p.isInTokenTypes(token.RIGHT_BRACE) {
+		return nil, p.expectedError("'}' after block")
+	}
+
+	return statements, nil
+}
+
+func (p *Parser) varDeclaration() (statements.Stmt, error) {
+	if !p.isInTokenTypes(token.IDENTIFIER) {
+		return nil, p.expectedError("identifier after 'var'")
+	}
+
+	varName := p.getPrevious()
+
+	var initializer expression.Expr
+	if p.isInTokenTypes(token.EQUAL) {
+		var err error
+		initializer, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		initializer = nil
+	}
+
+	if !p.isInTokenTypes(token.SEMICOLON) {
+		return nil, p.expectedError("';' after variable declaration")
+	}
+
+	return statements.NewVarStmt(varName, initializer), nil
+}
+
 func (p *Parser) getStatement() (expression.Expr, error) {
 	expr, err := p.expression()
 	if err != nil {
 		return nil, err
 	}
 	if !p.isInTokenTypes(token.SEMICOLON) {
-		if p.isTokenType(token.EOF) {
-			return nil, errors.NewLoxError(p.getCurrent().Line, "expected ';' after statement, got EOF instead")
-		}
-		return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected ';' after statement, got `%s` instead", p.getCurrent().Lexeme))
+		return nil, p.expectedError("';' after statement")
 	}
 	return expr, nil
 }
@@ -83,7 +145,31 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 // de llamadas recursivas para parsear la expresión completa, siguiendo la jerarquía de
 // precedencia de operadores.
 func (p *Parser) expression() (expression.Expr, error) {
-	return p.equality()
+	return p.assignment()
+}
+
+func (p *Parser) assignment() (expression.Expr, error) {
+	expr, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
+
+	if p.isInTokenTypes(token.EQUAL) {
+		equals := p.getPrevious()
+
+		value, err := p.assignment()
+		if err != nil {
+			return nil, err
+		}
+
+		if varExpr, ok := expr.(*expression.Variable); ok {
+			return expression.NewAssign(varExpr.Name, value), nil
+		}
+
+		return nil, errors.NewLoxError(equals.Line, "invalid assignment target")
+	}
+
+	return expr, nil
 }
 
 func (p *Parser) equality() (expression.Expr, error) {
@@ -181,24 +267,27 @@ func (p *Parser) primary() (expression.Expr, error) {
 	if p.isInTokenTypes(token.NIL) {
 		return expression.NewLiteral(nil), nil
 	}
+
 	if p.isInTokenTypes(token.NUMBER, token.STRING) {
 		return expression.NewLiteral(p.getPrevious().Literal), nil
 	}
+
 	if p.isInTokenTypes(token.LEFT_PAREN) {
 		expr, err := p.expression()
 		if err != nil {
 			return nil, err
 		}
 		if !p.isInTokenTypes(token.RIGHT_PAREN) {
-			return nil, errors.NewLoxError(p.getCurrent().Line, "expected ')' after expression")
+			return nil, errors.NewLoxError(p.getLine(), "expected ')' after expression")
 		}
 		return expression.NewGrouping(expr), nil
 	}
 
-	if p.isTokenType(token.EOF) {
-		return nil, errors.NewLoxError(p.getCurrent().Line, "expected expression, got EOF instead")
+	if p.isInTokenTypes(token.IDENTIFIER) {
+		return expression.NewVariable(p.getPrevious()), nil
 	}
-	return nil, errors.NewLoxError(p.getCurrent().Line, fmt.Sprintf("expected expression, got `%s` instead", p.getCurrent().Lexeme))
+
+	return nil, p.expectedError("expression")
 }
 
 // isAtEnd indica si el token actual es el último.
@@ -228,6 +317,22 @@ func (p *Parser) getCurrent() token.Token {
 
 func (p *Parser) getPrevious() token.Token {
 	return p.tokens[p.current-1]
+}
+
+func (p *Parser) getLine() int {
+	return p.getCurrent().Line
+}
+
+func (p *Parser) getLexeme() string {
+	return p.getCurrent().Lexeme
+}
+
+func (p *Parser) expectedError(expected string) error {
+	got := fmt.Sprintf("`%s`", p.getLexeme())
+	if p.isTokenType(token.EOF) {
+		got = "EOF"
+	}
+	return errors.NewLoxError(p.getLine(), fmt.Sprintf("expected %s, got %s instead", expected, got))
 }
 
 // advance avanza al siguiente token y devuelve el token consumido

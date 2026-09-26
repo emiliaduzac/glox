@@ -3,16 +3,21 @@ package interpreter
 import (
 	"fmt"
 	"math"
+	"tp-lox/internal/environment"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
 )
 
-type Interpreter struct{}
+type Interpreter struct {
+	environment *environment.Environment
+}
 
 func NewInterpreter() *Interpreter {
-	return &Interpreter{}
+	return &Interpreter{
+		environment: environment.NewEnvironment(),
+	}
 }
 
 func (in *Interpreter) Interpret(stmts []statements.Stmt) error {
@@ -43,10 +48,39 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 			return err
 		}
 		return nil
-
+	case *statements.VarStmt:
+		var value any = nil
+		if s.Initializer != nil {
+			var err error
+			value, err = in.Evaluate(s.Initializer)
+			if err != nil {
+				return err
+			}
+		}
+		in.environment.Define(s.Name.Lexeme, value)
+		return nil
+	case *statements.BlockStmt:
+		return in.ExecuteBlock(s.Statements, environment.NewEnclosedEnvironment(in.environment))
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}
+}
+
+func (in *Interpreter) ExecuteBlock(stmts []statements.Stmt, env *environment.Environment) error {
+	previous := in.environment
+	in.environment = env
+	defer func() {
+		in.environment = previous
+	}()
+
+	for _, stmt := range stmts {
+		err := in.Execute(stmt)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Evaluate evalúa una expresión y devuelve su valor.
@@ -60,6 +94,18 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 		return in.evaluateUnary(e)
 	case *expression.Binary:
 		return in.evaluateBinary(e)
+	case *expression.Variable:
+		return in.environment.Get(e.Name)
+	case *expression.Assign:
+		value, err := in.Evaluate(e.Value)
+		if err != nil {
+			return nil, err
+		}
+		err = in.environment.Assign(e.Name, value)
+		if err != nil {
+			return nil, err
+		}
+		return value, nil
 	default:
 		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown expression: %T", expr))
 	}
