@@ -56,6 +56,13 @@ func (p *Parser) statement() (statements.Stmt, error) {
 		}
 		return stmt, nil
 	}
+	if p.isInTokenTypes(token.LEFT_BRACE) {
+		stmts, err := p.block()
+		if err != nil {
+			return nil, err
+		}
+		return statements.NewBlockStmt(stmts), nil
+	}
 
 	stmt, err := p.expressionStatement()
 	if err != nil {
@@ -78,6 +85,24 @@ func (p *Parser) expressionStatement() (statements.Stmt, error) {
 		return nil, err
 	}
 	return statements.NewExpressionStmt(expr), nil
+}
+
+func (p *Parser) block() ([]statements.Stmt, error) {
+	var statements []statements.Stmt
+
+	for !p.isTokenType(token.RIGHT_BRACE) && !p.isAtEnd() {
+		decl, err := p.declaration()
+		if err != nil {
+			return nil, err
+		}
+		statements = append(statements, decl)
+	}
+
+	if !p.isInTokenTypes(token.RIGHT_BRACE) {
+		return nil, p.expectedError("'}' after block")
+	}
+
+	return statements, nil
 }
 
 func (p *Parser) varDeclaration() (statements.Stmt, error) {

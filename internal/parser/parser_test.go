@@ -130,6 +130,17 @@ func assertString(t *testing.T, expr expression.Expr, expected string) {
 	}
 }
 
+func assertStatementString(t *testing.T, stmts []statements.Stmt, expected string) {
+	t.Helper()
+
+	if len(stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(stmts))
+	}
+	if got := statements.String(stmts[0]); got != expected {
+		t.Errorf("expected %q, got %q", expected, got)
+	}
+}
+
 // TESTS -- Casos base válidos
 
 func TestParseLiterals(t *testing.T) {
@@ -405,6 +416,74 @@ func TestParseAssignment(t *testing.T) {
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
 		assertString(t, expr, "(= a (<5> PLUS <3>))")
+	})
+}
+
+func TestParseBlock(t *testing.T) {
+	t.Run("Empty block", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block)")
+	})
+
+	t.Run("Block with statements", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			varToken,
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			semicolonToken,
+			printToken,
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			semicolonToken,
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (var IDENTIFIER<a> <1>) (print <a>))")
+	})
+
+	t.Run("Block with expression statement", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			semicolonToken,
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (expr (<1> PLUS <2>)))")
+	})
+
+	t.Run("Nested blocks", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (block))")
+	})
+
+	t.Run("Deeply nested blocks with declaration", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			varToken,
+			*token.NewToken(token.IDENTIFIER, "x", nil, 1),
+			semicolonToken,
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (block (block (var IDENTIFIER<x>))))")
 	})
 }
 
@@ -753,6 +832,32 @@ func TestParseErrors(t *testing.T) {
 				semicolonToken,
 			},
 			"invalid assignment target",
+		},
+		{
+			"unclosed empty block",
+			[]token.Token{
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			},
+			"expected '}' after block",
+		},
+		{
+			"unclosed block with declaration",
+			[]token.Token{
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				varToken,
+				*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+				semicolonToken,
+			},
+			"expected '}' after block",
+		},
+		{
+			"unclosed nested block",
+			[]token.Token{
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			},
+			"expected '}' after block",
 		},
 	}
 
