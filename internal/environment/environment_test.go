@@ -78,3 +78,39 @@ func TestEnvironment(t *testing.T) {
 		AssertErrorMessage(t, err, "undefined variable 'undefined'")
 	})
 }
+
+func TestEnvironmentAssign(t *testing.T) {
+	t.Run("Assign to existing variable uptdates value", func(t *testing.T) {
+		env := SetUpEnvironment(t)
+		env.Define("number", 19.0)
+
+		tokenNumber := *token.NewToken(token.IDENTIFIER, "number", nil, 1)
+		err := env.Assign(tokenNumber, 99.0)
+		AssertNoError(t, err)
+
+		valueNumber, err := env.Get(tokenNumber)
+		AssertNoError(t, err)
+		AssertValue(t, valueNumber, 99.0)
+	})
+
+	t.Run("Assign different type to existing variable updates value", func(t *testing.T) {
+		env := SetUpEnvironment(t)
+		env.Define("var", 19.0)
+
+		tokenVar := *token.NewToken(token.IDENTIFIER, "var", nil, 1)
+		err := env.Assign(tokenVar, "Hello")
+		AssertNoError(t, err)
+
+		valueVar, err := env.Get(tokenVar)
+		AssertNoError(t, err)
+		AssertValue(t, valueVar, "Hello")
+	})
+
+	t.Run("Assign to undefined variable returns error", func(t *testing.T) {
+		env := SetUpEnvironment(t)
+		tokenUndefined := *token.NewToken(token.IDENTIFIER, "undefined", nil, 1)
+
+		err := env.Assign(tokenUndefined, 99.0)
+		AssertErrorMessage(t, err, "undefined variable 'undefined'")
+	})
+}

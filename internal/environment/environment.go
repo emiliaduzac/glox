@@ -26,3 +26,11 @@ func (e *Environment) Get(name token.Token) (any, error) {
 	}
 	return nil, errors.NewLoxError(name.Line, fmt.Sprintf("undefined variable '%s'", name.Lexeme))
 }
+
+func (e *Environment) Assign(name token.Token, value any) error {
+	if _, ok := e.values[name.Lexeme]; ok {
+		e.values[name.Lexeme] = value
+		return nil
+	}
+	return errors.NewLoxError(name.Line, fmt.Sprintf("undefined variable '%s'", name.Lexeme))
+}
