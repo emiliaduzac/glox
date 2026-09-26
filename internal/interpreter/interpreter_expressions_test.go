@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 	"tp-lox/internal/expression"
+	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
 )
 
@@ -1633,5 +1634,63 @@ func TestEvaluateBinaryBangEqual(t *testing.T) {
 		val, err := in.Evaluate(expr)
 		AssertNoError(t, err)
 		AssertValue(t, val, true)
+	})
+}
+
+func TestEvaluateAssign(t *testing.T) {
+	in := SetUpInterpreter(t)
+
+	t.Run("Assign a number to existing variable", func(t *testing.T) {
+		tok := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tok, expression.NewLiteral(10.0))))
+
+		assignExpr := expression.NewAssign(tok, expression.NewLiteral(20.0))
+		val, err := in.Evaluate(assignExpr)
+		AssertNoError(t, err)
+		AssertValue(t, val, 20.0)
+
+		varVal, err := in.Evaluate(expression.NewVariable(tok))
+		AssertNoError(t, err)
+		AssertValue(t, varVal, 20.0)
+	})
+
+	t.Run("Nested assignment propagates inner value and updates both variables", func(t *testing.T) {
+		tokA := *token.NewToken(token.IDENTIFIER, "a", nil, 1)
+		tokB := *token.NewToken(token.IDENTIFIER, "b", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tokA, expression.NewLiteral(1.0))))
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tokB, expression.NewLiteral(2.0))))
+
+		nested := expression.NewAssign(tokA, expression.NewAssign(tokB, expression.NewLiteral(5.0)))
+		val, err := in.Evaluate(nested)
+		AssertNoError(t, err)
+		AssertValue(t, val, 5.0)
+
+		varValA, err := in.Evaluate(expression.NewVariable(tokA))
+		AssertNoError(t, err)
+		AssertValue(t, varValA, 5.0)
+
+		varValB, err := in.Evaluate(expression.NewVariable(tokB))
+		AssertNoError(t, err)
+		AssertValue(t, varValB, 5.0)
+	})
+
+	t.Run("Assign to undeclared produces runtime error", func(t *testing.T) {
+		tok := *token.NewToken(token.IDENTIFIER, "undeclared", nil, 1)
+		assignExpr := expression.NewAssign(tok, expression.NewLiteral(30.0))
+		_, err := in.Evaluate(assignExpr)
+		AssertErrorMessage(t, err, "undefined variable 'undeclared'")
+	})
+
+	t.Run("Error evaluating right-hand expression preserves previous variable value", func(t *testing.T) {
+		tok := *token.NewToken(token.IDENTIFIER, "safe", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tok, expression.NewLiteral(10.0))))
+
+		assignExpr := expression.NewAssign(tok, invalidExpr())
+		_, err := in.Evaluate(assignExpr)
+		AssertError(t, err)
+
+		varVal, err := in.Evaluate(expression.NewVariable(tok))
+		AssertNoError(t, err)
+		AssertValue(t, varVal, 10.0)
 	})
 }

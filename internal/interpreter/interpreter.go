@@ -77,6 +77,16 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 		return in.evaluateBinary(e)
 	case *expression.Variable:
 		return in.environment.Get(e.Name)
+	case *expression.Assign:
+		value, err := in.Evaluate(e.Value)
+		if err != nil {
+			return nil, err
+		}
+		err = in.environment.Assign(e.Name, value)
+		if err != nil {
+			return nil, err
+		}
+		return value, nil
 	default:
 		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown expression: %T", expr))
 	}

@@ -3,6 +3,7 @@ package interpreter
 import (
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/token"
@@ -62,6 +63,14 @@ func AssertError(t *testing.T, err error) {
 	t.Helper()
 	if err == nil {
 		t.Fatalf("expected error, got nil")
+	}
+}
+
+func AssertErrorMessage(t *testing.T, err error, expected string) {
+	t.Helper()
+	AssertError(t, err)
+	if !strings.Contains(err.Error(), expected) {
+		t.Fatalf("expected error containing %q, got %q", expected, err.Error())
 	}
 }
 
