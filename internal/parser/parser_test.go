@@ -12,6 +12,7 @@ import (
 
 var printToken = *token.NewToken(token.PRINT, "print", nil, 1)
 var semicolonToken = *token.NewToken(token.SEMICOLON, ";", nil, 1)
+var varToken = *token.NewToken(token.VAR, "var", nil, 1)
 
 func setUpParser(t *testing.T, tokens []token.Token) []statements.Stmt {
 	t.Helper()
@@ -65,6 +66,21 @@ func assertPrintStatement(t *testing.T, stmts []statements.Stmt) expression.Expr
 		t.Fatalf("expected a non nil expression in PrintStmt")
 	}
 	return stmtExpr.Expr
+}
+
+func assertVariableStatement(t *testing.T, stmts []statements.Stmt, expectedName string) expression.Expr {
+	t.Helper()
+	if len(stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(stmts))
+	}
+	stmtVar, ok := stmts[0].(*statements.VarStmt)
+	if !ok {
+		t.Fatalf("expected a VariableStmt, got %T", stmts[0])
+	}
+	if stmtVar.Name.Lexeme != expectedName {
+		t.Errorf("expected variable name %q, got %q", expectedName, stmtVar.Name.Lexeme)
+	}
+	return stmtVar.Initializer
 }
 
 func assertLiteral(t *testing.T, expr expression.Expr, expectedValue any) {
@@ -328,6 +344,36 @@ func TestParseGrouping(t *testing.T) {
 			t.Fatalf("expected a Grouping expression, got %T", expr)
 		}
 		assertLiteral(t, grouping.Expr, 123.0)
+	})
+}
+
+func TestParseVariables(t *testing.T) {
+	nonInitializedVar := []token.Token{
+		varToken,
+		*token.NewToken(token.IDENTIFIER, "x", nil, 1),
+		semicolonToken,
+	}
+
+	t.Run("non_initialized_var", func(t *testing.T) {
+		stmts := setUpParser(t, nonInitializedVar)
+		expr := assertVariableStatement(t, stmts, "x")
+		if expr != nil {
+			t.Errorf("expected nil initializer, got %v", expr)
+		}
+	})
+
+	initializedVar := []token.Token{
+		varToken,
+		*token.NewToken(token.IDENTIFIER, "x", nil, 1),
+		*token.NewToken(token.EQUAL, "=", nil, 1),
+		*token.NewToken(token.NUMBER, "42", 42.0, 1),
+		semicolonToken,
+	}
+
+	t.Run("initialized_var", func(t *testing.T) {
+		stmts := setUpParser(t, initializedVar)
+		expr := assertVariableStatement(t, stmts, "x")
+		assertLiteral(t, expr, 42.0)
 	})
 }
 
@@ -602,6 +648,24 @@ func TestParseErrors(t *testing.T) {
 				semicolonToken,
 			},
 			"expected expression, got `print`",
+		},
+		{
+			"var sin identificador",
+			[]token.Token{
+				varToken,
+				semicolonToken,
+			},
+			"expected identifier after 'var', got `;`",
+		},
+		{
+			"var con '=' sin expresion",
+			[]token.Token{
+				varToken,
+				*token.NewToken(token.IDENTIFIER, "x", nil, 1),
+				*token.NewToken(token.EQUAL, "=", nil, 1),
+				semicolonToken,
+			},
+			"expected expression, got `;`",
 		},
 	}
 
