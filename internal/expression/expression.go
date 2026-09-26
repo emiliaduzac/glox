@@ -75,6 +75,20 @@ func NewVariable(name token.Token) *Variable {
 
 func (v *Variable) Expression() {}
 
+type Assign struct {
+	Name  token.Token
+	Value Expr
+}
+
+func NewAssign(name token.Token, value Expr) *Assign {
+	return &Assign{
+		Name:  name,
+		Value: value,
+	}
+}
+
+func (a *Assign) Expression() {}
+
 func stringLiteral(value any) string {
 	switch v := value.(type) {
 	case string:
@@ -103,6 +117,8 @@ func String(expr Expr) string {
 		return fmt.Sprintf("(group %s)", String(e.Expr))
 	case *Variable:
 		return fmt.Sprintf("<%s>", e.Name.Lexeme)
+	case *Assign:
+		return fmt.Sprintf("(= %s %s)", e.Name.Lexeme, String(e.Value))
 	default:
 		return ""
 	}

@@ -377,6 +377,37 @@ func TestParseVariables(t *testing.T) {
 	})
 }
 
+func TestParseAssignment(t *testing.T) {
+
+	t.Run("Simple assignment", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a <5>)")
+	})
+
+	t.Run("Assignment with binary expression on right", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			*token.NewToken(token.NUMBER, "3", 3.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a (<5> PLUS <3>))")
+	})
+}
+
 // TESTS -- Casos de asociatividad y precedencia de operadores
 
 func TestPrecedenceEquality(t *testing.T) {
@@ -582,6 +613,38 @@ func TestPrecedenceGrouping(t *testing.T) {
 	}
 }
 
+func TestPrecedenceAssignment(t *testing.T) {
+	t.Run("Assignment is right associative", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a (= b <5>))")
+	})
+
+	t.Run("Assignment has lower precedence than equality", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a (<b> EQUAL_EQUAL <5>))")
+	})
+}
+
 // TESTS -- Casos de error
 
 func TestParseErrors(t *testing.T) {
@@ -666,6 +729,30 @@ func TestParseErrors(t *testing.T) {
 				semicolonToken,
 			},
 			"expected expression, got `;`",
+		},
+		{
+			"invalid assignment target on arithmetic expression",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				*token.NewToken(token.EQUAL, "=", nil, 1),
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
+			},
+			"invalid assignment target",
+		},
+		{
+			"invalid assignment target on grouped variable",
+			[]token.Token{
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+				*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+				*token.NewToken(token.EQUAL, "=", nil, 1),
+				*token.NewToken(token.NUMBER, "5", 5.0, 1),
+				semicolonToken,
+			},
+			"invalid assignment target",
 		},
 	}
 

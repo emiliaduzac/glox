@@ -120,7 +120,31 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 // de llamadas recursivas para parsear la expresión completa, siguiendo la jerarquía de
 // precedencia de operadores.
 func (p *Parser) expression() (expression.Expr, error) {
-	return p.equality()
+	return p.assignment()
+}
+
+func (p *Parser) assignment() (expression.Expr, error) {
+	expr, err := p.equality()
+	if err != nil {
+		return nil, err
+	}
+
+	if p.isInTokenTypes(token.EQUAL) {
+		equals := p.getPrevious()
+
+		value, err := p.assignment()
+		if err != nil {
+			return nil, err
+		}
+
+		if varExpr, ok := expr.(*expression.Variable); ok {
+			return expression.NewAssign(varExpr.Name, value), nil
+		}
+
+		return nil, errors.NewLoxError(equals.Line, "invalid assignment target")
+	}
+
+	return expr, nil
 }
 
 func (p *Parser) equality() (expression.Expr, error) {
