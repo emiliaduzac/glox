@@ -5,7 +5,35 @@ import (
 	"tp-lox/internal/token"
 )
 
-// TESTS -- Casos base válidos
+// Tests de la gramática de statements: print, expression-statement, var, block, if, etc.
+// Cubre la sintaxis propia de cada statement, no la gramática de las expresiones que
+// envuelven.
+
+func TestParsePrint(t *testing.T) {
+	t.Run("print of a literal", func(t *testing.T) {
+		tokens := []token.Token{
+			printToken,
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		expr := assertPrintStatement(t, stmts)
+		assertLiteral(t, expr, 1.0)
+	})
+
+	t.Run("print wraps an arbitrary expression", func(t *testing.T) {
+		tokens := []token.Token{
+			printToken,
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		expr := assertPrintStatement(t, stmts)
+		assertBinary(t, expr, token.PLUS, 1.0, 2.0)
+	})
+}
 
 func TestParsePrintErrors(t *testing.T) {
 	tests := []struct {
@@ -49,25 +77,13 @@ func TestParsePrintErrors(t *testing.T) {
 }
 
 func TestParseExpressionStatementErrors(t *testing.T) {
-	tests := []struct {
-		name                 string
-		tokens               []token.Token
-		expectedErrorContent string
-	}{
-		{
-			"expression statement sin ';'",
-			[]token.Token{
-				*token.NewToken(token.NUMBER, "1", 1.0, 1),
-			},
-			"expected ';' after statement",
-		},
+	tokens := []token.Token{
+		*token.NewToken(token.NUMBER, "1", 1.0, 1),
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			setUpParserExpectError(t, test.tokens, test.expectedErrorContent)
-		})
-	}
+	t.Run("expression statement sin ';'", func(t *testing.T) {
+		setUpParserExpectError(t, tokens, "expected ';' after statement")
+	})
 }
 
 func TestParseVariables(t *testing.T) {

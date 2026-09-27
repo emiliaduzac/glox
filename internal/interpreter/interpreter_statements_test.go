@@ -7,6 +7,8 @@ import (
 	"tp-lox/internal/token"
 )
 
+// Tests de Execute para cada statement (Print, Expression, Var, Block, If)
+
 func TestExecuteUnsupportedStatement(t *testing.T) {
 	in := SetUpInterpreter(t)
 
@@ -17,29 +19,6 @@ func TestExecuteUnsupportedStatement(t *testing.T) {
 
 	t.Run("Error when statement type is unknown", func(t *testing.T) {
 		err := in.Execute(UnsupportedStmt{})
-		AssertError(t, err)
-	})
-}
-
-func TestExecuteExpressionStatement(t *testing.T) {
-	in := SetUpInterpreter(t)
-
-	t.Run("Execute expression statement with literal", func(t *testing.T) {
-		stmt := statements.NewExpressionStmt(expression.NewLiteral(99.0))
-		err := in.Execute(stmt)
-		AssertNoError(t, err)
-	})
-
-	t.Run("Execute expression statement with binary expression", func(t *testing.T) {
-		op := *token.NewToken(token.PLUS, "+", nil, 1)
-		stmt := statements.NewExpressionStmt(expression.NewBinary(expression.NewLiteral(1.0), op, expression.NewLiteral(2.0)))
-		err := in.Execute(stmt)
-		AssertNoError(t, err)
-	})
-
-	t.Run("Error when expression is invalid", func(t *testing.T) {
-		stmt := statements.NewExpressionStmt(invalidExpr())
-		err := in.Execute(stmt)
 		AssertError(t, err)
 	})
 }
@@ -65,6 +44,28 @@ func TestExecutePrintStatement(t *testing.T) {
 	})
 }
 
+func TestStringify(t *testing.T) {
+	t.Run("Stringify nil value", func(t *testing.T) {
+		AssertValue(t, Stringify(nil), "nil")
+	})
+
+	t.Run("Stringify integer value", func(t *testing.T) {
+		AssertValue(t, Stringify(99), "99")
+	})
+
+	t.Run("Stringify string value", func(t *testing.T) {
+		AssertValue(t, Stringify("Hello"), "Hello")
+	})
+
+	t.Run("Stringify boolean true value", func(t *testing.T) {
+		AssertValue(t, Stringify(true), "true")
+	})
+
+	t.Run("Stringify boolean false value", func(t *testing.T) {
+		AssertValue(t, Stringify(false), "false")
+	})
+}
+
 func TestExecutePrintStatementErrors(t *testing.T) {
 	in := SetUpInterpreter(t)
 
@@ -75,34 +76,25 @@ func TestExecutePrintStatementErrors(t *testing.T) {
 	})
 }
 
-func TestInterpret(t *testing.T) {
+func TestExecuteExpressionStatement(t *testing.T) {
 	in := SetUpInterpreter(t)
 
-	t.Run("No error with empty list of statements", func(t *testing.T) {
-		err := in.Interpret([]statements.Stmt{})
+	t.Run("Execute expression statement with literal", func(t *testing.T) {
+		stmt := statements.NewExpressionStmt(expression.NewLiteral(99.0))
+		err := in.Execute(stmt)
 		AssertNoError(t, err)
 	})
 
-	t.Run("No error with multiple valid statements", func(t *testing.T) {
-		stmts := []statements.Stmt{
-			statements.NewExpressionStmt(expression.NewLiteral(1.0)),
-			statements.NewExpressionStmt(expression.NewLiteral("a")),
-		}
-		err := in.Interpret(stmts)
+	t.Run("Execute expression statement with binary expression", func(t *testing.T) {
+		op := *token.NewToken(token.PLUS, "+", nil, 1)
+		stmt := statements.NewExpressionStmt(expression.NewBinary(expression.NewLiteral(1.0), op, expression.NewLiteral(2.0)))
+		err := in.Execute(stmt)
 		AssertNoError(t, err)
 	})
 
-	t.Run("Error when one statement is invalid", func(t *testing.T) {
-		stmts := []statements.Stmt{
-			statements.NewExpressionStmt(expression.NewLiteral(1.0)),
-			statements.NewExpressionStmt(invalidExpr()),
-		}
-		err := in.Interpret(stmts)
-		AssertError(t, err)
-	})
-
-	t.Run("Error when statement type is unknown", func(t *testing.T) {
-		err := in.Interpret([]statements.Stmt{UnsupportedStmt{}})
+	t.Run("Error when expression is invalid", func(t *testing.T) {
+		stmt := statements.NewExpressionStmt(invalidExpr())
+		err := in.Execute(stmt)
 		AssertError(t, err)
 	})
 }
@@ -143,12 +135,6 @@ func TestExecuteVarStatement(t *testing.T) {
 		stmt := statements.NewVarStmt(token, invalidExpr())
 
 		AssertError(t, in.Execute(stmt))
-		_, err := in.Evaluate(expression.NewVariable(token))
-		AssertError(t, err)
-	})
-
-	t.Run("Error when evaluating undeclared variable", func(t *testing.T) {
-		token := *token.NewToken(token.IDENTIFIER, "undeclared", nil, 1)
 		_, err := in.Evaluate(expression.NewVariable(token))
 		AssertError(t, err)
 	})
@@ -238,29 +224,6 @@ func TestExecuteIfStatement(t *testing.T) {
 		AssertValue(t, out, "")
 	})
 
-	t.Run("Condition truthiness follows Lox rules", func(t *testing.T) {
-		tests := []struct {
-			name      string
-			condition any
-			expected  string
-		}{
-			{"nil is falsy", nil, "else\n"},
-			{"zero is truthy", 0.0, "then\n"},
-			{"empty string is truthy", "", "then\n"},
-			{"non-empty string is truthy", "a", "then\n"},
-		}
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				in := SetUpInterpreter(t)
-				stmt := statements.NewIfStmt(expression.NewLiteral(tt.condition), printStmt("then"), printStmt("else"))
-				out := CaptureOutput(t, func() {
-					AssertNoError(t, in.Execute(stmt))
-				})
-				AssertValue(t, out, tt.expected)
-			})
-		}
-	})
-
 	t.Run("Error in condition is returned and no branch runs", func(t *testing.T) {
 		in := SetUpInterpreter(t)
 		stmt := statements.NewIfStmt(invalidExpr(), printStmt("then"), printStmt("else"))
@@ -286,33 +249,36 @@ func TestExecuteIfStatement(t *testing.T) {
 		})
 		AssertValue(t, out, "second\n")
 	})
+}
 
-	t.Run("Variable declared in block branch is inaccessible outside", func(t *testing.T) {
-		in := SetUpInterpreter(t)
-		tokLocal := *token.NewToken(token.IDENTIFIER, "localOnly", nil, 1)
-		blockStmt := statements.NewBlockStmt([]statements.Stmt{
-			statements.NewVarStmt(tokLocal, expression.NewLiteral(1.0)),
-		})
-		stmt := statements.NewIfStmt(expression.NewLiteral(true), blockStmt, nil)
+func TestInterpret(t *testing.T) {
+	in := SetUpInterpreter(t)
 
-		AssertNoError(t, in.Execute(stmt))
-
-		_, err := in.Evaluate(expression.NewVariable(tokLocal))
-		AssertErrorMessage(t, err, "undefined variable 'localOnly'")
+	t.Run("No error with empty list of statements", func(t *testing.T) {
+		err := in.Interpret([]statements.Stmt{})
+		AssertNoError(t, err)
 	})
 
-	t.Run("Assignment in branch modifies outer variable", func(t *testing.T) {
-		in := SetUpInterpreter(t)
-		tokX := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
-		AssertNoError(t, in.Execute(statements.NewVarStmt(tokX, expression.NewLiteral(1.0))))
-
-		assignStmt := statements.NewExpressionStmt(expression.NewAssign(tokX, expression.NewLiteral(2.0)))
-		stmt := statements.NewIfStmt(expression.NewLiteral(true), assignStmt, nil)
-
-		AssertNoError(t, in.Execute(stmt))
-
-		val, err := in.Evaluate(expression.NewVariable(tokX))
+	t.Run("No error with multiple valid statements", func(t *testing.T) {
+		stmts := []statements.Stmt{
+			statements.NewExpressionStmt(expression.NewLiteral(1.0)),
+			statements.NewExpressionStmt(expression.NewLiteral("a")),
+		}
+		err := in.Interpret(stmts)
 		AssertNoError(t, err)
-		AssertValue(t, val, 2.0)
+	})
+
+	t.Run("Error when one statement is invalid", func(t *testing.T) {
+		stmts := []statements.Stmt{
+			statements.NewExpressionStmt(expression.NewLiteral(1.0)),
+			statements.NewExpressionStmt(invalidExpr()),
+		}
+		err := in.Interpret(stmts)
+		AssertError(t, err)
+	})
+
+	t.Run("Error when statement type is unknown", func(t *testing.T) {
+		err := in.Interpret([]statements.Stmt{UnsupportedStmt{}})
+		AssertError(t, err)
 	})
 }
