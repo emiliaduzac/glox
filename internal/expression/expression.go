@@ -89,6 +89,22 @@ func NewAssign(name token.Token, value Expr) *Assign {
 
 func (a *Assign) Expression() {}
 
+type Logical struct {
+	Left     Expr
+	Operator token.Token
+	Right    Expr
+}
+
+func NewLogical(left Expr, operator token.Token, right Expr) *Logical {
+	return &Logical{
+		Left:     left,
+		Operator: operator,
+		Right:    right,
+	}
+}
+
+func (l *Logical) Expression() {}
+
 func stringLiteral(value any) string {
 	switch v := value.(type) {
 	case string:
@@ -119,6 +135,8 @@ func String(expr Expr) string {
 		return fmt.Sprintf("<%s>", e.Name.Lexeme)
 	case *Assign:
 		return fmt.Sprintf("(= %s %s)", e.Name.Lexeme, String(e.Value))
+	case *Logical:
+		return fmt.Sprintf("(%s %s %s)", String(e.Left), e.Operator.TokenType, String(e.Right))
 	default:
 		return ""
 	}

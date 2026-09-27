@@ -118,6 +118,22 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 			return nil, err
 		}
 		return value, nil
+	case *expression.Logical:
+		left, err := in.Evaluate(e.Left)
+		if err != nil {
+			return nil, err
+		}
+
+		if e.Operator.TokenType == token.OR && isTruthy(left) {
+			return left, nil
+		} else if e.Operator.TokenType == token.AND && !isTruthy(left) {
+			return left, nil
+		}
+		right, err := in.Evaluate(e.Right)
+		if err != nil {
+			return nil, err
+		}
+		return right, nil
 	default:
 		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown expression: %T", expr))
 	}
