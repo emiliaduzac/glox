@@ -124,12 +124,15 @@ func (p *PrintStmt) Statement() {}
 
 - **While statements**: permiten repetir una porción de código una cantidad de veces indefinida: mientras se cumpla una condición.
 
+- **For statements (?)**: técnicamente son lo mismo que un while, pero como repiten una semántica muy utilizada por los usuarios, se resuelve con syntactic sugar para facilitar su uso. Entonces se implementan por detrás con un while (no es un statement nuevo), pero se mantiene la palabra reservada `for` con su semántica, para que el usuario pueda hacer uso del mismo, sin saber como se implementa por detrás. Un `for` entonces contiene: (1) inicializador, (2) condición e (3) incremento: `for ( <initializer> ; <condition> ; <increment>) <body>`.
+
 Se expande nuestra gramática:
 
 ```
 program     → declaration* EOF ;
 declaration → varDecl | statement ;
-statement   → exprStmt | ifStmt | printStmt | whileStmt | block ;
+statement   → exprStmt | forStmt | ifStmt | printStmt | whileStmt | block ;
+forStmt     → "for" "(" ( varDecl | exprStmt | ";" ) expression? ";" expression? ")" statement ;
 ifStmt      → "if" "(" expression ")" statement ( "else" statement )? ;
 whileStmt   → "while" "(" expression ")" statement ;
 block       → "{" declaration* "}" ;
