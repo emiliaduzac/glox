@@ -73,6 +73,22 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 			return in.Execute(s.ElseBranch)
 		}
 		return nil
+	case *statements.WhileStmt:
+		for {
+			condition, err := in.Evaluate(s.Condition)
+			if err != nil {
+				return err
+			}
+			if !isTruthy(condition) {
+				break
+			}
+
+			err = in.Execute(s.Body)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}

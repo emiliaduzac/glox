@@ -49,11 +49,7 @@ func (p *Parser) declaration() (statements.Stmt, error) {
 
 func (p *Parser) statement() (statements.Stmt, error) {
 	if p.isInTokenTypes(token.PRINT) {
-		stmt, err := p.printStatement()
-		if err != nil {
-			return nil, err
-		}
-		return stmt, nil
+		return p.printStatement()
 	}
 	if p.isInTokenTypes(token.LEFT_BRACE) {
 		stmts, err := p.block()
@@ -63,18 +59,13 @@ func (p *Parser) statement() (statements.Stmt, error) {
 		return statements.NewBlockStmt(stmts), nil
 	}
 	if p.isInTokenTypes(token.IF) {
-		stmt, err := p.ifStatement()
-		if err != nil {
-			return nil, err
-		}
-		return stmt, nil
+		return p.ifStatement()
+	}
+	if p.isInTokenTypes(token.WHILE) {
+		return p.whileStatement()
 	}
 
-	stmt, err := p.expressionStatement()
-	if err != nil {
-		return nil, err
-	}
-	return stmt, nil
+	return p.expressionStatement()
 }
 
 func (p *Parser) printStatement() (statements.Stmt, error) {
@@ -162,6 +153,26 @@ func (p *Parser) ifStatement() (statements.Stmt, error) {
 	}
 
 	return statements.NewIfStmt(condition, thenBranch, elseBranch), nil
+}
+
+func (p *Parser) whileStatement() (statements.Stmt, error) {
+	if !p.isInTokenTypes(token.LEFT_PAREN) {
+		return nil, p.expectedError("'(' after 'while'")
+	}
+	condition, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	if !p.isInTokenTypes(token.RIGHT_PAREN) {
+		return nil, p.expectedError("')' after while condition")
+	}
+
+	body, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	return statements.NewWhileStmt(condition, body), nil
 }
 
 func (p *Parser) getStatement() (expression.Expr, error) {

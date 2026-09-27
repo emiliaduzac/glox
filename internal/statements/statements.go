@@ -75,7 +75,21 @@ func NewIfStmt(condition expression.Expr, thenBranch Stmt, elseBranch Stmt) *IfS
 	}
 }
 
-func (is *IfStmt) Statement() {}
+func (i *IfStmt) Statement() {}
+
+type WhileStmt struct {
+	Condition expression.Expr
+	Body      Stmt
+}
+
+func NewWhileStmt(condition expression.Expr, body Stmt) *WhileStmt {
+	return &WhileStmt{
+		Condition: condition,
+		Body:      body,
+	}
+}
+
+func (w *WhileStmt) Statement() {}
 
 func String(s Stmt) string {
 	switch s := s.(type) {
@@ -102,6 +116,8 @@ func String(s Stmt) string {
 			return fmt.Sprintf("(if %s %s)", expression.String(s.Condition), String(s.ThenBranch))
 		}
 		return fmt.Sprintf("(if %s %s %s)", expression.String(s.Condition), String(s.ThenBranch), String(s.ElseBranch))
+	case *WhileStmt:
+		return fmt.Sprintf("(while %s %s)", expression.String(s.Condition), String(s.Body))
 	}
 	return fmt.Sprintf("unknown statement: %T", s)
 }
