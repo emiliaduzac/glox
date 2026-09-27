@@ -3,6 +3,7 @@ package interpreter
 import (
 	"fmt"
 	"math"
+	"time"
 	"tp-lox/internal/environment"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
@@ -16,13 +17,31 @@ type Callable interface {
 	String() string
 }
 
+type ClockCallable struct{}
+
+func (c *ClockCallable) Arity() int {
+	return 0
+}
+
+func (c *ClockCallable) Call(in *Interpreter, arguments []any) (any, error) {
+	return float64(time.Now().UnixNano()) / 1e9, nil
+}
+
+func (c *ClockCallable) String() string {
+	return "<native fn>"
+}
+
 type Interpreter struct {
+	globals     *environment.Environment
 	environment *environment.Environment
 }
 
 func NewInterpreter() *Interpreter {
+	globals := environment.NewEnvironment()
+	globals.Define("clock", &ClockCallable{})
 	return &Interpreter{
-		environment: environment.NewEnvironment(),
+		globals:     globals,
+		environment: globals,
 	}
 }
 

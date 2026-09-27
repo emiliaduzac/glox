@@ -1933,3 +1933,33 @@ func TestEvaluateCall(t *testing.T) {
 		AssertErrorMessage(t, err, "invocation failure")
 	})
 }
+
+func TestNativeClock(t *testing.T) {
+	in := SetUpInterpreter(t)
+	paren := *token.NewToken(token.RIGHT_PAREN, ")", nil, 1)
+
+	t.Run("Evaluate native clock returns positive timestamp", func(t *testing.T) {
+		call := expression.NewCall(
+			expression.NewVariable(*token.NewToken(token.IDENTIFIER, "clock", nil, 1)),
+			paren,
+			nil,
+		)
+		val, err := in.Evaluate(call)
+		AssertNoError(t, err)
+
+		num, ok := val.(float64)
+		if !ok || num <= 0 {
+			t.Fatalf("expected positive float64, got %v", val)
+		}
+	})
+
+	t.Run("Error when calling native clock with arguments", func(t *testing.T) {
+		call := expression.NewCall(
+			expression.NewVariable(*token.NewToken(token.IDENTIFIER, "clock", nil, 1)),
+			paren,
+			[]expression.Expr{expression.NewLiteral(1.0)},
+		)
+		_, err := in.Evaluate(call)
+		AssertErrorMessage(t, err, "expected 0 arguments but got 1")
+	})
+}
