@@ -8,6 +8,9 @@ import (
 	"tp-lox/internal/token"
 )
 
+// Tests de Evaluate para cada construcción de expresión (Literal, Grouping,
+// Unary, Binary, Variable, Assign)
+
 func TestEvaluateUnsupportedExpression(t *testing.T) {
 	in := SetUpInterpreter(t)
 
@@ -28,77 +31,43 @@ func TestEvaluateLiterals(t *testing.T) {
 	t.Run("Evaluate positive integer literal", func(t *testing.T) {
 		expression := expression.NewLiteral(99.0)
 		value, err := in.Evaluate(expression)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		AssertNoError(t, err)
 		AssertValue(t, value, 99.0)
 	})
 
 	t.Run("Evaluate empty string literal", func(t *testing.T) {
 		expression := expression.NewLiteral("")
 		value, err := in.Evaluate(expression)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		AssertNoError(t, err)
 		AssertValue(t, value, "")
 	})
 
 	t.Run("Evaluate string literal", func(t *testing.T) {
 		expression := expression.NewLiteral("Hello World")
 		value, err := in.Evaluate(expression)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		AssertNoError(t, err)
 		AssertValue(t, value, "Hello World")
 	})
 
 	t.Run("Evaluate boolean literal", func(t *testing.T) {
 		expression := expression.NewLiteral(true)
 		value, err := in.Evaluate(expression)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		AssertNoError(t, err)
 		AssertValue(t, value, true)
 	})
 
 	t.Run("Evaluate false boolean literal", func(t *testing.T) {
 		expression := expression.NewLiteral(false)
 		value, err := in.Evaluate(expression)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		AssertNoError(t, err)
 		AssertValue(t, value, false)
 	})
 
 	t.Run("Evaluate nil literal", func(t *testing.T) {
 		expression := expression.NewLiteral(nil)
 		value, err := in.Evaluate(expression)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		AssertNoError(t, err)
 		AssertValue(t, value, nil)
-	})
-}
-
-func TestStringify(t *testing.T) {
-	t.Run("Stringify nil value", func(t *testing.T) {
-		AssertValue(t, Stringify(nil), "nil")
-	})
-
-	t.Run("Stringify integer value", func(t *testing.T) {
-		AssertValue(t, Stringify(99), "99")
-	})
-
-	t.Run("Stringify string value", func(t *testing.T) {
-		AssertValue(t, Stringify("Hello"), "Hello")
-	})
-
-	t.Run("Stringify boolean true value", func(t *testing.T) {
-		AssertValue(t, Stringify(true), "true")
-	})
-
-	t.Run("Stringify boolean false value", func(t *testing.T) {
-		AssertValue(t, Stringify(false), "false")
 	})
 }
 
@@ -124,128 +93,6 @@ func TestEvaluateGrouping(t *testing.T) {
 		value, err := in.Evaluate(expression)
 		AssertNoError(t, err)
 		AssertValue(t, value, 88)
-	})
-}
-
-func TestIsTruthy(t *testing.T) {
-	t.Run("Nil is falsy", func(t *testing.T) {
-		AssertValue(t, isTruthy(nil), false)
-	})
-
-	t.Run("False is falsy", func(t *testing.T) {
-		AssertValue(t, isTruthy(false), false)
-	})
-
-	t.Run("True is truthy", func(t *testing.T) {
-		AssertValue(t, isTruthy(true), true)
-	})
-
-	t.Run("Zero number is truthy", func(t *testing.T) {
-		AssertValue(t, isTruthy(0.0), true)
-	})
-
-	t.Run("Positive number is truthy", func(t *testing.T) {
-		AssertValue(t, isTruthy(88.0), true)
-	})
-
-	t.Run("Empty string is truthy", func(t *testing.T) {
-		AssertValue(t, isTruthy(""), true)
-	})
-
-	t.Run("Non-empty string is truthy", func(t *testing.T) {
-		AssertValue(t, isTruthy("hello"), true)
-	})
-}
-
-func TestIsEqual(t *testing.T) {
-	t.Run("Nil equals nil", func(t *testing.T) {
-		AssertValue(t, isEqual(nil, nil), true)
-	})
-
-	t.Run("Nil does not equal non-nil", func(t *testing.T) {
-		AssertValue(t, isEqual(nil, false), false)
-		AssertValue(t, isEqual(nil, 0.0), false)
-		AssertValue(t, isEqual(nil, ""), false)
-		AssertValue(t, isEqual(false, nil), false)
-		AssertValue(t, isEqual(0.0, nil), false)
-		AssertValue(t, isEqual("", nil), false)
-	})
-
-	t.Run("Same numbers are equal", func(t *testing.T) {
-		AssertValue(t, isEqual(11.0, 11.0), true)
-		AssertValue(t, isEqual(-10.0, -10.0), true)
-		AssertValue(t, isEqual(0.0, 0.0), true)
-	})
-
-	t.Run("Different numbers are not equal", func(t *testing.T) {
-		AssertValue(t, isEqual(11.0, 10.0), false)
-		AssertValue(t, isEqual(-5.0, 5.0), false)
-	})
-
-	t.Run("Same strings are equal", func(t *testing.T) {
-		AssertValue(t, isEqual("hello", "hello"), true)
-		AssertValue(t, isEqual("", ""), true)
-	})
-
-	t.Run("Different strings are not equal", func(t *testing.T) {
-		AssertValue(t, isEqual("hello", "world"), false)
-	})
-
-	t.Run("Same booleans are equal", func(t *testing.T) {
-		AssertValue(t, isEqual(true, true), true)
-		AssertValue(t, isEqual(false, false), true)
-	})
-
-	t.Run("Different booleans are not equal", func(t *testing.T) {
-		AssertValue(t, isEqual(true, false), false)
-	})
-
-	t.Run("Different types are not equal without coercion", func(t *testing.T) {
-		AssertValue(t, isEqual(42.0, "42.0"), false)
-		AssertValue(t, isEqual(0.0, false), false)
-		AssertValue(t, isEqual("", false), false)
-		AssertValue(t, isEqual(true, 1.0), false)
-	})
-}
-
-func TestCheckNumberOperand(t *testing.T) {
-	op := *token.NewToken(token.MINUS, "-", nil, 1)
-
-	t.Run("Operand is a number", func(t *testing.T) {
-		num, err := checkNumberOperand(op, 10.0)
-		AssertNoError(t, err)
-		AssertValue(t, num, 10.0)
-	})
-
-	t.Run("Operand is not a number", func(t *testing.T) {
-		_, err := checkNumberOperand(op, "not a number")
-		AssertError(t, err)
-	})
-}
-
-func TestCheckNumberOperands(t *testing.T) {
-	op := *token.NewToken(token.PLUS, "+", nil, 1)
-
-	t.Run("Both operands are numbers", func(t *testing.T) {
-		left, right, err := checkNumberOperands(op, 10.0, 20.0)
-		AssertNoError(t, err)
-		AssertValue(t, left, 10.0)
-		AssertValue(t, right, 20.0)
-	})
-
-	t.Run("Left operand is not a number", func(t *testing.T) {
-		_, _, err := checkNumberOperands(op, "not a number", 20.0)
-		AssertError(t, err)
-	})
-
-	t.Run("Right operand is not a number", func(t *testing.T) {
-		_, _, err := checkNumberOperands(op, 10.0, "not a number")
-		AssertError(t, err)
-	})
-
-	t.Run("Neither operand is a number", func(t *testing.T) {
-		_, _, err := checkNumberOperands(op, "a", "b")
-		AssertError(t, err)
 	})
 }
 
@@ -288,6 +135,21 @@ func TestEvaluateUnaryMinus(t *testing.T) {
 	t.Run("Error when negating nil", func(t *testing.T) {
 		expr := expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral(nil))
 		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+}
+
+func TestCheckNumberOperand(t *testing.T) {
+	op := *token.NewToken(token.MINUS, "-", nil, 1)
+
+	t.Run("Operand is a number", func(t *testing.T) {
+		num, err := checkNumberOperand(op, 10.0)
+		AssertNoError(t, err)
+		AssertValue(t, num, 10.0)
+	})
+
+	t.Run("Operand is not a number", func(t *testing.T) {
+		_, err := checkNumberOperand(op, "not a number")
 		AssertError(t, err)
 	})
 }
@@ -340,6 +202,36 @@ func TestEvaluateUnaryBang(t *testing.T) {
 	})
 }
 
+func TestIsTruthy(t *testing.T) {
+	t.Run("Nil is falsy", func(t *testing.T) {
+		AssertValue(t, isTruthy(nil), false)
+	})
+
+	t.Run("False is falsy", func(t *testing.T) {
+		AssertValue(t, isTruthy(false), false)
+	})
+
+	t.Run("True is truthy", func(t *testing.T) {
+		AssertValue(t, isTruthy(true), true)
+	})
+
+	t.Run("Zero number is truthy", func(t *testing.T) {
+		AssertValue(t, isTruthy(0.0), true)
+	})
+
+	t.Run("Positive number is truthy", func(t *testing.T) {
+		AssertValue(t, isTruthy(88.0), true)
+	})
+
+	t.Run("Empty string is truthy", func(t *testing.T) {
+		AssertValue(t, isTruthy(""), true)
+	})
+
+	t.Run("Non-empty string is truthy", func(t *testing.T) {
+		AssertValue(t, isTruthy("hello"), true)
+	})
+}
+
 func TestEvaluateBinary(t *testing.T) {
 	in := SetUpInterpreter(t)
 
@@ -378,6 +270,32 @@ func TestEvaluateBinary(t *testing.T) {
 			expression.NewLiteral(20.0),
 		)
 		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+}
+
+func TestCheckNumberOperands(t *testing.T) {
+	op := *token.NewToken(token.PLUS, "+", nil, 1)
+
+	t.Run("Both operands are numbers", func(t *testing.T) {
+		left, right, err := checkNumberOperands(op, 10.0, 20.0)
+		AssertNoError(t, err)
+		AssertValue(t, left, 10.0)
+		AssertValue(t, right, 20.0)
+	})
+
+	t.Run("Left operand is not a number", func(t *testing.T) {
+		_, _, err := checkNumberOperands(op, "not a number", 20.0)
+		AssertError(t, err)
+	})
+
+	t.Run("Right operand is not a number", func(t *testing.T) {
+		_, _, err := checkNumberOperands(op, 10.0, "not a number")
+		AssertError(t, err)
+	})
+
+	t.Run("Neither operand is a number", func(t *testing.T) {
+		_, _, err := checkNumberOperands(op, "a", "b")
 		AssertError(t, err)
 	})
 }
@@ -1503,6 +1421,57 @@ func TestEvaluateBinaryEqualEqual(t *testing.T) {
 	})
 }
 
+func TestIsEqual(t *testing.T) {
+	t.Run("Nil equals nil", func(t *testing.T) {
+		AssertValue(t, isEqual(nil, nil), true)
+	})
+
+	t.Run("Nil does not equal non-nil", func(t *testing.T) {
+		AssertValue(t, isEqual(nil, false), false)
+		AssertValue(t, isEqual(nil, 0.0), false)
+		AssertValue(t, isEqual(nil, ""), false)
+		AssertValue(t, isEqual(false, nil), false)
+		AssertValue(t, isEqual(0.0, nil), false)
+		AssertValue(t, isEqual("", nil), false)
+	})
+
+	t.Run("Same numbers are equal", func(t *testing.T) {
+		AssertValue(t, isEqual(11.0, 11.0), true)
+		AssertValue(t, isEqual(-10.0, -10.0), true)
+		AssertValue(t, isEqual(0.0, 0.0), true)
+	})
+
+	t.Run("Different numbers are not equal", func(t *testing.T) {
+		AssertValue(t, isEqual(11.0, 10.0), false)
+		AssertValue(t, isEqual(-5.0, 5.0), false)
+	})
+
+	t.Run("Same strings are equal", func(t *testing.T) {
+		AssertValue(t, isEqual("hello", "hello"), true)
+		AssertValue(t, isEqual("", ""), true)
+	})
+
+	t.Run("Different strings are not equal", func(t *testing.T) {
+		AssertValue(t, isEqual("hello", "world"), false)
+	})
+
+	t.Run("Same booleans are equal", func(t *testing.T) {
+		AssertValue(t, isEqual(true, true), true)
+		AssertValue(t, isEqual(false, false), true)
+	})
+
+	t.Run("Different booleans are not equal", func(t *testing.T) {
+		AssertValue(t, isEqual(true, false), false)
+	})
+
+	t.Run("Different types are not equal without coercion", func(t *testing.T) {
+		AssertValue(t, isEqual(42.0, "42.0"), false)
+		AssertValue(t, isEqual(0.0, false), false)
+		AssertValue(t, isEqual("", false), false)
+		AssertValue(t, isEqual(true, 1.0), false)
+	})
+}
+
 func TestEvaluateBinaryBangEqual(t *testing.T) {
 	in := SetUpInterpreter(t)
 
@@ -1637,6 +1606,25 @@ func TestEvaluateBinaryBangEqual(t *testing.T) {
 	})
 }
 
+func TestEvaluateVariable(t *testing.T) {
+	in := SetUpInterpreter(t)
+
+	t.Run("Evaluate a declared variable", func(t *testing.T) {
+		tok := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tok, expression.NewLiteral(42.0))))
+
+		val, err := in.Evaluate(expression.NewVariable(tok))
+		AssertNoError(t, err)
+		AssertValue(t, val, 42.0)
+	})
+
+	t.Run("Error when evaluating undeclared variable", func(t *testing.T) {
+		tok := *token.NewToken(token.IDENTIFIER, "undeclared", nil, 1)
+		_, err := in.Evaluate(expression.NewVariable(tok))
+		AssertErrorMessage(t, err, "undefined variable 'undeclared'")
+	})
+}
+
 func TestEvaluateAssign(t *testing.T) {
 	in := SetUpInterpreter(t)
 
@@ -1692,5 +1680,104 @@ func TestEvaluateAssign(t *testing.T) {
 		varVal, err := in.Evaluate(expression.NewVariable(tok))
 		AssertNoError(t, err)
 		AssertValue(t, varVal, 10.0)
+	})
+}
+
+func TestEvaluateLogical(t *testing.T) {
+	in := SetUpInterpreter(t)
+
+	t.Run("Or with truthy left short-circuits and does not evaluate right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(true),
+			*token.NewToken(token.OR, "or", nil, 1),
+			invalidExpr(),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, true)
+	})
+
+	t.Run("Or with falsy left evaluates and returns right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(false),
+			*token.NewToken(token.OR, "or", nil, 1),
+			expression.NewLiteral("hello"),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, "hello")
+	})
+
+	t.Run("Or returns the truthy operand as-is, not coerced to boolean", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(0.0),
+			*token.NewToken(token.OR, "or", nil, 1),
+			expression.NewLiteral("ignored"),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, 0.0)
+	})
+
+	t.Run("Or propagates error from left operand", func(t *testing.T) {
+		expr := expression.NewLogical(
+			invalidExpr(),
+			*token.NewToken(token.OR, "or", nil, 1),
+			expression.NewLiteral(true),
+		)
+		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+
+	t.Run("Or propagates error from right operand when left is falsy", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(false),
+			*token.NewToken(token.OR, "or", nil, 1),
+			invalidExpr(),
+		)
+		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+
+	t.Run("And with falsy left short-circuits and does not evaluate right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(false),
+			*token.NewToken(token.AND, "and", nil, 1),
+			invalidExpr(),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, false)
+	})
+
+	t.Run("And with truthy left evaluates and returns right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(true),
+			*token.NewToken(token.AND, "and", nil, 1),
+			expression.NewLiteral("hello"),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, "hello")
+	})
+
+	t.Run("And propagates error from left operand", func(t *testing.T) {
+		expr := expression.NewLogical(
+			invalidExpr(),
+			*token.NewToken(token.AND, "and", nil, 1),
+			expression.NewLiteral(true),
+		)
+		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+
+	t.Run("And propagates error from right operand when left is truthy", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(true),
+			*token.NewToken(token.AND, "and", nil, 1),
+			invalidExpr(),
+		)
+		_, err := in.Evaluate(expr)
+		AssertError(t, err)
 	})
 }

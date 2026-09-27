@@ -97,7 +97,7 @@ TBD
 - [X] Parser - statements
 - [X] Interpreter - statements
 - [X] Estado
-- [ ] Control de flujo
+- [X] Control de flujo
 - [ ] Funciones
 
 (esto lo borramos despues para la entrega)

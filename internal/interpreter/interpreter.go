@@ -61,6 +61,34 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 		return nil
 	case *statements.BlockStmt:
 		return in.ExecuteBlock(s.Statements, environment.NewEnclosedEnvironment(in.environment))
+	case *statements.IfStmt:
+		condition, err := in.Evaluate(s.Condition)
+		if err != nil {
+			return err
+		}
+
+		if isTruthy(condition) {
+			return in.Execute(s.ThenBranch)
+		} else if s.ElseBranch != nil {
+			return in.Execute(s.ElseBranch)
+		}
+		return nil
+	case *statements.WhileStmt:
+		for {
+			condition, err := in.Evaluate(s.Condition)
+			if err != nil {
+				return err
+			}
+			if !isTruthy(condition) {
+				break
+			}
+
+			err = in.Execute(s.Body)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}
@@ -106,6 +134,22 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 			return nil, err
 		}
 		return value, nil
+	case *expression.Logical:
+		left, err := in.Evaluate(e.Left)
+		if err != nil {
+			return nil, err
+		}
+
+		if e.Operator.TokenType == token.OR && isTruthy(left) {
+			return left, nil
+		} else if e.Operator.TokenType == token.AND && !isTruthy(left) {
+			return left, nil
+		}
+		right, err := in.Evaluate(e.Right)
+		if err != nil {
+			return nil, err
+		}
+		return right, nil
 	default:
 		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown expression: %T", expr))
 	}

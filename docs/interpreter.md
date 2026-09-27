@@ -29,6 +29,8 @@ Acá es que también debemos manejar "a mano" el caso `default` y estar atentos 
 
 4. Sobre el operador módulo (`%`): Al manejarlo Go solo lo aplica a enteros, por lo que usamos `math.Mod` para preservar los flotantes y no caer en panics. 
 
+5. **Operadores lógicos**: a diferencia de otros lenguajes, evaluar estos operadores no se resuelve a un booleano, sino que devuelven el valor del operando que "decidió" el resultado. Es decir: el de la izquierda si hubo cortocircuito (explicados en [parser.md](parser.md)), el de la derecha si no. 
+
 ### Errores en tiempo de ejecución
 
 Si por ejemplo llega un `true < false`, no se crashea con `panic`, sino que se retorna un error con el número de línea informativo. 
@@ -58,11 +60,13 @@ Otro caso muy interesante es el de mutación de las variables externas. Es decir
 
 #### Ejecución de bloques
 
-Para ejecutar un bloque implementamos en el método encargado la idea de guardarse una referencia al entorno anterior como una variable, activás el entorno del hijo y ahí ejecutás cada una de las sentencias del bloque. 
+Para ejecutar un bloque implementamos el siguiente método: la idea es primero guardarse una referencia al entorno actual como una variable (pasa a ser el `previous`), después se activa el entorno del hijo (que pasa a ser el actual) y ahí se ejecuta cada una de las sentencias del bloque. 
 
 Un detalle propio de implementar Glox, es que en el libro al usar Java se usa un `try` y `finally`, pero en Go no existe, por lo que la forma más idiomática de Go fue usar un `defer`. Esto ayuda a que si una sentencia del bloque falla al ejecutarse, se corta y Go termina ejecutando sí o sí `in.environment = previous` que es el scope del padre, y no se queda atrapado en el del hijo. 
 
-Y un detalle interesante de nuestra implementación hasta el momento es que no tenemos un método para destruir los scopes. Sino que como los punteros van del hijo al padre, cuando se termina el bloque y se cambia el puntero al padre, nadie más referencia al hijo, y eso es lo que le permite al garbage collector de Go detectar que ya nadie lo referencia, por lo tanto es inalcanzable y lo libera de manera automática. Por el momento es algo que está así, analizaremos a futuro si así lo dejamos. 
+Y un detalle interesante de nuestra implementación es que, hasta el momento, no tenemos un método para destruir los scopes explícitamente. Acá hay que distinguir dos punteros distintos: por un lado el `enclosing`: puntero de un entorno hijo hacia su padre, que se define una sola vez al crearlo y nunca cambia después. Por otro lado el `environment`: el puntero de "cuál entorno está activo ahora" en el intérprete: al entrar al bloque apunta al hijo, y al salir (por el `defer`) vuelve a apuntar al padre. Una vez que eso pasa, y la variable local `env` del método sale de scope, nadie en el programa referencia más al entorno del hijo, y eso es lo que le permite al garbage collector de Go detectarlo y liberarlo solo. Por el momento es algo que está así, analizaremos a futuro si así lo dejamos. 
+
+Al agregar los ciclos sucede que, cuando el cuerpo es un bloque, se crea un nuevo `environment` en cada iteración. Por lo tanto, las variables definidas dentro del cuerpo se re-declaran en cada vuelta (cada una en su entorno, que vive exactamente una sola iteración), si se quisiera utilizar una variable más a modo acumuladora, debe declararse fuera del ciclo (como sucede en todos los lenguajes). 
 
 ### Tests
 

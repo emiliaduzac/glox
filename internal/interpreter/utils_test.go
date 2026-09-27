@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"tp-lox/internal/expression"
+	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
 )
 
@@ -85,4 +86,9 @@ func (u UnsupportedStmt) Statement() {}
 // invalidExpr devuelve una expresión que falla al evaluarse.
 func invalidExpr() expression.Expr {
 	return expression.NewUnary(*token.NewToken(token.MINUS, "-", nil, 1), expression.NewLiteral("a"))
+}
+
+// printStmt devuelve un print statement que imprime el string dado.
+func printStmt(msg string) statements.Stmt {
+	return statements.NewPrintStmt(expression.NewLiteral(msg))
 }
