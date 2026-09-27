@@ -251,6 +251,69 @@ func TestExecuteIfStatement(t *testing.T) {
 	})
 }
 
+func TestExecuteWhileStatement(t *testing.T) {
+	t.Run("Loop runs while condition holds and updates outer variable across iterations", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokCount := *token.NewToken(token.IDENTIFIER, "count", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tokCount, expression.NewLiteral(0.0))))
+
+		condition := expression.NewBinary(
+			expression.NewVariable(tokCount),
+			*token.NewToken(token.LESS, "<", nil, 1),
+			expression.NewLiteral(3.0),
+		)
+		body := statements.NewBlockStmt([]statements.Stmt{
+			statements.NewPrintStmt(expression.NewVariable(tokCount)),
+			statements.NewExpressionStmt(expression.NewAssign(
+				tokCount,
+				expression.NewBinary(expression.NewVariable(tokCount), *token.NewToken(token.PLUS, "+", nil, 1), expression.NewLiteral(1.0)),
+			)),
+		})
+		stmt := statements.NewWhileStmt(condition, body)
+
+		out := CaptureOutput(t, func() {
+			AssertNoError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "0\n1\n2\n")
+
+		val, err := in.Evaluate(expression.NewVariable(tokCount))
+		AssertNoError(t, err)
+		AssertValue(t, val, 3.0)
+	})
+
+	t.Run("False condition from the start executes zero iterations", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewWhileStmt(expression.NewLiteral(false), printStmt("never"))
+		out := CaptureOutput(t, func() {
+			AssertNoError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "")
+	})
+
+	t.Run("Error in condition is returned and body never runs", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewWhileStmt(invalidExpr(), printStmt("never"))
+		out := CaptureOutput(t, func() {
+			AssertError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "")
+	})
+
+	t.Run("Error in body stops the loop and is returned", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		body := statements.NewBlockStmt([]statements.Stmt{
+			printStmt("loop"),
+			statements.NewExpressionStmt(invalidExpr()),
+		})
+		stmt := statements.NewWhileStmt(expression.NewLiteral(true), body)
+
+		out := CaptureOutput(t, func() {
+			AssertError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "loop\n")
+	})
+}
+
 func TestInterpret(t *testing.T) {
 	in := SetUpInterpreter(t)
 

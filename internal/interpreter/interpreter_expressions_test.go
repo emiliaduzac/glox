@@ -1682,3 +1682,124 @@ func TestEvaluateAssign(t *testing.T) {
 		AssertValue(t, varVal, 10.0)
 	})
 }
+
+func TestEvaluateLogical(t *testing.T) {
+	in := SetUpInterpreter(t)
+
+	t.Run("Or with truthy left short-circuits and does not evaluate right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(true),
+			*token.NewToken(token.OR, "or", nil, 1),
+			invalidExpr(),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, true)
+	})
+
+	t.Run("Or with falsy left evaluates and returns right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(false),
+			*token.NewToken(token.OR, "or", nil, 1),
+			expression.NewLiteral("hello"),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, "hello")
+	})
+
+	t.Run("Or with nil left evaluates and returns right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.OR, "or", nil, 1),
+			expression.NewLiteral("hello"),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, "hello")
+	})
+
+	t.Run("Or returns the truthy operand as-is, not coerced to boolean", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(0.0),
+			*token.NewToken(token.OR, "or", nil, 1),
+			expression.NewLiteral("ignored"),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, 0.0)
+	})
+
+	t.Run("Or propagates error from left operand", func(t *testing.T) {
+		expr := expression.NewLogical(
+			invalidExpr(),
+			*token.NewToken(token.OR, "or", nil, 1),
+			expression.NewLiteral(true),
+		)
+		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+
+	t.Run("Or propagates error from right operand when left is falsy", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(false),
+			*token.NewToken(token.OR, "or", nil, 1),
+			invalidExpr(),
+		)
+		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+
+	t.Run("And with falsy left short-circuits and does not evaluate right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(false),
+			*token.NewToken(token.AND, "and", nil, 1),
+			invalidExpr(),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, false)
+	})
+
+	t.Run("And with nil left short-circuits and does not evaluate right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(nil),
+			*token.NewToken(token.AND, "and", nil, 1),
+			invalidExpr(),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, nil)
+	})
+
+	t.Run("And with truthy left evaluates and returns right", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(true),
+			*token.NewToken(token.AND, "and", nil, 1),
+			expression.NewLiteral("hello"),
+		)
+		val, err := in.Evaluate(expr)
+		AssertNoError(t, err)
+		AssertValue(t, val, "hello")
+	})
+
+	t.Run("And propagates error from left operand", func(t *testing.T) {
+		expr := expression.NewLogical(
+			invalidExpr(),
+			*token.NewToken(token.AND, "and", nil, 1),
+			expression.NewLiteral(true),
+		)
+		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+
+	t.Run("And propagates error from right operand when left is truthy", func(t *testing.T) {
+		expr := expression.NewLogical(
+			expression.NewLiteral(true),
+			*token.NewToken(token.AND, "and", nil, 1),
+			invalidExpr(),
+		)
+		_, err := in.Evaluate(expr)
+		AssertError(t, err)
+	})
+}
