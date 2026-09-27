@@ -290,6 +290,143 @@ func TestParseAssignmentErrors(t *testing.T) {
 	}
 }
 
+func TestParseLogical(t *testing.T) {
+	t.Run("or", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			orToken,
+			*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(<1> OR <2>)")
+	})
+
+	t.Run("and", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			andToken,
+			*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(<1> AND <2>)")
+	})
+}
+
+func TestParseLogicalErrors(t *testing.T) {
+	tokens := []token.Token{
+		*token.NewToken(token.NUMBER, "1", 1.0, 1),
+		orToken,
+		semicolonToken,
+	}
+
+	t.Run("falta operando derecho (expresion incompleta)", func(t *testing.T) {
+		setUpParserExpectError(t, tokens, "expected expression, got `;`")
+	})
+}
+
+func TestPrecedenceAssignment(t *testing.T) {
+	t.Run("Assignment is right associative", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a (= b <5>))")
+	})
+
+	t.Run("Assignment has lower precedence than equality", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.EQUAL, "=", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+			*token.NewToken(token.NUMBER, "5", 5.0, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(= a (<b> EQUAL_EQUAL <5>))")
+	})
+}
+
+func TestPrecedenceLogical(t *testing.T) {
+	tests := []struct {
+		name     string
+		tokens   []token.Token
+		expected string
+	}{
+		{
+			"and es mas prioritario que or",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				orToken,
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				andToken,
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
+			},
+			"(<1> OR (<2> AND <3>))",
+		},
+		{
+			"equality es mas prioritario que and",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				andToken,
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
+				*token.NewToken(token.NUMBER, "4", 4.0, 1),
+				semicolonToken,
+			},
+			"((<1> EQUAL_EQUAL <2>) AND (<3> EQUAL_EQUAL <4>))",
+		},
+		{
+			"asociatividad izquierda de or",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				orToken,
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				orToken,
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
+			},
+			"((<1> OR <2>) OR <3>)",
+		},
+		{
+			"asociatividad izquierda de and",
+			[]token.Token{
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				andToken,
+				*token.NewToken(token.NUMBER, "2", 2.0, 1),
+				andToken,
+				*token.NewToken(token.NUMBER, "3", 3.0, 1),
+				semicolonToken,
+			},
+			"((<1> AND <2>) AND <3>)",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			stmts := setUpParser(t, test.tokens)
+			expr := assertExpressionStatement(t, stmts)
+			assertString(t, expr, test.expected)
+		})
+	}
+}
+
 func TestPrecedenceEquality(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -475,36 +612,4 @@ func TestPrecedenceGrouping(t *testing.T) {
 		assertString(t, expr, "((group (<1> PLUS <2>)) STAR <3>)")
 	})
 
-}
-
-func TestPrecedenceAssignment(t *testing.T) {
-	t.Run("Assignment is right associative", func(t *testing.T) {
-		tokens := []token.Token{
-			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
-			*token.NewToken(token.EQUAL, "=", nil, 1),
-			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
-			*token.NewToken(token.EQUAL, "=", nil, 1),
-			*token.NewToken(token.NUMBER, "5", 5.0, 1),
-			semicolonToken,
-		}
-
-		stmts := setUpParser(t, tokens)
-		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(= a (= b <5>))")
-	})
-
-	t.Run("Assignment has lower precedence than equality", func(t *testing.T) {
-		tokens := []token.Token{
-			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
-			*token.NewToken(token.EQUAL, "=", nil, 1),
-			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
-			*token.NewToken(token.EQUAL_EQUAL, "==", nil, 1),
-			*token.NewToken(token.NUMBER, "5", 5.0, 1),
-			semicolonToken,
-		}
-
-		stmts := setUpParser(t, tokens)
-		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(= a (<b> EQUAL_EQUAL <5>))")
-	})
 }

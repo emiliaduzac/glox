@@ -417,3 +417,112 @@ func TestParseIfErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestParseWhile(t *testing.T) {
+	t.Run("While with print body", func(t *testing.T) {
+		tokens := []token.Token{
+			whileToken, leftParen, trueToken, rightParen,
+			printToken, *token.NewToken(token.NUMBER, "1", 1.0, 1), semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(while <TRUE> (print <1>))")
+	})
+
+	t.Run("While with block body", func(t *testing.T) {
+		tokens := []token.Token{
+			whileToken, leftParen, trueToken, rightParen,
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			printToken, *token.NewToken(token.NUMBER, "1", 1.0, 1), semicolonToken,
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(while <TRUE> (block (print <1>)))")
+	})
+
+	t.Run("Condition with comparison", func(t *testing.T) {
+		tokens := []token.Token{
+			whileToken, leftParen,
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.LESS, "<", nil, 1),
+			*token.NewToken(token.NUMBER, "10", 10.0, 1),
+			rightParen,
+			printToken, *token.NewToken(token.IDENTIFIER, "a", nil, 1), semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(while (<a> LESS <10>) (print <a>))")
+	})
+
+	t.Run("While inside a block", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			whileToken, leftParen, trueToken, rightParen,
+			printToken, *token.NewToken(token.NUMBER, "1", 1.0, 1), semicolonToken,
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (while <TRUE> (print <1>)))")
+	})
+}
+
+func TestParseWhileErrors(t *testing.T) {
+	tests := []struct {
+		name                 string
+		tokens               []token.Token
+		expectedErrorContent string
+	}{
+		{
+			"while without '(' after 'while'",
+			[]token.Token{
+				whileToken,
+				trueToken,
+				printToken,
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				semicolonToken,
+			},
+			"expected '(' after 'while', got `true`",
+		},
+		{
+			"while without ')' after condition",
+			[]token.Token{
+				whileToken,
+				leftParen,
+				trueToken,
+				printToken,
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				semicolonToken,
+			},
+			"expected ')' after while condition, got `print`",
+		},
+		{
+			"while with empty condition",
+			[]token.Token{
+				whileToken,
+				leftParen,
+				rightParen,
+				printToken,
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				semicolonToken,
+			},
+			"expected expression, got `)`",
+		},
+		{
+			"while with declaration as body",
+			[]token.Token{
+				whileToken,
+				leftParen,
+				trueToken,
+				rightParen,
+				varToken,
+				*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+				semicolonToken,
+			},
+			"expected expression, got `var`",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setUpParserExpectError(t, test.tokens, test.expectedErrorContent)
+		})
+	}
+}

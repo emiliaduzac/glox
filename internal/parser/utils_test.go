@@ -15,10 +15,13 @@ var semicolonToken = *token.NewToken(token.SEMICOLON, ";", nil, 1)
 var varToken = *token.NewToken(token.VAR, "var", nil, 1)
 var ifToken = *token.NewToken(token.IF, "if", nil, 1)
 var elseToken = *token.NewToken(token.ELSE, "else", nil, 1)
+var whileToken = *token.NewToken(token.WHILE, "while", nil, 1)
 var leftParen = *token.NewToken(token.LEFT_PAREN, "(", nil, 1)
 var rightParen = *token.NewToken(token.RIGHT_PAREN, ")", nil, 1)
 var trueToken = *token.NewToken(token.TRUE, "true", nil, 1)
 var falseToken = *token.NewToken(token.FALSE, "false", nil, 1)
+var andToken = *token.NewToken(token.AND, "and", nil, 1)
+var orToken = *token.NewToken(token.OR, "or", nil, 1)
 
 func setUpParser(t *testing.T, tokens []token.Token) []statements.Stmt {
 	t.Helper()
