@@ -54,6 +54,7 @@ La gramática con precedencia y asociatividad queda definida:
 
 ```
 expression → assignment ;
+
 assignment → IDENTIFIER "=" assignment | equality ;
 
 equality   → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -80,6 +81,7 @@ Para **resolver** una expresión, el proceso va de arriba hacia abajo: **Recursi
 Como se evalúa dicho árbol será explicado en la implementación del interpreter: [interpreter.md](interpreter.md).
 
 #### El truco de L-Value y R-Value en la asignación
+
 Acá lo que pasaba es que nuestro parser solo mira un token, entonces en el caso de, por ejemplo, leer `x` no puede saber qué viene después, no sabe si es `x = 1` o `x + 1` hasta que no ve el `=`. Ahí es que seguimos el truco que se propone en el libro de parsear el lado izquierdo como si fuera una expresión, luego te fijás si lo que sigue es un `=`, si lo es ahí volvés a mirar para atrás entonces si lo que tenías antes es válido para ir con el `=`. Es decir, si tenés una variable está bien, y entonces convierte el nodo en un `Assign`, si no en ese momento ya te das cuenta del error.
 
 #### Manejo de errores

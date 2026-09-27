@@ -61,6 +61,18 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 		return nil
 	case *statements.BlockStmt:
 		return in.ExecuteBlock(s.Statements, environment.NewEnclosedEnvironment(in.environment))
+	case *statements.IfStmt:
+		condition, err := in.Evaluate(s.Condition)
+		if err != nil {
+			return err
+		}
+
+		if isTruthy(condition) {
+			return in.Execute(s.ThenBranch)
+		} else if s.ElseBranch != nil {
+			return in.Execute(s.ElseBranch)
+		}
+		return nil
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}

@@ -63,6 +63,13 @@ func (p *Parser) statement() (statements.Stmt, error) {
 		}
 		return statements.NewBlockStmt(stmts), nil
 	}
+	if p.isInTokenTypes(token.IF) {
+		stmt, err := p.ifStatement()
+		if err != nil {
+			return nil, err
+		}
+		return stmt, nil
+	}
 
 	stmt, err := p.expressionStatement()
 	if err != nil {
@@ -128,6 +135,36 @@ func (p *Parser) varDeclaration() (statements.Stmt, error) {
 	}
 
 	return statements.NewVarStmt(varName, initializer), nil
+}
+
+func (p *Parser) ifStatement() (statements.Stmt, error) {
+	if !p.isInTokenTypes(token.LEFT_PAREN) {
+		return nil, p.expectedError("'(' after 'if'")
+	}
+	condition, err := p.expression()
+	if err != nil {
+		return nil, err
+	}
+	if !p.isInTokenTypes(token.RIGHT_PAREN) {
+		return nil, p.expectedError("')' after if condition")
+	}
+
+	thenBranch, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	var elseBranch statements.Stmt
+	if p.isInTokenTypes(token.ELSE) {
+		elseBranch, err = p.statement()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		elseBranch = nil
+	}
+
+	return statements.NewIfStmt(condition, thenBranch, elseBranch), nil
 }
 
 func (p *Parser) getStatement() (expression.Expr, error) {

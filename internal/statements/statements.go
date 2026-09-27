@@ -47,7 +47,7 @@ func NewVarStmt(name token.Token, expr expression.Expr) *VarStmt {
 	}
 }
 
-func (p *VarStmt) Statement() {}
+func (v *VarStmt) Statement() {}
 
 type BlockStmt struct {
 	Statements []Stmt
@@ -60,6 +60,22 @@ func NewBlockStmt(statements []Stmt) *BlockStmt {
 }
 
 func (b *BlockStmt) Statement() {}
+
+type IfStmt struct {
+	Condition  expression.Expr
+	ThenBranch Stmt
+	ElseBranch Stmt
+}
+
+func NewIfStmt(condition expression.Expr, thenBranch Stmt, elseBranch Stmt) *IfStmt {
+	return &IfStmt{
+		Condition:  condition,
+		ThenBranch: thenBranch,
+		ElseBranch: elseBranch,
+	}
+}
+
+func (is *IfStmt) Statement() {}
 
 func String(s Stmt) string {
 	switch s := s.(type) {
@@ -81,6 +97,11 @@ func String(s Stmt) string {
 			return "(block)"
 		}
 		return fmt.Sprintf("(block %s)", strings.Join(result, " "))
+	case *IfStmt:
+		if s.ElseBranch == nil {
+			return fmt.Sprintf("(if %s %s)", expression.String(s.Condition), String(s.ThenBranch))
+		}
+		return fmt.Sprintf("(if %s %s %s)", expression.String(s.Condition), String(s.ThenBranch), String(s.ElseBranch))
 	}
 	return fmt.Sprintf("unknown statement: %T", s)
 }
