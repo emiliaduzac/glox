@@ -160,8 +160,6 @@ func (p *Parser) ifStatement() (statements.Stmt, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		elseBranch = nil
 	}
 
 	return statements.NewIfStmt(condition, thenBranch, elseBranch), nil

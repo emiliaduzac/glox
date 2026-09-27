@@ -209,3 +209,110 @@ func TestExecuteBlockStatement(t *testing.T) {
 		AssertErrorMessage(t, err, "undefined variable 'temp'")
 	})
 }
+
+func TestExecuteIfStatement(t *testing.T) {
+	t.Run("True condition executes then branch only", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewIfStmt(expression.NewLiteral(true), printStmt("then"), printStmt("else"))
+		out := CaptureOutput(t, func() {
+			AssertNoError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "then\n")
+	})
+
+	t.Run("False condition executes else branch only", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewIfStmt(expression.NewLiteral(false), printStmt("then"), printStmt("else"))
+		out := CaptureOutput(t, func() {
+			AssertNoError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "else\n")
+	})
+
+	t.Run("False condition without else does nothing", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewIfStmt(expression.NewLiteral(false), printStmt("then"), nil)
+		out := CaptureOutput(t, func() {
+			AssertNoError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "")
+	})
+
+	t.Run("Condition truthiness follows Lox rules", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			condition any
+			expected  string
+		}{
+			{"nil is falsy", nil, "else\n"},
+			{"zero is truthy", 0.0, "then\n"},
+			{"empty string is truthy", "", "then\n"},
+			{"non-empty string is truthy", "a", "then\n"},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				in := SetUpInterpreter(t)
+				stmt := statements.NewIfStmt(expression.NewLiteral(tt.condition), printStmt("then"), printStmt("else"))
+				out := CaptureOutput(t, func() {
+					AssertNoError(t, in.Execute(stmt))
+				})
+				AssertValue(t, out, tt.expected)
+			})
+		}
+	})
+
+	t.Run("Error in condition is returned and no branch runs", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewIfStmt(invalidExpr(), printStmt("then"), printStmt("else"))
+		out := CaptureOutput(t, func() {
+			AssertError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "")
+	})
+
+	t.Run("Error in executed branch is returned", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		failingStmt := statements.NewExpressionStmt(invalidExpr())
+		stmt := statements.NewIfStmt(expression.NewLiteral(true), failingStmt, nil)
+		AssertError(t, in.Execute(stmt))
+	})
+
+	t.Run("Else if executes the matching branch only", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		elseIf := statements.NewIfStmt(expression.NewLiteral(true), printStmt("second"), printStmt("third"))
+		stmt := statements.NewIfStmt(expression.NewLiteral(false), printStmt("first"), elseIf)
+		out := CaptureOutput(t, func() {
+			AssertNoError(t, in.Execute(stmt))
+		})
+		AssertValue(t, out, "second\n")
+	})
+
+	t.Run("Variable declared in block branch is inaccessible outside", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokLocal := *token.NewToken(token.IDENTIFIER, "localOnly", nil, 1)
+		blockStmt := statements.NewBlockStmt([]statements.Stmt{
+			statements.NewVarStmt(tokLocal, expression.NewLiteral(1.0)),
+		})
+		stmt := statements.NewIfStmt(expression.NewLiteral(true), blockStmt, nil)
+
+		AssertNoError(t, in.Execute(stmt))
+
+		_, err := in.Evaluate(expression.NewVariable(tokLocal))
+		AssertErrorMessage(t, err, "undefined variable 'localOnly'")
+	})
+
+	t.Run("Assignment in branch modifies outer variable", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokX := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tokX, expression.NewLiteral(1.0))))
+
+		assignStmt := statements.NewExpressionStmt(expression.NewAssign(tokX, expression.NewLiteral(2.0)))
+		stmt := statements.NewIfStmt(expression.NewLiteral(true), assignStmt, nil)
+
+		AssertNoError(t, in.Execute(stmt))
+
+		val, err := in.Evaluate(expression.NewVariable(tokX))
+		AssertNoError(t, err)
+		AssertValue(t, val, 2.0)
+	})
+}
