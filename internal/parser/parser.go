@@ -64,6 +64,9 @@ func (p *Parser) statement() (statements.Stmt, error) {
 	if p.isInTokenTypes(token.WHILE) {
 		return p.whileStatement()
 	}
+	if p.isInTokenTypes(token.FOR) {
+		return p.forStatement()
+	}
 
 	return p.expressionStatement()
 }
@@ -173,6 +176,51 @@ func (p *Parser) whileStatement() (statements.Stmt, error) {
 	}
 
 	return statements.NewWhileStmt(condition, body), nil
+}
+
+func (p *Parser) forStatement() (statements.Stmt, error) {
+	if !p.isInTokenTypes(token.LEFT_PAREN) {
+		return nil, p.expectedError("'(' after 'for'")
+	}
+
+	// obtenemos las partes del for: inicializador, condición e incremento
+	initializer, err := p.parseForInitializer()
+	if err != nil {
+		return nil, err
+	}
+	condition, err := p.parseForCondition()
+	if err != nil {
+		return nil, err
+	}
+	increment, err := p.parseForIncrement()
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := p.statement()
+	if err != nil {
+		return nil, err
+	}
+
+	// de-sugaring: convertimos el for en un while con las partes obtenidas
+	if increment != nil {
+		body = statements.NewBlockStmt([]statements.Stmt{
+			body,
+			statements.NewExpressionStmt(increment),
+		})
+	}
+	if condition == nil {
+		condition = expression.NewLiteral(true)
+	}
+	body = statements.NewWhileStmt(condition, body)
+	if initializer != nil {
+		body = statements.NewBlockStmt([]statements.Stmt{
+			initializer,
+			body,
+		})
+	}
+
+	return body, nil
 }
 
 func (p *Parser) getStatement() (expression.Expr, error) {

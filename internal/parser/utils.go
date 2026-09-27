@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 	"tp-lox/internal/errors"
+	"tp-lox/internal/expression"
+	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
 )
 
@@ -57,4 +59,45 @@ func (p *Parser) advance() token.Token {
 		p.current++
 	}
 	return p.getPrevious()
+}
+
+func (p *Parser) parseForInitializer() (statements.Stmt, error) {
+	var initializer statements.Stmt
+	var err error
+	if p.isInTokenTypes(token.VAR) {
+		initializer, err = p.varDeclaration()
+	} else if !p.isInTokenTypes(token.SEMICOLON) {
+		initializer, err = p.expressionStatement()
+	}
+	return initializer, err
+}
+
+func (p *Parser) parseForCondition() (expression.Expr, error) {
+	var condition expression.Expr
+	var err error
+	if !p.isTokenType(token.SEMICOLON) {
+		condition, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !p.isInTokenTypes(token.SEMICOLON) {
+		return nil, p.expectedError("';' after for condition")
+	}
+	return condition, nil
+}
+
+func (p *Parser) parseForIncrement() (expression.Expr, error) {
+	var increment expression.Expr
+	var err error
+	if !p.isTokenType(token.RIGHT_PAREN) {
+		increment, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !p.isInTokenTypes(token.RIGHT_PAREN) {
+		return nil, p.expectedError("')' after for clauses")
+	}
+	return increment, nil
 }
