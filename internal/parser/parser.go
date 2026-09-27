@@ -411,6 +411,9 @@ func (p *Parser) finishCall(callee expression.Expr) (expression.Expr, error) {
 
 	if !p.isTokenType(token.RIGHT_PAREN) {
 		for {
+			if len(arguments) >= 255 {
+				return nil, p.expectedError("cannot have more than 255 arguments")
+			}
 			arg, err := p.expression()
 			if err != nil {
 				return nil, err

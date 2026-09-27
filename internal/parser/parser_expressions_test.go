@@ -683,4 +683,21 @@ func TestCallExpressions(t *testing.T) {
 
 		setUpParserExpectError(t, tokens, "')' after arguments")
 	})
+
+	t.Run("Exceeds max arguments error", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+		}
+
+		for i := 0; i < 256; i++ {
+			tokens = append(tokens, *token.NewToken(token.NUMBER, "1", 1.0, 1))
+			if i < 255 {
+				tokens = append(tokens, *token.NewToken(token.COMMA, ",", nil, 1))
+			}
+		}
+		tokens = append(tokens, *token.NewToken(token.RIGHT_PAREN, ")", nil, 1), semicolonToken)
+
+		setUpParserExpectError(t, tokens, "cannot have more than 255 arguments")
+	})
 }
