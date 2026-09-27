@@ -526,3 +526,131 @@ func TestParseWhileErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestParseFor(t *testing.T) {
+	t.Run("For with all clauses empty desugars to an infinite while", func(t *testing.T) {
+		tokens := []token.Token{
+			forToken, leftParen, semicolonToken, semicolonToken, rightParen,
+			printToken, *token.NewToken(token.NUMBER, "1", 1.0, 1), semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(while <TRUE> (print <1>))")
+	})
+
+	t.Run("For with only an initializer, a variable", func(t *testing.T) {
+		tokens := []token.Token{
+			forToken, leftParen,
+			varToken, *token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.EQUAL, "=", nil, 1), *token.NewToken(token.NUMBER, "0", 0.0, 1), semicolonToken,
+			semicolonToken,
+			rightParen,
+			printToken, *token.NewToken(token.IDENTIFIER, "i", nil, 1), semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (var IDENTIFIER<i> <0>) (while <TRUE> (print <i>)))")
+	})
+
+	t.Run("For with only a condition", func(t *testing.T) {
+		tokens := []token.Token{
+			forToken, leftParen,
+			semicolonToken,
+			*token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.LESS, "<", nil, 1), *token.NewToken(token.NUMBER, "3", 3.0, 1), semicolonToken,
+			rightParen,
+			printToken, *token.NewToken(token.IDENTIFIER, "i", nil, 1), semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(while (<i> LESS <3>) (print <i>))")
+	})
+
+	t.Run("For with only an increment", func(t *testing.T) {
+		tokens := []token.Token{
+			forToken, leftParen,
+			semicolonToken,
+			semicolonToken,
+			*token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.EQUAL, "=", nil, 1), *token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.PLUS, "+", nil, 1), *token.NewToken(token.NUMBER, "1", 1.0, 1),
+			rightParen,
+			printToken, *token.NewToken(token.IDENTIFIER, "i", nil, 1), semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(while <TRUE> (block (print <i>) (expr (= i (<i> PLUS <1>)))))")
+	})
+
+	t.Run("For with all three clauses", func(t *testing.T) {
+		tokens := []token.Token{
+			forToken, leftParen,
+			varToken, *token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.EQUAL, "=", nil, 1), *token.NewToken(token.NUMBER, "0", 0.0, 1), semicolonToken,
+			*token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.LESS, "<", nil, 1), *token.NewToken(token.NUMBER, "3", 3.0, 1), semicolonToken,
+			*token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.EQUAL, "=", nil, 1), *token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.PLUS, "+", nil, 1), *token.NewToken(token.NUMBER, "1", 1.0, 1),
+			rightParen,
+			printToken, *token.NewToken(token.IDENTIFIER, "i", nil, 1), semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (var IDENTIFIER<i> <0>) (while (<i> LESS <3>) (block (print <i>) (expr (= i (<i> PLUS <1>))))))")
+	})
+
+	t.Run("For with an expression as initializer", func(t *testing.T) {
+		tokens := []token.Token{
+			forToken, leftParen,
+			*token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.EQUAL, "=", nil, 1), *token.NewToken(token.NUMBER, "0", 0.0, 1), semicolonToken,
+			*token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.LESS, "<", nil, 1), *token.NewToken(token.NUMBER, "3", 3.0, 1), semicolonToken,
+			*token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.EQUAL, "=", nil, 1), *token.NewToken(token.IDENTIFIER, "i", nil, 1), *token.NewToken(token.PLUS, "+", nil, 1), *token.NewToken(token.NUMBER, "1", 1.0, 1),
+			rightParen,
+			printToken, *token.NewToken(token.IDENTIFIER, "i", nil, 1), semicolonToken,
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (expr (= i <0>)) (while (<i> LESS <3>) (block (print <i>) (expr (= i (<i> PLUS <1>))))))")
+	})
+}
+
+func TestParseForErrors(t *testing.T) {
+	tests := []struct {
+		name                 string
+		tokens               []token.Token
+		expectedErrorContent string
+	}{
+		{
+			"for without '(' after 'for'",
+			[]token.Token{
+				forToken,
+				trueToken,
+				printToken,
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				semicolonToken,
+			},
+			"expected '(' after 'for', got `true`",
+		},
+		{
+			"for without ';' after condition",
+			[]token.Token{
+				forToken,
+				leftParen,
+				semicolonToken,
+				trueToken,
+				rightParen,
+				printToken,
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				semicolonToken,
+			},
+			"expected ';' after for condition, got `)`",
+		},
+		{
+			"for without ')' after clauses",
+			[]token.Token{
+				forToken,
+				leftParen,
+				semicolonToken,
+				semicolonToken,
+				trueToken,
+				printToken,
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				semicolonToken,
+			},
+			"expected ')' after for clauses, got `print`",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setUpParserExpectError(t, test.tokens, test.expectedErrorContent)
+		})
+	}
+}

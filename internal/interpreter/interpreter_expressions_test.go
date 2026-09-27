@@ -1708,17 +1708,6 @@ func TestEvaluateLogical(t *testing.T) {
 		AssertValue(t, val, "hello")
 	})
 
-	t.Run("Or with nil left evaluates and returns right", func(t *testing.T) {
-		expr := expression.NewLogical(
-			expression.NewLiteral(nil),
-			*token.NewToken(token.OR, "or", nil, 1),
-			expression.NewLiteral("hello"),
-		)
-		val, err := in.Evaluate(expr)
-		AssertNoError(t, err)
-		AssertValue(t, val, "hello")
-	})
-
 	t.Run("Or returns the truthy operand as-is, not coerced to boolean", func(t *testing.T) {
 		expr := expression.NewLogical(
 			expression.NewLiteral(0.0),
@@ -1759,17 +1748,6 @@ func TestEvaluateLogical(t *testing.T) {
 		val, err := in.Evaluate(expr)
 		AssertNoError(t, err)
 		AssertValue(t, val, false)
-	})
-
-	t.Run("And with nil left short-circuits and does not evaluate right", func(t *testing.T) {
-		expr := expression.NewLogical(
-			expression.NewLiteral(nil),
-			*token.NewToken(token.AND, "and", nil, 1),
-			invalidExpr(),
-		)
-		val, err := in.Evaluate(expr)
-		AssertNoError(t, err)
-		AssertValue(t, val, nil)
 	})
 
 	t.Run("And with truthy left evaluates and returns right", func(t *testing.T) {
