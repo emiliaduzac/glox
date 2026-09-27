@@ -383,7 +383,51 @@ func (p *Parser) unary() (expression.Expr, error) {
 		return expression.NewUnary(operator, right), nil
 	}
 
-	return p.primary()
+	return p.call()
+}
+
+func (p *Parser) call() (expression.Expr, error) {
+	expr, err := p.primary()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		if p.isInTokenTypes(token.LEFT_PAREN) {
+			expr, err = p.finishCall(expr)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
+		}
+	}
+
+	return expr, nil
+}
+
+func (p *Parser) finishCall(callee expression.Expr) (expression.Expr, error) {
+	var arguments []expression.Expr
+
+	if !p.isTokenType(token.RIGHT_PAREN) {
+		for {
+			arg, err := p.expression()
+			if err != nil {
+				return nil, err
+			}
+			arguments = append(arguments, arg)
+			if !p.isInTokenTypes(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	if !p.isInTokenTypes(token.RIGHT_PAREN) {
+		return nil, p.expectedError("')' after arguments")
+	}
+
+	paren := p.getPrevious()
+	return expression.NewCall(callee, paren, arguments), nil
 }
 
 func (p *Parser) primary() (expression.Expr, error) {

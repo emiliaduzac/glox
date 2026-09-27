@@ -613,3 +613,74 @@ func TestPrecedenceGrouping(t *testing.T) {
 	})
 
 }
+
+func TestCallExpressions(t *testing.T) {
+	t.Run("Call without arguments", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(call <foo>)")
+	})
+
+	t.Run("Call with arguments", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "add", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			*token.NewToken(token.COMMA, ",", nil, 1),
+			*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(call <add> <1> <2>)")
+	})
+
+	t.Run("Chained calls", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "getCallback", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(call (call <getCallback>))")
+	})
+
+	t.Run("Call precedence higher than unary", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.BANG, "!", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "fn", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			semicolonToken,
+		}
+
+		stmts := setUpParser(t, tokens)
+		expr := assertExpressionStatement(t, stmts)
+		assertString(t, expr, "(BANG (call <fn>))")
+	})
+
+	t.Run("Missing right paren error", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			semicolonToken,
+		}
+
+		setUpParserExpectError(t, tokens, "')' after arguments")
+	})
+}
