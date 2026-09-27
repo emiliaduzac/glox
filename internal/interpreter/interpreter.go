@@ -10,6 +10,12 @@ import (
 	"tp-lox/internal/token"
 )
 
+type Callable interface {
+	Arity() int
+	Call(in *Interpreter, arguments []any) (any, error)
+	String() string
+}
+
 type Interpreter struct {
 	environment *environment.Environment
 }
@@ -150,6 +156,31 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 			return nil, err
 		}
 		return right, nil
+	case *expression.Call:
+		callee, err := in.Evaluate(e.Callee)
+		if err != nil {
+			return nil, err
+		}
+
+		var arguments []any
+		for _, arg := range e.Arguments {
+			val, err := in.Evaluate(arg)
+			if err != nil {
+				return nil, err
+			}
+			arguments = append(arguments, val)
+		}
+
+		function, ok := callee.(Callable)
+		if !ok {
+			return nil, errors.NewLoxError(e.Paren.Line, "can only call functions and classes")
+		}
+
+		if len(arguments) != function.Arity() {
+			return nil, errors.NewLoxError(e.Paren.Line, fmt.Sprintf("expected %d arguments but got %d", function.Arity(), len(arguments)))
+		}
+
+		return function.Call(in, arguments)
 	default:
 		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown expression: %T", expr))
 	}
