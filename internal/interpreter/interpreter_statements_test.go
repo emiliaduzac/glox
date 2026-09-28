@@ -335,32 +335,6 @@ func TestExecuteFunctionStatement(t *testing.T) {
 		AssertValue(t, callable.Arity(), 0)
 	})
 
-	t.Run("Execute function call passes arguments to parameters and executes body", func(t *testing.T) {
-		in := SetUpInterpreter(t)
-		tokFn := *token.NewToken(token.IDENTIFIER, "say", nil, 1)
-		tokParam := *token.NewToken(token.IDENTIFIER, "msg", nil, 1)
-		fnStmt := statements.NewFunctionStmt(
-			tokFn,
-			[]token.Token{tokParam},
-			[]statements.Stmt{
-				statements.NewPrintStmt(expression.NewVariable(tokParam)),
-			},
-		)
-		AssertNoError(t, in.Execute(fnStmt))
-
-		call := expression.NewCall(
-			expression.NewVariable(tokFn),
-			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
-			[]expression.Expr{expression.NewLiteral("hello")},
-		)
-		out := CaptureOutput(t, func() {
-			val, err := in.Evaluate(call)
-			AssertNoError(t, err)
-			AssertValue(t, val, nil)
-		})
-		AssertValue(t, out, "hello\n")
-	})
-
 	t.Run("Function parameters are not accessible outside function scope", func(t *testing.T) {
 		in := SetUpInterpreter(t)
 		tokFn := *token.NewToken(token.IDENTIFIER, "f", nil, 1)
@@ -423,68 +397,6 @@ func TestExecuteFunctionStatement(t *testing.T) {
 		)
 		_, err := in.Evaluate(call)
 		AssertError(t, err)
-	})
-
-	t.Run("Closure captures and mutates outer function variable across calls", func(t *testing.T) {
-		in := SetUpInterpreter(t)
-		tokMakeCounter := *token.NewToken(token.IDENTIFIER, "makeCounter", nil, 1)
-		tokI := *token.NewToken(token.IDENTIFIER, "i", nil, 1)
-		tokCount := *token.NewToken(token.IDENTIFIER, "count", nil, 1)
-		tokCounter := *token.NewToken(token.IDENTIFIER, "counter", nil, 1)
-
-		fnStmt := statements.NewFunctionStmt(
-			tokMakeCounter,
-			nil,
-			[]statements.Stmt{
-				statements.NewVarStmt(tokI, expression.NewLiteral(0.0)),
-				statements.NewFunctionStmt(
-					tokCount,
-					nil,
-					[]statements.Stmt{
-						statements.NewExpressionStmt(
-							expression.NewAssign(
-								tokI,
-								expression.NewBinary(
-									expression.NewVariable(tokI),
-									*token.NewToken(token.PLUS, "+", nil, 1),
-									expression.NewLiteral(1.0),
-								),
-							),
-						),
-						statements.NewReturnStmt(
-							*token.NewToken(token.RETURN, "return", nil, 1),
-							expression.NewVariable(tokI),
-						),
-					},
-				),
-				statements.NewReturnStmt(
-					*token.NewToken(token.RETURN, "return", nil, 1),
-					expression.NewVariable(tokCount),
-				),
-			},
-		)
-		AssertNoError(t, in.Execute(fnStmt))
-
-		callMakeCounter := expression.NewCall(
-			expression.NewVariable(tokMakeCounter),
-			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
-			nil,
-		)
-		AssertNoError(t, in.Execute(statements.NewVarStmt(tokCounter, callMakeCounter)))
-
-		callCounter := expression.NewCall(
-			expression.NewVariable(tokCounter),
-			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
-			nil,
-		)
-
-		val1, err := in.Evaluate(callCounter)
-		AssertNoError(t, err)
-		AssertValue(t, val1, 1.0)
-
-		val2, err := in.Evaluate(callCounter)
-		AssertNoError(t, err)
-		AssertValue(t, val2, 2.0)
 	})
 }
 

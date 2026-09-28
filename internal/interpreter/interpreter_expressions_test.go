@@ -3,6 +3,7 @@ package interpreter
 import (
 	"math"
 	"testing"
+	"tp-lox/internal/environment"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
@@ -1624,6 +1625,39 @@ func TestEvaluateVariable(t *testing.T) {
 		_, err := in.Evaluate(expression.NewVariable(tok))
 		AssertErrorMessage(t, err, "undefined variable 'undeclared'")
 	})
+
+	t.Run("Resolved variable reads from the environment at its distance", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tok := *token.NewToken(token.IDENTIFIER, "a", nil, 1)
+		in.globals.Define("a", "outer")
+		in.environment = environment.NewEnclosedEnvironment(in.globals)
+		in.environment.Define("a", "inner")
+
+		local := expression.NewVariable(tok)
+		enclosing := expression.NewVariable(tok)
+		in.Resolve(local, 0)
+		in.Resolve(enclosing, 1)
+
+		val, err := in.Evaluate(local)
+		AssertNoError(t, err)
+		AssertValue(t, val, "inner")
+
+		val, err = in.Evaluate(enclosing)
+		AssertNoError(t, err)
+		AssertValue(t, val, "outer")
+	})
+
+	t.Run("Unresolved variable reads from globals ignoring a local with the same name", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tok := *token.NewToken(token.IDENTIFIER, "a", nil, 1)
+		in.globals.Define("a", "global")
+		in.environment = environment.NewEnclosedEnvironment(in.globals)
+		in.environment.Define("a", "block")
+
+		val, err := in.Evaluate(expression.NewVariable(tok))
+		AssertNoError(t, err)
+		AssertValue(t, val, "global")
+	})
 }
 
 func TestEvaluateAssign(t *testing.T) {
@@ -1681,6 +1715,50 @@ func TestEvaluateAssign(t *testing.T) {
 		varVal, err := in.Evaluate(expression.NewVariable(tok))
 		AssertNoError(t, err)
 		AssertValue(t, varVal, 10.0)
+	})
+
+	t.Run("Resolved assignment modifies the environment at its distance", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tok := *token.NewToken(token.IDENTIFIER, "a", nil, 1)
+		outer := in.globals
+		outer.Define("a", "outer")
+		inner := environment.NewEnclosedEnvironment(outer)
+		inner.Define("a", "inner")
+		in.environment = inner
+
+		assign := expression.NewAssign(tok, expression.NewLiteral("changed"))
+		in.Resolve(assign, 1)
+
+		_, err := in.Evaluate(assign)
+		AssertNoError(t, err)
+
+		outerVal, err := outer.Get(tok)
+		AssertNoError(t, err)
+		AssertValue(t, outerVal, "changed")
+
+		innerVal, err := inner.Get(tok)
+		AssertNoError(t, err)
+		AssertValue(t, innerVal, "inner")
+	})
+
+	t.Run("Unresolved assignment modifies globals ignoring a local with the same name", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tok := *token.NewToken(token.IDENTIFIER, "a", nil, 1)
+		in.globals.Define("a", "global")
+		block := environment.NewEnclosedEnvironment(in.globals)
+		block.Define("a", "block")
+		in.environment = block
+
+		_, err := in.Evaluate(expression.NewAssign(tok, expression.NewLiteral("changed")))
+		AssertNoError(t, err)
+
+		globalVal, err := in.globals.Get(tok)
+		AssertNoError(t, err)
+		AssertValue(t, globalVal, "changed")
+
+		blockVal, err := block.Get(tok)
+		AssertNoError(t, err)
+		AssertValue(t, blockVal, "block")
 	})
 }
 

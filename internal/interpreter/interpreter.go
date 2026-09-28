@@ -333,7 +333,7 @@ func (in *Interpreter) lookupVariable(expr *expression.Variable) (any, error) {
 	if ok {
 		return in.environment.GetAt(distance, expr.Name.Lexeme)
 	} else {
-		return in.environment.Get(expr.Name)
+		return in.globals.Get(expr.Name)
 	}
 }
 
@@ -349,7 +349,7 @@ func (in *Interpreter) assignVariable(expr *expression.Assign) (any, error) {
 			return nil, err
 		}
 	} else {
-		err = in.environment.Assign(expr.Name, value)
+		err = in.globals.Assign(expr.Name, value)
 		if err != nil {
 			return nil, err
 		}
