@@ -31,6 +31,10 @@ func (in *Interpreter) Interpret(stmts []statements.Stmt) error {
 	return nil
 }
 
+func (in *Interpreter) Resolve(expr expression.Expr, depth int) {
+	// pass
+}
+
 // Execute ejecuta una sentencia.
 func (in *Interpreter) Execute(stmt statements.Stmt) error {
 	switch s := stmt.(type) {
