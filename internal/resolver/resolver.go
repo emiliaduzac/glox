@@ -1,6 +1,7 @@
 package resolver
 
 import (
+	"fmt"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/interpreter"
@@ -89,7 +90,7 @@ func (r *Resolver) resolveStmt(stmt statements.Stmt) error {
 		}
 
 	default:
-		// agregar caso default
+		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}
 	return nil
 }
@@ -172,8 +173,7 @@ func (r *Resolver) resolveExpr(expr expression.Expr) error {
 		}
 
 	default:
-		// agregar caso default
-		return nil
+		return errors.NewLoxError(0, fmt.Sprintf("unknown expression: %T", expr))
 	}
 	return nil
 }
