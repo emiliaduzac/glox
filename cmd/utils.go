@@ -17,6 +17,7 @@ const (
 const (
 	ScanningMode = iota
 	ParsingMode
+	ResolveMode
 	FullMode
 )
 

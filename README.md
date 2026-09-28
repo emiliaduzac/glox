@@ -28,6 +28,7 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Scanner](docs/scanner.md)
 - [Parser](docs/parser.md)
 - [Interpreter](docs/interpreter.md)
+- [Resolver](docs/resolver.md)
 
 ## Cómo correr lox
 
