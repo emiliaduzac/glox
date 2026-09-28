@@ -3,6 +3,7 @@ package interpreter
 import (
 	"fmt"
 	"math"
+	"strings"
 	"tp-lox/internal/environment"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
@@ -12,13 +13,13 @@ import (
 
 type Interpreter struct {
 	environment *environment.Environment
-	locals      map[expression.Expr]int
+	Locals      map[expression.Expr]int
 }
 
 func NewInterpreter() *Interpreter {
 	return &Interpreter{
 		environment: environment.NewEnvironment(),
-		locals:      make(map[expression.Expr]int),
+		Locals:      make(map[expression.Expr]int),
 	}
 }
 
@@ -34,7 +35,7 @@ func (in *Interpreter) Interpret(stmts []statements.Stmt) error {
 }
 
 func (in *Interpreter) Resolve(expr expression.Expr, depth int) {
-	in.locals[expr] = depth
+	in.Locals[expr] = depth
 }
 
 // Execute ejecuta una sentencia.
@@ -255,7 +256,7 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 }
 
 func (in *Interpreter) lookupVariable(expr *expression.Variable) (any, error) {
-	distance, ok := in.locals[expr]
+	distance, ok := in.Locals[expr]
 	if ok {
 		return in.environment.GetAt(distance, expr.Name.Lexeme)
 	} else {
@@ -268,7 +269,7 @@ func (in *Interpreter) assignVariable(expr *expression.Assign) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	distance, ok := in.locals[expr]
+	distance, ok := in.Locals[expr]
 	if ok {
 		err = in.environment.AssignAt(distance, expr.Name, value)
 		if err != nil {
@@ -298,6 +299,21 @@ func Stringify(value any) string {
 		return "nil"
 	}
 	return fmt.Sprintf("%v", value)
+}
+
+func LocalsString(locals map[expression.Expr]int) string {
+	parts := make([]string, 0, len(locals))
+	for expr, depth := range locals {
+		var name token.Token
+		switch e := expr.(type) {
+		case *expression.Variable:
+			name = e.Name
+		case *expression.Assign:
+			name = e.Name
+		}
+		parts = append(parts, fmt.Sprintf("%s: %d", name, depth))
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 func isEqual(a, b any) bool {

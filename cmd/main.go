@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"tp-lox/internal/interpreter"
 	"tp-lox/internal/parser"
+	"tp-lox/internal/resolver"
 	"tp-lox/internal/scanner"
 	"tp-lox/internal/statements"
 )
@@ -95,6 +96,18 @@ func (l *Lox) run(source string) error {
 		return nil
 	}
 
+	resolver := resolver.NewResolver(l.interpreter)
+	err = resolver.Resolve(stmts)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return err
+	}
+
+	if l.mode == ResolveMode {
+		fmt.Println("Interpreter Locals: " + interpreter.LocalsString(l.interpreter.Locals))
+		return nil
+	}
+
 	err = l.interpreter.Interpret(stmts)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -106,6 +119,7 @@ func (l *Lox) run(source string) error {
 func main() {
 	scanningFlag := flag.Bool("scanning", false, "corre solo el scanner, muestra los tokens")
 	parsingFlag := flag.Bool("parsing", false, "corre el scanner y el parser, muestra el AST")
+	resolveFlag := flag.Bool("resolve", false, "corre el scanner, el parser y el resolver, muestra las distancias resueltas de las variables locales")
 	flag.Parse()
 
 	var mode int
@@ -114,6 +128,8 @@ func main() {
 		mode = ScanningMode
 	case *parsingFlag:
 		mode = ParsingMode
+	case *resolveFlag:
+		mode = ResolveMode
 	default:
 		mode = FullMode
 	}
