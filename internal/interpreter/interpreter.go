@@ -3,6 +3,7 @@ package interpreter
 import (
 	"fmt"
 	"math"
+	"time"
 	"tp-lox/internal/environment"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
@@ -10,13 +11,37 @@ import (
 	"tp-lox/internal/token"
 )
 
+type Callable interface {
+	Arity() int
+	Call(in *Interpreter, arguments []any) (any, error)
+	String() string
+}
+
+type ClockCallable struct{}
+
+func (c *ClockCallable) Arity() int {
+	return 0
+}
+
+func (c *ClockCallable) Call(in *Interpreter, arguments []any) (any, error) {
+	return float64(time.Now().UnixNano()) / 1e9, nil
+}
+
+func (c *ClockCallable) String() string {
+	return "<native fn>"
+}
+
 type Interpreter struct {
+	globals     *environment.Environment
 	environment *environment.Environment
 }
 
 func NewInterpreter() *Interpreter {
+	globals := environment.NewEnvironment()
+	globals.Define("clock", &ClockCallable{})
 	return &Interpreter{
-		environment: environment.NewEnvironment(),
+		globals:     globals,
+		environment: globals,
 	}
 }
 
@@ -29,6 +54,14 @@ func (in *Interpreter) Interpret(stmts []statements.Stmt) error {
 	}
 
 	return nil
+}
+
+type ReturnValue struct {
+	Value any
+}
+
+func (r ReturnValue) Error() string {
+	return "return value"
 }
 
 // Execute ejecuta una sentencia.
@@ -89,6 +122,21 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 			}
 		}
 		return nil
+	case *statements.FunctionStmt:
+		function := NewFunction(s, in.environment)
+		in.environment.Define(s.Name.Lexeme, function)
+
+		return nil
+	case *statements.ReturnStmt:
+		var value any = nil
+		if s.Value != nil {
+			var err error
+			value, err = in.Evaluate(s.Value)
+			if err != nil {
+				return err
+			}
+		}
+		return ReturnValue{Value: value}
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}
@@ -150,6 +198,31 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 			return nil, err
 		}
 		return right, nil
+	case *expression.Call:
+		callee, err := in.Evaluate(e.Callee)
+		if err != nil {
+			return nil, err
+		}
+
+		var arguments []any
+		for _, arg := range e.Arguments {
+			val, err := in.Evaluate(arg)
+			if err != nil {
+				return nil, err
+			}
+			arguments = append(arguments, val)
+		}
+
+		function, ok := callee.(Callable)
+		if !ok {
+			return nil, errors.NewLoxError(e.Paren.Line, "can only call functions and classes")
+		}
+
+		if len(arguments) != function.Arity() {
+			return nil, errors.NewLoxError(e.Paren.Line, fmt.Sprintf("expected %d arguments but got %d", function.Arity(), len(arguments)))
+		}
+
+		return function.Call(in, arguments)
 	default:
 		return nil, errors.NewLoxError(0, fmt.Sprintf("unknown expression: %T", expr))
 	}

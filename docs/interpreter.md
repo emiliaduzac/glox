@@ -10,6 +10,7 @@ El interpreter tiene la responsabilidad de recorrer el **AST** generado por el p
 | STRING | `string` |
 | BOOL | `bool` |
 | NIL | `nil` |
+| FUNCTION / CALLABLE | `Callable` (interfaz) |
 
 Particularmente en la parte de nil, nos encontramos que por cómo trabaja Go terminaba saliendo `<nil>`, entonces ahí fue que implementamos la función de `Stringify`.
 
@@ -30,6 +31,13 @@ Acá es que también debemos manejar "a mano" el caso `default` y estar atentos 
 4. Sobre el operador módulo (`%`): Al manejarlo Go solo lo aplica a enteros, por lo que usamos `math.Mod` para preservar los flotantes y no caer en panics. 
 
 5. **Operadores lógicos**: a diferencia de otros lenguajes, evaluar estos operadores no se resuelve a un booleano, sino que devuelven el valor del operando que "decidió" el resultado. Es decir: el de la izquierda si hubo cortocircuito (explicados en [parser.md](parser.md)), el de la derecha si no. 
+
+### Funciones y llamadas
+
+Cuando el intérprete va a evaluar una llamada a una función, primero que nada evalúa la expresión de lo que quiere llamar. Después, evalúa todos los argumentos de izquierda a derecha. Se fija si lo que se quiere llamar realmente es una función, por ejemplo si intentás hacer `"hola"()` ahí se corta de una con un error de runtime, un dato es que el error lo dejamos como en el libro que habla de clases aunque en este momento no las soportamos, sabemos que vienen y ya quedó el error tal cual como está en el libro en el capítulo 10. Otra cosa que se fija es la arity, es decir la cantidad de argumentos que le pasaste tiene que ser la misma que la esperada, y si no coinciden tira error avisando cuántas obtuvo y las esperadas. 
+
+#### Función clock()
+Siguiendo un poco el libro fue que también implementamos la función nativa de `clock()` que tiene aridad 0 y devuelve el tiempo. Podríamos usarla para un propio benchmark. 
 
 ### Errores en tiempo de ejecución
 
@@ -64,9 +72,16 @@ Para ejecutar un bloque implementamos el siguiente método: la idea es primero g
 
 Un detalle propio de implementar Glox, es que en el libro al usar Java se usa un `try` y `finally`, pero en Go no existe, por lo que la forma más idiomática de Go fue usar un `defer`. Esto ayuda a que si una sentencia del bloque falla al ejecutarse, se corta y Go termina ejecutando sí o sí `in.environment = previous` que es el scope del padre, y no se queda atrapado en el del hijo. 
 
-Y un detalle interesante de nuestra implementación es que, hasta el momento, no tenemos un método para destruir los scopes explícitamente. Acá hay que distinguir dos punteros distintos: por un lado el `enclosing`: puntero de un entorno hijo hacia su padre, que se define una sola vez al crearlo y nunca cambia después. Por otro lado el `environment`: el puntero de "cuál entorno está activo ahora" en el intérprete: al entrar al bloque apunta al hijo, y al salir (por el `defer`) vuelve a apuntar al padre. Una vez que eso pasa, y la variable local `env` del método sale de scope, nadie en el programa referencia más al entorno del hijo, y eso es lo que le permite al garbage collector de Go detectarlo y liberarlo solo. Por el momento es algo que está así, analizaremos a futuro si así lo dejamos. 
+Y un detalle interesante de nuestra implementación es que, hasta el momento, no tenemos un método para destruir los scopes explícitamente. Acá hay que distinguir dos punteros distintos: por un lado el `enclosing`: puntero de un entorno hijo hacia su padre, que se define una sola vez al crearlo y nunca cambia después. Por otro lado el `environment`: el puntero de "cuál entorno está activo ahora" en el intérprete: al entrar al bloque apunta al hijo, y al salir (por el `defer`) vuelve a apuntar al padre. Una vez que eso pasa, y la variable local `env` del método sale de scope, nadie en el programa referencia más al entorno del hijo, y eso es lo que le permite al garbage collector de Go detectarlo y liberarlo solo. Al momento de agregar funciones y closures nos acordamos de esto, pero como una función intenta quedarse con ese entorno, si la función sigue "viva", la referencia también y el garbage collector no lo borra, así que las variables de afuera de la función que necesita de contexto siguen, hasta que finalmente se quedan sin referencia. 
+ 
 
 Al agregar los ciclos sucede que, cuando el cuerpo es un bloque, se crea un nuevo `environment` en cada iteración. Por lo tanto, las variables definidas dentro del cuerpo se re-declaran en cada vuelta (cada una en su entorno, que vive exactamente una sola iteración), si se quisiera utilizar una variable más a modo acumuladora, debe declararse fuera del ciclo (como sucede en todos los lenguajes). 
+
+#### Declaración de funciones y returns
+
+El intérprete al encontrarse con una función no la ejecuta en ese momento sino que la empaqueta con el entorno actual y el nombre que le pusimos. 
+
+Para los returns acá usamos una estrategia diferente a lo que se habla en el libro y más propia de Java, en nuestro Glox implementamos la idea de un `ReturnValue`. Es decir, tenemos el caso de que dentro de un bucle capaz queremos salir con un return, entonces aprovechamos que si llegamos al return se devuelve el `ReturnValue` para arriba, y como los chequeos son del tipo `err != nil`, este error nuestro sigue su camino cortando hasta llegar al call, que se fija qué es lo que volvió, si un error de `ReturnValue` que en sí no es un error real sino el valor retornado, el cual saca el valor y sale bien, o si realmente era un error del runtime. 
 
 ### Tests
 
