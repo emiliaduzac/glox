@@ -16,7 +16,7 @@ Siguiendo el orden en el que se explican en el libro y en clase, en el parser pr
 
 Las expresiones son maneras de **producir valores**. Sumar, restar, concatenar, etc. El problema es que solo generan un valor, pero **no hacemos nada con él**.
 
-Tenemos varias expresiones válidas en Lox: **literales**, **unarias**, **binarias**, **grupos**, **variables**, **asignaciones** y **operadores lógicos** (definidas en [`expression.go`](../internal/expression/expression.go)), y basadas en la definición que el [libro](https://craftinginterpreters.com/representing-code.html) va dando a medida que avanzan los capitulos (y se incorporan nuevas expresiones). Como a su vez, estas pueden estar compuestas de más expresiones, debemos poder soportar la recursividad al definirlas.
+Tenemos varias expresiones válidas en Lox: **literales**, **unarias**, **binarias**, **grupos**, **variables**, **asignaciones**, **operadores lógicos** y **llamadas a funciones** (definidas en [`expression.go`](../internal/expression/expression.go)), y basadas en la definición del [libro](https://craftinginterpreters.com/representing-code.html). Como a su vez, estas pueden estar compuestas de más expresiones, debemos poder soportar la recursividad al definirlas.
 
 Como Go no tiene clases y herencias, utilizamos la siguiente estratégia:
 
@@ -42,6 +42,8 @@ Optamos por implementarlo de una forma más "funcional", donde cada operación h
 En el libro descarta esta opción ya que en Java, es una cadena de `if` que se ejecutan linealmente hasta encontrar el caso que corresponda (los casos definidos más abajo tardarían más), y justamente se define que un parser debería ser rápido. En Go esto no sucede ya que optimiza la búsqueda entre los posibles casos del `switch`.
 Lo que si debemos tener en cuenta, es que no podemos olvidarnos de agregar _todos_ los casos posibles. Si nos falta alguno, el compilador no se dará cuenta.
 Implementar un **Visitor Pattern** era innecesario en nuestro caso.
+
+Las llamadas a las funciones son una expresión que se aplica a algo que devuelva algo llamable, en el libro por ejemplo se habla de un `getCallback()()`, y ahí vemos que el primer `()` llama a `getCallback`, y el segundo paréntesis llama a lo que esa función devolvió.
 
 #### Precedencia y asociatividad
 
@@ -69,9 +71,13 @@ term       → factor ( ( "-" | "+" ) factor )* ;
 
 factor     → unary ( ( "/" | "*" | "%" ) unary )* ;
 
-unary      → ( "!" | "-" ) unary | primary ;
+unary      → ( "!" | "-" ) unary | call ;
+
+call       → primary ( "(" arguments? ")" )* ;
 
 primary    → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
+
+arguments  → expression ( "," expression )* ;
 ```
 
 1. **primary es la de mayor precedencia**: si se cruza con un número, por ejemplo, se resuelve inmediatamente.
@@ -82,7 +88,10 @@ primary    → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" |
 
 4. **operadores lógicos**: estos nos permiten anidar varias condiciones, y se evalúan de una forma particular: contienen "cortocircuitos", una manera distinta de evaluarse que no permite que sean simples operadores binarios. En el caso del `or`, se evalúa primero la expresión de la izquierda. Si esta es verdadera, ya no se necesita evaluar la expresión de la derecha, ya cumple. En el caso del `and`, si el término de la izquierda es falso, ya no hay más nada que evaluar, ya que sin importar el resultado de la expresión derecha, no va a cumplirse que ambas sean verdaderas. En cuanto a su precedencia, el `or` tiene menor precedencia. Por ejemplo `TRUE or FALSE and TRUE` se resuelve a: `TRUE or (FALSE and TRUE)` → `TRUE or FALSE` → `TRUE`. Por último, destacar que en lox los operadores lógicos son considerados expresiones ya que devuelven el valor del operando (no un booleano).
 
-Para **resolver** una expresión, el proceso va de arriba hacia abajo: **Recursive Descent Parser**. Es decir: de menor a mayor precedencia: `expression → assignment → logic_or → logic_and → equality → comparison → term → factor → unary → primary`, y el árbol se arma de izquierda a derecha a medida que se desciende y se vuelve.
+5. **call** queda en precedencia entre primary y unary, y esto porque los paréntesis de la llamada tienen que resolverse antes del unary. Un ejemplo sería si uno hace `!esVerdadero()`, primero debería resolver la función `esVerdadero()` y después negar eso.
+
+
+Para **resolver** una expresión, el proceso va de arriba hacia abajo: **Recursive Descent Parser**. Es decir: de menor a mayor precedencia: `expression → assignment → logic_or → logic_and → equality → comparison → term → factor → unary → call → primary`, y el árbol se arma de izquierda a derecha a medida que se desciende y se vuelve.
 
 Como se evalúa dicho árbol será explicado en la implementación del interpreter: [interpreter.md](interpreter.md).
 
@@ -126,12 +135,21 @@ func (p *PrintStmt) Statement() {}
 
 - **For statements (?)**: técnicamente son lo mismo que un while, pero como repiten una semántica muy utilizada por los usuarios, se resuelve con syntactic sugar para facilitar su uso. Entonces se implementan por detrás con un while (no es un statement nuevo), pero se mantiene la palabra reservada `for` con su semántica, para que el usuario pueda hacer uso del mismo, sin saber como se implementa por detrás. Un `for` entonces contiene: (1) inicializador, (2) condición e (3) incremento: `for ( <initializer> ; <condition> ; <increment>) <body>`.
 
+- **Function statements**: nos sirven para poder declarar una función con su nombre, sus parámetros (si es que tiene) y su cuerpo que es un bloque. 
+
+- **Return statements**: en sí devuelve un valor, si lo escribiste es el valor que le asignaste para devolver, ej: `return 5;` devuelve 5, pero también es válido solo un `return;` porque termina devolviendo `nil` aunque no lo pongas explícito. Entonces te permite salir de una función en el momento que vos quieras y retornando el valor deseado.
+
 Se expande nuestra gramática:
 
 ```
 program     → declaration* EOF ;
-declaration → varDecl | statement ;
-statement   → exprStmt | forStmt | ifStmt | printStmt | whileStmt | block ;
+declaration → funDecl | varDecl | statement ;
+funDecl     → "fun" function ;
+function    → IDENTIFIER "(" parameters? ")" block ;
+parameters  → IDENTIFIER ( "," IDENTIFIER )* ;
+
+statement   → exprStmt | forStmt | ifStmt | printStmt | returnStmt | whileStmt | block ;
+returnStmt  → "return" expression? ";" ;
 forStmt     → "for" "(" ( varDecl | exprStmt | ";" ) expression? ";" expression? ")" statement ;
 ifStmt      → "if" "(" expression ")" statement ( "else" statement )? ;
 whileStmt   → "while" "(" expression ")" statement ;
@@ -149,8 +167,11 @@ equality    → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison  → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term        → factor ( ( "-" | "+" ) factor )* ;
 factor      → unary ( ( "/" | "*" | "%" ) unary )* ;
-unary       → ( "!" | "-" ) unary | primary ;
+unary       → ( "!" | "-" ) unary | call ;
+call        → primary ( "(" arguments? ")" )* ;
 primary     → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" | IDENTIFIER ;
+
+arguments   → expression ( "," expression )* ;
 ```
 
 #### Manejo de errores
@@ -158,6 +179,8 @@ primary     → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" 
 Al incorporar statements surge un nuevo error: toda sentencia debe terminar en `;`. Si falta, el parser lanza un error indicando qué encontró en su lugar.
 Además agregamos el chequeo del error de no cerrar con `}` porque también podría pasar que siga y se tope con un EOF, así que en ese caso se informa con el error "expected '}' after block". 
 Con `if` y `while` aparecen errores análogos: falta del `(` o del `)` alrededor de la condición, o una condición vacía.
+
+Siguiendo un poco el libro para el parser, se levanta un error si se pasan más de 255 argumentos o parámetros.
 
 #### Tests
 

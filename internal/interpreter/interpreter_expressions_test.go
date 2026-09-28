@@ -3,6 +3,7 @@ package interpreter
 import (
 	"math"
 	"testing"
+	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
@@ -1779,5 +1780,186 @@ func TestEvaluateLogical(t *testing.T) {
 		)
 		_, err := in.Evaluate(expr)
 		AssertError(t, err)
+	})
+}
+
+type testCallable struct {
+	arity int
+	call  func(in *Interpreter, arguments []any) (any, error)
+}
+
+func (c *testCallable) Arity() int {
+	return c.arity
+}
+
+func (c *testCallable) Call(in *Interpreter, arguments []any) (any, error) {
+	return c.call(in, arguments)
+}
+
+func (c *testCallable) String() string {
+	return "<fn test>"
+}
+
+func TestEvaluateCall(t *testing.T) {
+	in := SetUpInterpreter(t)
+	paren := *token.NewToken(token.RIGHT_PAREN, ")", nil, 1)
+
+	t.Run("Evaluate call expression returns result of invocation", func(t *testing.T) {
+		in.environment.Define("add", &testCallable{
+			arity: 2,
+			call: func(in *Interpreter, arguments []any) (any, error) {
+				a := arguments[0].(float64)
+				b := arguments[1].(float64)
+				return a + b, nil
+			},
+		})
+
+		call := expression.NewCall(
+			expression.NewVariable(*token.NewToken(token.IDENTIFIER, "add", nil, 1)),
+			paren,
+			[]expression.Expr{
+				expression.NewLiteral(2.0),
+				expression.NewLiteral(3.0),
+			},
+		)
+		val, err := in.Evaluate(call)
+		AssertNoError(t, err)
+		AssertValue(t, val, 5.0)
+	})
+
+	t.Run("Evaluate call evaluates arguments in left to right order", func(t *testing.T) {
+		in.environment.Define("a", 1.0)
+		in.environment.Define("b", 2.0)
+		in.environment.Define("pair", &testCallable{
+			arity: 2,
+			call: func(in *Interpreter, arguments []any) (any, error) {
+				return arguments, nil
+			},
+		})
+
+		call := expression.NewCall(
+			expression.NewVariable(*token.NewToken(token.IDENTIFIER, "pair", nil, 1)),
+			paren,
+			[]expression.Expr{
+				expression.NewAssign(*token.NewToken(token.IDENTIFIER, "a", nil, 1), expression.NewLiteral(10.0)),
+				expression.NewAssign(*token.NewToken(token.IDENTIFIER, "b", nil, 1), expression.NewBinary(
+					expression.NewVariable(*token.NewToken(token.IDENTIFIER, "a", nil, 1)),
+					*token.NewToken(token.PLUS, "+", nil, 1),
+					expression.NewLiteral(5.0),
+				)),
+			},
+		)
+
+		val, err := in.Evaluate(call)
+		AssertNoError(t, err)
+
+		args := val.([]any)
+		AssertValue(t, args[0], 10.0)
+		AssertValue(t, args[1], 15.0)
+
+		valB, _ := in.environment.Get(*token.NewToken(token.IDENTIFIER, "b", nil, 1))
+		AssertValue(t, valB, 15.0)
+	})
+
+	t.Run("Error when callee is not callable", func(t *testing.T) {
+		nonCallables := []any{123.0, "not a func", true, false, nil}
+		for _, target := range nonCallables {
+			call := expression.NewCall(expression.NewLiteral(target), paren, nil)
+			_, err := in.Evaluate(call)
+			AssertErrorMessage(t, err, "can only call functions and classes")
+		}
+	})
+
+	t.Run("Error when argument count does not match arity", func(t *testing.T) {
+		in.environment.Define("binaryFn", &testCallable{
+			arity: 2,
+			call: func(in *Interpreter, arguments []any) (any, error) {
+				return nil, nil
+			},
+		})
+
+		callee := expression.NewVariable(*token.NewToken(token.IDENTIFIER, "binaryFn", nil, 1))
+
+		callTooFew := expression.NewCall(callee, paren, []expression.Expr{expression.NewLiteral(1.0)})
+		_, errTooFew := in.Evaluate(callTooFew)
+		AssertErrorMessage(t, errTooFew, "expected 2 arguments but got 1")
+
+		callTooMany := expression.NewCall(callee, paren, []expression.Expr{
+			expression.NewLiteral(1.0),
+			expression.NewLiteral(2.0),
+			expression.NewLiteral(3.0),
+		})
+		_, errTooMany := in.Evaluate(callTooMany)
+		AssertErrorMessage(t, errTooMany, "expected 2 arguments but got 3")
+	})
+
+	t.Run("Error when callee evaluation fails", func(t *testing.T) {
+		call := expression.NewCall(invalidExpr(), paren, nil)
+		_, err := in.Evaluate(call)
+		AssertError(t, err)
+	})
+
+	t.Run("Error when argument evaluation fails", func(t *testing.T) {
+		in.environment.Define("unaryFn", &testCallable{
+			arity: 1,
+			call: func(in *Interpreter, arguments []any) (any, error) {
+				return nil, nil
+			},
+		})
+
+		call := expression.NewCall(
+			expression.NewVariable(*token.NewToken(token.IDENTIFIER, "unaryFn", nil, 1)),
+			paren,
+			[]expression.Expr{invalidExpr()},
+		)
+		_, err := in.Evaluate(call)
+		AssertError(t, err)
+	})
+
+	t.Run("Error when invocation returns error", func(t *testing.T) {
+		in.environment.Define("failingFn", &testCallable{
+			arity: 0,
+			call: func(in *Interpreter, arguments []any) (any, error) {
+				return nil, errors.NewLoxError(1, "invocation failure")
+			},
+		})
+
+		call := expression.NewCall(
+			expression.NewVariable(*token.NewToken(token.IDENTIFIER, "failingFn", nil, 1)),
+			paren,
+			nil,
+		)
+		_, err := in.Evaluate(call)
+		AssertErrorMessage(t, err, "invocation failure")
+	})
+}
+
+func TestNativeClock(t *testing.T) {
+	in := SetUpInterpreter(t)
+	paren := *token.NewToken(token.RIGHT_PAREN, ")", nil, 1)
+
+	t.Run("Evaluate native clock returns positive timestamp", func(t *testing.T) {
+		call := expression.NewCall(
+			expression.NewVariable(*token.NewToken(token.IDENTIFIER, "clock", nil, 1)),
+			paren,
+			nil,
+		)
+		val, err := in.Evaluate(call)
+		AssertNoError(t, err)
+
+		num, ok := val.(float64)
+		if !ok || num <= 0 {
+			t.Fatalf("expected positive float64, got %v", val)
+		}
+	})
+
+	t.Run("Error when calling native clock with arguments", func(t *testing.T) {
+		call := expression.NewCall(
+			expression.NewVariable(*token.NewToken(token.IDENTIFIER, "clock", nil, 1)),
+			paren,
+			[]expression.Expr{expression.NewLiteral(1.0)},
+		)
+		_, err := in.Evaluate(call)
+		AssertErrorMessage(t, err, "expected 0 arguments but got 1")
 	})
 }

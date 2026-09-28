@@ -654,3 +654,242 @@ func TestParseForErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestParseFunction(t *testing.T) {
+	t.Run("Function declaration with parameters and block body", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.FUN, "fun", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "add", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.COMMA, ",", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.PRINT, "print", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(fun add (a b) (print <a>))")
+	})
+
+	t.Run("Function declaration with zero parameters", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.FUN, "fun", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "zero", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(fun zero ())")
+	})
+}
+
+func TestParseFunctionErrors(t *testing.T) {
+	tests := []struct {
+		name                 string
+		tokens               []token.Token
+		expectedErrorContent string
+	}{
+		{
+			"missing function name",
+			[]token.Token{
+				*token.NewToken(token.FUN, "fun", nil, 1),
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			},
+			"expect function name",
+		},
+		{
+			"missing '(' after function name",
+			[]token.Token{
+				*token.NewToken(token.FUN, "fun", nil, 1),
+				*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			},
+			"'(' after function name",
+		},
+		{
+			"parameter name is not identifier",
+			[]token.Token{
+				*token.NewToken(token.FUN, "fun", nil, 1),
+				*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.NUMBER, "123", 123.0, 1),
+				*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			},
+			"expect parameter name",
+		},
+		{
+			"missing ')' after parameters",
+			[]token.Token{
+				*token.NewToken(token.FUN, "fun", nil, 1),
+				*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+				*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+			},
+			"')' after parameters",
+		},
+		{
+			"missing '{' before function body",
+			[]token.Token{
+				*token.NewToken(token.FUN, "fun", nil, 1),
+				*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+				*token.NewToken(token.PRINT, "print", nil, 1),
+				*token.NewToken(token.NUMBER, "1", 1.0, 1),
+				*token.NewToken(token.SEMICOLON, ";", nil, 1),
+			},
+			"'{' before function body",
+		},
+		{
+			"unclosed block in function body",
+			[]token.Token{
+				*token.NewToken(token.FUN, "fun", nil, 1),
+				*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+				*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+				*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+				*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			},
+			"'}' after block",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setUpParserExpectError(t, test.tokens, test.expectedErrorContent)
+		})
+	}
+
+	t.Run("exceeds 255 parameters error", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.FUN, "fun", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "tooMany", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+		}
+		for i := 0; i < 256; i++ {
+			tokens = append(tokens, *token.NewToken(token.IDENTIFIER, "p", nil, 1))
+			if i < 255 {
+				tokens = append(tokens, *token.NewToken(token.COMMA, ",", nil, 1))
+			}
+		}
+		tokens = append(tokens,
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		)
+		setUpParserExpectError(t, tokens, "cannot have more than 255 parameters")
+	})
+}
+
+func TestParseReturn(t *testing.T) {
+	t.Run("Return without value", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(return)")
+	})
+
+	t.Run("Return with literal value", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.NUMBER, "17", 17.0, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(return <17>)")
+	})
+
+	t.Run("Return with binary expression", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(return (<a> PLUS <b>))")
+	})
+
+	t.Run("Return inside a block", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (return <1>))")
+	})
+
+	t.Run("Return inside a function body", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.FUN, "fun", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(fun foo () (return <2>))")
+	})
+}
+
+func TestParseReturnErrors(t *testing.T) {
+	tests := []struct {
+		name                 string
+		tokens               []token.Token
+		expectedErrorContent string
+	}{
+		{
+			"missing semicolon after return without value",
+			[]token.Token{
+				*token.NewToken(token.RETURN, "return", nil, 1),
+			},
+			"expected expression",
+		},
+		{
+			"missing semicolon after return with value",
+			[]token.Token{
+				*token.NewToken(token.RETURN, "return", nil, 1),
+				*token.NewToken(token.NUMBER, "18", 18.0, 1),
+			},
+			"';' after return value",
+		},
+		{
+			"missing expression after return operator",
+			[]token.Token{
+				*token.NewToken(token.RETURN, "return", nil, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+				*token.NewToken(token.SEMICOLON, ";", nil, 1),
+			},
+			"expected expression",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setUpParserExpectError(t, test.tokens, test.expectedErrorContent)
+		})
+	}
+}
