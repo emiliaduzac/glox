@@ -322,3 +322,75 @@ func TestResolveShadowedVariableResolvesToNearestDeclaration(t *testing.T) {
 		t.Errorf("expected outer 'i' resolved at distance 0, got %d (found: %v)", outerDistance, outerOk)
 	}
 }
+
+func TestResolveFunctionParameterResolvesInSameScope(t *testing.T) {
+	r, interp := SetUpResolver(t)
+
+	tokFoo := *token.NewToken(token.IDENTIFIER, "foo", nil, 1)
+	tokX := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+	varX := expression.NewVariable(tokX)
+	fn := statements.NewFunctionStmt(tokFoo, []token.Token{tokX}, []statements.Stmt{
+		statements.NewPrintStmt(varX),
+	})
+
+	err := r.Resolve([]statements.Stmt{fn})
+	AssertNoError(t, err)
+
+	distance, ok := interp.Locals[varX]
+	if !ok {
+		t.Fatalf("expected a resolved distance for the parameter, got none")
+	}
+	if distance != 0 {
+		t.Errorf("expected distance 0, got %d", distance)
+	}
+}
+
+func TestResolveFunctionCapturesOuterVariable(t *testing.T) {
+	r, interp := SetUpResolver(t)
+
+	tokFoo := *token.NewToken(token.IDENTIFIER, "foo", nil, 1)
+	tokX := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+	varX := expression.NewVariable(tokX)
+	fn := statements.NewFunctionStmt(tokFoo, []token.Token{}, []statements.Stmt{
+		statements.NewPrintStmt(varX),
+	})
+	block := statements.NewBlockStmt([]statements.Stmt{
+		statements.NewVarStmt(tokX, expression.NewLiteral(1.0)),
+		fn,
+	})
+
+	err := r.Resolve([]statements.Stmt{block})
+	AssertNoError(t, err)
+
+	distance, ok := interp.Locals[varX]
+	if !ok {
+		t.Fatalf("expected a resolved distance for the captured variable, got none")
+	}
+	if distance != 1 {
+		t.Errorf("expected distance 1, got %d", distance)
+	}
+}
+
+func TestResolveFunctionNameUsableInsideOwnBody(t *testing.T) {
+	r, interp := SetUpResolver(t)
+
+	tokFoo := *token.NewToken(token.IDENTIFIER, "foo", nil, 1)
+	varFoo := expression.NewVariable(tokFoo)
+	fn := statements.NewFunctionStmt(tokFoo, []token.Token{}, []statements.Stmt{
+		statements.NewPrintStmt(varFoo),
+	})
+	block := statements.NewBlockStmt([]statements.Stmt{
+		fn,
+	})
+
+	err := r.Resolve([]statements.Stmt{block})
+	AssertNoError(t, err)
+
+	distance, ok := interp.Locals[varFoo]
+	if !ok {
+		t.Fatalf("expected a resolved distance for the recursive reference, got none")
+	}
+	if distance != 1 {
+		t.Errorf("expected distance 1, got %d", distance)
+	}
+}

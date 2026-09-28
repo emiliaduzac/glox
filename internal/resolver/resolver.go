@@ -89,6 +89,14 @@ func (r *Resolver) resolveStmt(stmt statements.Stmt) error {
 			return err
 		}
 
+	case *statements.FunctionStmt:
+		r.declare(s.Name.Lexeme)
+		r.define(s.Name.Lexeme)
+		err := r.resolveFunction(s)
+		if err != nil {
+			return err
+		}
+
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}
@@ -185,4 +193,20 @@ func (r *Resolver) resolveLocal(expr expression.Expr, name token.Token) {
 			return
 		}
 	}
+}
+
+func (r *Resolver) resolveFunction(function *statements.FunctionStmt) error {
+	r.beginScope()
+	for _, param := range function.Params {
+		r.declare(param.Lexeme)
+		r.define(param.Lexeme)
+	}
+
+	err := r.Resolve(function.Body)
+	if err != nil {
+		return err
+	}
+
+	r.endScope()
+	return nil
 }
