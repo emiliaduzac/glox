@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
@@ -33,6 +34,9 @@ func (p *Parser) Parse() ([]statements.Stmt, error) {
 }
 
 func (p *Parser) declaration() (statements.Stmt, error) {
+	if p.isInTokenTypes(token.FUN) {
+		return p.function("function")
+	}
 	if p.isInTokenTypes(token.VAR) {
 		stmt, err := p.varDeclaration()
 		if err != nil {
@@ -464,4 +468,47 @@ func (p *Parser) primary() (expression.Expr, error) {
 	}
 
 	return nil, p.expectedError("expression")
+}
+
+func (p *Parser) function(kind string) (statements.Stmt, error) {
+	if !p.isInTokenTypes(token.IDENTIFIER) {
+		return nil, p.expectedError(fmt.Sprintf("expect %s name", kind))
+	}
+
+	name := p.getPrevious()
+
+	if !p.isInTokenTypes(token.LEFT_PAREN) {
+		return nil, p.expectedError(fmt.Sprintf("'(' after %s name", kind))
+	}
+
+	var parameters []token.Token
+	if !p.isTokenType(token.RIGHT_PAREN) {
+		for {
+			if len(parameters) >= 255 {
+				return nil, p.expectedError("cannot have more than 255 parameters")
+			}
+			if !p.isInTokenTypes(token.IDENTIFIER) {
+				return nil, p.expectedError("expect parameter name")
+			}
+			parameters = append(parameters, p.getPrevious())
+			if !p.isInTokenTypes(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	if !p.isInTokenTypes(token.RIGHT_PAREN) {
+		return nil, p.expectedError("')' after parameters")
+	}
+
+	if !p.isInTokenTypes(token.LEFT_BRACE) {
+		return nil, p.expectedError(fmt.Sprintf("'{' before %s body", kind))
+	}
+
+	body, err := p.block()
+	if err != nil {
+		return nil, err
+	}
+
+	return statements.NewFunctionStmt(name, parameters, body), nil
 }
