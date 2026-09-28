@@ -3,6 +3,7 @@ package interpreter
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 	"tp-lox/internal/environment"
 	"tp-lox/internal/errors"
@@ -34,12 +35,14 @@ func (c *ClockCallable) String() string {
 type Interpreter struct {
 	globals     *environment.Environment
 	environment *environment.Environment
+	Locals      map[expression.Expr]int
 }
 
 func NewInterpreter() *Interpreter {
 	globals := environment.NewEnvironment()
 	globals.Define("clock", &ClockCallable{})
 	return &Interpreter{
+		Locals:      make(map[expression.Expr]int),
 		globals:     globals,
 		environment: globals,
 	}
@@ -54,6 +57,10 @@ func (in *Interpreter) Interpret(stmts []statements.Stmt) error {
 	}
 
 	return nil
+}
+
+func (in *Interpreter) Resolve(expr expression.Expr, depth int) {
+	in.Locals[expr] = depth
 }
 
 type ReturnValue struct {
@@ -171,17 +178,9 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 	case *expression.Binary:
 		return in.evaluateBinary(e)
 	case *expression.Variable:
-		return in.environment.Get(e.Name)
+		return in.lookupVariable(e)
 	case *expression.Assign:
-		value, err := in.Evaluate(e.Value)
-		if err != nil {
-			return nil, err
-		}
-		err = in.environment.Assign(e.Name, value)
-		if err != nil {
-			return nil, err
-		}
-		return value, nil
+		return in.assignVariable(e)
 	case *expression.Logical:
 		left, err := in.Evaluate(e.Left)
 		if err != nil {
@@ -329,6 +328,35 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 	}
 }
 
+func (in *Interpreter) lookupVariable(expr *expression.Variable) (any, error) {
+	distance, ok := in.Locals[expr]
+	if ok {
+		return in.environment.GetAt(distance, expr.Name.Lexeme)
+	} else {
+		return in.globals.Get(expr.Name)
+	}
+}
+
+func (in *Interpreter) assignVariable(expr *expression.Assign) (any, error) {
+	value, err := in.Evaluate(expr.Value)
+	if err != nil {
+		return nil, err
+	}
+	distance, ok := in.Locals[expr]
+	if ok {
+		err = in.environment.AssignAt(distance, expr.Name, value)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = in.globals.Assign(expr.Name, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return value, nil
+}
+
 func isTruthy(value any) bool {
 	if value == nil {
 		return false
@@ -344,6 +372,21 @@ func Stringify(value any) string {
 		return "nil"
 	}
 	return fmt.Sprintf("%v", value)
+}
+
+func LocalsString(locals map[expression.Expr]int) string {
+	parts := make([]string, 0, len(locals))
+	for expr, depth := range locals {
+		var name token.Token
+		switch e := expr.(type) {
+		case *expression.Variable:
+			name = e.Name
+		case *expression.Assign:
+			name = e.Name
+		}
+		parts = append(parts, fmt.Sprintf("%s: %d", name, depth))
+	}
+	return "{" + strings.Join(parts, ", ") + "}"
 }
 
 func isEqual(a, b any) bool {

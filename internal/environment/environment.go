@@ -39,6 +39,14 @@ func (e *Environment) Get(name token.Token) (any, error) {
 	return nil, errors.NewLoxError(name.Line, fmt.Sprintf("undefined variable '%s'", name.Lexeme))
 }
 
+func (e *Environment) GetAt(distance int, name string) (any, error) {
+	ancestor := e.ancestor(distance)
+	if value, ok := ancestor.values[name]; ok {
+		return value, nil
+	}
+	return nil, errors.NewLoxError(0, fmt.Sprintf("undefined variable '%s'", name))
+}
+
 func (e *Environment) Assign(name token.Token, value any) error {
 	if _, ok := e.values[name.Lexeme]; ok {
 		e.values[name.Lexeme] = value
@@ -48,4 +56,20 @@ func (e *Environment) Assign(name token.Token, value any) error {
 		return e.enclosing.Assign(name, value)
 	}
 	return errors.NewLoxError(name.Line, fmt.Sprintf("undefined variable '%s'", name.Lexeme))
+}
+
+func (e *Environment) AssignAt(distance int, name token.Token, value any) error {
+	ancestor := e.ancestor(distance)
+	if _, ok := ancestor.values[name.Lexeme]; ok {
+		ancestor.values[name.Lexeme] = value
+		return nil
+	}
+	return errors.NewLoxError(name.Line, fmt.Sprintf("undefined variable '%s'", name.Lexeme))
+}
+
+func (e *Environment) ancestor(distance int) *Environment {
+	for i := 0; i < distance; i++ {
+		e = e.enclosing
+	}
+	return e
 }
