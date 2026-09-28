@@ -12,7 +12,6 @@ Implementación de una variante propia del lenguaje [Lox](https://craftinginterp
 - [Tests unitarios](#tests-unitarios)
 - [Tests de la cátedra](#tests-de-la-cátedra)
 - [Benchmarks](#benchmarks)
-- [To Dos](#to-dos)
 
 ## Integrantes
 
@@ -25,10 +24,10 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 
 > Indice de documentación
 
-- [Scanner](docs/scanner.md)
-- [Parser](docs/parser.md)
-- [Interpreter](docs/interpreter.md)
-- [Resolver](docs/resolver.md)
+- [Scanner](docs/1-scanner.md)
+- [Parser](docs/2-parser.md)
+- [Interpreter](docs/3-interpreter.md)
+- [Resolver](docs/4-resolver.md)
 
 ## Cómo correr lox
 
@@ -93,16 +92,3 @@ Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de hab
 ## Benchmarks
 
 TBD
-
-## To Dos
-
-- [ ] Manejar errores: la verdad que me confunde un poco como hace el libro y como hace la versión de clase. No me termina de quedar claro, por ejemplo en el scanner, si tenemos que leer todos los tokens, mostrar el error y seguir leyendo o cortar con el primer error. **Ahora con los tests de la catedra se nota mas, muestra solo el 1er error que se encuentra**
-- [X] Parser - expressions
-- [X] Interpreter - expressions
-- [X] Parser - statements
-- [X] Interpreter - statements
-- [X] Estado
-- [X] Control de flujo
-- [ ] Funciones
-
-(esto lo borramos despues para la entrega)
