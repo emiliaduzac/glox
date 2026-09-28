@@ -56,6 +56,14 @@ func (in *Interpreter) Interpret(stmts []statements.Stmt) error {
 	return nil
 }
 
+type ReturnValue struct {
+	Value any
+}
+
+func (r ReturnValue) Error() string {
+	return "return value"
+}
+
 // Execute ejecuta una sentencia.
 func (in *Interpreter) Execute(stmt statements.Stmt) error {
 	switch s := stmt.(type) {
@@ -119,6 +127,16 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 		in.environment.Define(s.Name.Lexeme, function)
 
 		return nil
+	case *statements.ReturnStmt:
+		var value any = nil
+		if s.Value != nil {
+			var err error
+			value, err = in.Evaluate(s.Value)
+			if err != nil {
+				return err
+			}
+		}
+		return ReturnValue{Value: value}
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}

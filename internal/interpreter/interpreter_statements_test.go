@@ -426,6 +426,165 @@ func TestExecuteFunctionStatement(t *testing.T) {
 	})
 }
 
+func TestExecuteReturnStatement(t *testing.T) {
+	t.Run("Direct Execute of ReturnStmt emits ReturnValue", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewReturnStmt(
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			expression.NewLiteral(17.0),
+		)
+		err := in.Execute(stmt)
+		ret, ok := err.(ReturnValue)
+		if !ok {
+			t.Fatalf("expected ReturnValue, got %T (%v)", err, err)
+		}
+		AssertValue(t, ret.Value, 17.0)
+	})
+
+	t.Run("Direct Execute of ReturnStmt with failing expression returns runtime error", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		stmt := statements.NewReturnStmt(
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			invalidExpr(),
+		)
+		err := in.Execute(stmt)
+		AssertErrorMessage(t, err, "operand must be a number")
+	})
+
+	t.Run("Return with explicit value returns it to caller", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "getAnswer", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			nil,
+			[]statements.Stmt{
+				statements.NewReturnStmt(
+					*token.NewToken(token.RETURN, "return", nil, 1),
+					expression.NewLiteral(6.0),
+				),
+			},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+		val, err := in.Evaluate(call)
+		AssertNoError(t, err)
+		AssertValue(t, val, 6.0)
+	})
+
+	t.Run("Return without value yields nil to caller", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "emptyReturn", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			nil,
+			[]statements.Stmt{
+				statements.NewReturnStmt(
+					*token.NewToken(token.RETURN, "return", nil, 1),
+					nil,
+				),
+			},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+		val, err := in.Evaluate(call)
+		AssertNoError(t, err)
+		AssertValue(t, val, nil)
+	})
+
+	t.Run("Return unwinds block and skips subsequent statements", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "earlyExit", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			nil,
+			[]statements.Stmt{
+				statements.NewBlockStmt([]statements.Stmt{
+					statements.NewReturnStmt(
+						*token.NewToken(token.RETURN, "return", nil, 1),
+						expression.NewLiteral("early"),
+					),
+				}),
+				printStmt("unreachable"),
+			},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+		out := CaptureOutput(t, func() {
+			val, err := in.Evaluate(call)
+			AssertNoError(t, err)
+			AssertValue(t, val, "early")
+		})
+		AssertValue(t, out, "")
+	})
+
+	t.Run("Return breaks while loop immediately", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "loopReturn", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			nil,
+			[]statements.Stmt{
+				statements.NewWhileStmt(
+					expression.NewLiteral(true),
+					statements.NewReturnStmt(
+						*token.NewToken(token.RETURN, "return", nil, 1),
+						expression.NewLiteral(93.0),
+					),
+				),
+			},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+		val, err := in.Evaluate(call)
+		AssertNoError(t, err)
+		AssertValue(t, val, 93.0)
+	})
+
+	t.Run("Error during return expression evaluation propagates to caller", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "failingReturn", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			nil,
+			[]statements.Stmt{
+				statements.NewReturnStmt(
+					*token.NewToken(token.RETURN, "return", nil, 1),
+					invalidExpr(),
+				),
+			},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+		_, err := in.Evaluate(call)
+		AssertErrorMessage(t, err, "operand must be a number")
+	})
+}
+
 func TestInterpret(t *testing.T) {
 	in := SetUpInterpreter(t)
 

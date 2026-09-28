@@ -28,6 +28,9 @@ func (f *Function) Call(in *Interpreter, arguments []any) (any, error) {
 
 	err := in.ExecuteBlock(f.declaration.Body, env)
 	if err != nil {
+		if returnValue, ok := err.(ReturnValue); ok {
+			return returnValue.Value, nil
+		}
 		return nil, err
 	}
 
