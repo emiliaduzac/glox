@@ -19,9 +19,9 @@ go run ./cmd benchmarks/fizzbuzz-clock.lox
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
-| `fib-clock.lox` | 146.92 | 199.11 | **166.63** | 21.73 ms |
-| `minsky-clock.lox` | 19.52 | 20.64 | **20.24** | 0.46 ms |
-| `fizzbuzz-clock.lox` | 10.51 | 13.72 | **11.86** | 1.17 ms |
+| `fib-clock.lox` | 42.674 | 46.998 | **45.699** | 1.547 ms |
+| `minsky-clock.lox` | 4.812 | 6.103 | **5.816** | 0.503 ms |
+| `fizzbuzz-clock.lox` | 3.346 | 3.898 | **3.663** | 0.178 ms |
 
 ## 2. Mediciones externas con `time go run ./cmd`
 
@@ -41,9 +41,9 @@ time go run ./cmd benchmarks/fizzbuzz.lox
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
-| `fibonacci.lox` | 230.00 | 316.00 | **253.40** | 35.54 ms |
-| `minsky.lox` | 91.00 | 98.00 | **95.00** | 2.74 ms |
-| `fizzbuzz.lox` | 83.00 | 90.00 | **85.60** | 2.70 ms |
+| `fibonacci.lox` | 108.00 | 203.00 | **127.80** | 42.04 ms |
+| `minsky.lox` | 47.00 | 67.00 | **62.60** | 8.73 ms |
+| `fizzbuzz.lox` | 62.00 | 79.00 | **67.00** | 6.86 ms |
 
 ## 3. Mediciones externas con binario precompilado (`time ./glox`)
 
@@ -66,17 +66,17 @@ time ./glox benchmarks/fizzbuzz.lox
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
-| `fibonacci.lox` | 151.00 | 308.00 | **213.40** | 57.75 ms |
-| `minsky.lox` | 24.00 | 27.00 | **25.20** | 1.30 ms |
-| `fizzbuzz.lox` | 15.00 | 17.00 | **15.60** | 0.89 ms |
+| `fibonacci.lox` | 73.00 | 78.00 | **76.20** | 1.92 ms |
+| `minsky.lox` | 9.00 | 37.00 | **22.40** | 9.91 ms |
+| `fizzbuzz.lox` | 12.00 | 17.00 | **16.00** | 2.24 ms |
 
 ## 4. Comparativa interna glox
 
 | Benchmark | 1. `clock()` interno (ms) | 2. `go run ./cmd` (ms) | 3. Binario `./glox` (ms) |
 |---|---|---|---|
-| `fibonacci` | 166.63 | 253.40 | 213.40 |
-| `minsky` | 20.24 | 95.00 | 25.20 |
-| `fizzbuzz` | 11.86 | 85.60 | 15.60 |
+| `fibonacci` | 45.70 | 127.80 | 76.20 |
+| `minsky` | 5.82 | 62.60 | 22.40 |
+| `fizzbuzz` | 3.66 | 67.00 | 16.00 |
 
 ---
 
@@ -94,8 +94,8 @@ time plox benchmarks/minsky.lox
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
-| `fibonacci.lox` | 8688.00 | 8823.00 | **8749.00** | 57.70 ms |
-| `minsky.lox` | 1581.00 | 1618.00 | **1595.80** | 14.31 ms |
+| `fibonacci.lox` | 1816.00 | 1837.00 | **1824.40** | 9.50 ms |
+| `minsky.lox` | 345.00 | 372.00 | **361.80** | 10.33 ms |
 
 ---
 
@@ -107,5 +107,5 @@ Los resultados son los siguientes:
 
 | Benchmark | `plox` Promedio (ms) | `glox` (`go run`) Promedio (ms) | Speedup (`glox` vs `plox`) |
 |---|---|---|:---:|
-| `fibonacci` | 8749.00 | 253.40 | **34.5x más rápido** |
-| `minsky` | 1595.80 | 95.00 | **16.8x más rápido** |
+| `fibonacci` | 1824.40 | 127.80 | **14.3x más rápido** |
+| `minsky` | 361.80 | 62.60 | **5.8x más rápido** |
