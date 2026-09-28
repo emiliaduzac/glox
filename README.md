@@ -30,6 +30,7 @@ para facilitar su lectura y comprensión. Toda la documentación técnica se enc
 - [Scanner](docs/scanner.md)
 - [Parser](docs/parser.md)
 - [Interpreter](docs/interpreter.md)
+- [Resolver](docs/resolver.md)
 
 ## Cómo correr lox
 
