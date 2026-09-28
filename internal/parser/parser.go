@@ -71,6 +71,9 @@ func (p *Parser) statement() (statements.Stmt, error) {
 	if p.isInTokenTypes(token.FOR) {
 		return p.forStatement()
 	}
+	if p.isInTokenTypes(token.RETURN) {
+		return p.returnStatement()
+	}
 
 	return p.expressionStatement()
 }
@@ -236,6 +239,24 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 		return nil, p.expectedError("';' after statement")
 	}
 	return expr, nil
+}
+
+func (p *Parser) returnStatement() (statements.Stmt, error) {
+	keyword := p.getPrevious()
+	var value expression.Expr
+	if !p.isTokenType(token.SEMICOLON) {
+		var err error
+		value, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !p.isInTokenTypes(token.SEMICOLON) {
+		return nil, p.expectedError("';' after return value")
+	}
+
+	return statements.NewReturnStmt(keyword, value), nil
 }
 
 // expression es el punto de entrada para parsear una expresión. Comienza el proceso

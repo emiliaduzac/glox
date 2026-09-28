@@ -793,3 +793,103 @@ func TestParseFunctionErrors(t *testing.T) {
 		setUpParserExpectError(t, tokens, "cannot have more than 255 parameters")
 	})
 }
+
+func TestParseReturn(t *testing.T) {
+	t.Run("Return without value", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(return)")
+	})
+
+	t.Run("Return with literal value", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.NUMBER, "17", 17.0, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(return <17>)")
+	})
+
+	t.Run("Return with binary expression", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "a", nil, 1),
+			*token.NewToken(token.PLUS, "+", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "b", nil, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(return (<a> PLUS <b>))")
+	})
+
+	t.Run("Return inside a block", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.NUMBER, "1", 1.0, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(block (return <1>))")
+	})
+
+	t.Run("Return inside a function body", func(t *testing.T) {
+		tokens := []token.Token{
+			*token.NewToken(token.FUN, "fun", nil, 1),
+			*token.NewToken(token.IDENTIFIER, "foo", nil, 1),
+			*token.NewToken(token.LEFT_PAREN, "(", nil, 1),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			*token.NewToken(token.LEFT_BRACE, "{", nil, 1),
+			*token.NewToken(token.RETURN, "return", nil, 1),
+			*token.NewToken(token.NUMBER, "2", 2.0, 1),
+			*token.NewToken(token.SEMICOLON, ";", nil, 1),
+			*token.NewToken(token.RIGHT_BRACE, "}", nil, 1),
+		}
+		stmts := setUpParser(t, tokens)
+		assertStatementString(t, stmts, "(fun foo () (return <2>))")
+	})
+}
+
+func TestParseReturnErrors(t *testing.T) {
+	tests := []struct {
+		name                 string
+		tokens               []token.Token
+		expectedErrorContent string
+	}{
+		{
+			"missing semicolon after return without value",
+			[]token.Token{
+				*token.NewToken(token.RETURN, "return", nil, 1),
+			},
+			"expected expression",
+		},
+		{
+			"missing semicolon after return with value",
+			[]token.Token{
+				*token.NewToken(token.RETURN, "return", nil, 1),
+				*token.NewToken(token.NUMBER, "18", 18.0, 1),
+			},
+			"';' after return value",
+		},
+		{
+			"missing expression after return operator",
+			[]token.Token{
+				*token.NewToken(token.RETURN, "return", nil, 1),
+				*token.NewToken(token.PLUS, "+", nil, 1),
+				*token.NewToken(token.SEMICOLON, ";", nil, 1),
+			},
+			"expected expression",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setUpParserExpectError(t, test.tokens, test.expectedErrorContent)
+		})
+	}
+}

@@ -107,6 +107,20 @@ func NewFunctionStmt(name token.Token, params []token.Token, body []Stmt) *Funct
 
 func (f *FunctionStmt) Statement() {}
 
+type ReturnStmt struct {
+	Keyword token.Token
+	Value   expression.Expr
+}
+
+func NewReturnStmt(keyword token.Token, value expression.Expr) *ReturnStmt {
+	return &ReturnStmt{
+		Keyword: keyword,
+		Value:   value,
+	}
+}
+
+func (r *ReturnStmt) Statement() {}
+
 func String(s Stmt) string {
 	switch s := s.(type) {
 	case *PrintStmt:
@@ -147,6 +161,11 @@ func String(s Stmt) string {
 			return fmt.Sprintf("(fun %s (%s))", s.Name.Lexeme, strings.Join(params, " "))
 		}
 		return fmt.Sprintf("(fun %s (%s) %s)", s.Name.Lexeme, strings.Join(params, " "), strings.Join(body, " "))
+	case *ReturnStmt:
+		if s.Value == nil {
+			return "(return)"
+		}
+		return fmt.Sprintf("(return %s)", expression.String(s.Value))
 	}
 	return fmt.Sprintf("unknown statement: %T", s)
 }
