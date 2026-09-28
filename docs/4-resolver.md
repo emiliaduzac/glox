@@ -15,7 +15,7 @@ Su principal diferencia es que uno es dinámico y el otro estático, por lo que 
 
 3. Interpreter ⇒ ejecuta el programa (runtime, dinámico)
 
-Como vemos, los scopes parecieran no entrar en ningún caso. Acá entra un paso intermedio entre el parser y el interpreter: el **resolver**. Este se encarga de dar pasadas sobre el AST _antes_ de ejecutarlo, que buscan entender el significado de lo que el programador quiso hacer: **análisis semántico**. Es clave entender que estas pasadas no ejecutan nada: no hay efectos secundarios ni control de flujo. Simplemente se encarga del scope estático, resolviendo variables locales.
+Como vemos, los scopes parecieran no entrar en ningún caso. Acá entra un paso intermedio entre el parser y el interpreter: el **resolver**. Este se encarga de dar pasadas sobre el AST _antes_ de ejecutarlo, que buscan entender el significado de lo que el programador quiso hacer: **análisis semántico**. Es clave entender que estas pasadas no ejecutan nada: no hay efectos secundarios ni control de flujo. Simplemente se encarga del scope estático, resolviendo variables _locales_.
 
 A diferencia del **environment**, este no busca resolver valores sino distancias. La idea es saber a cuantos saltos está definida una variable, para que luego el intérprete pueda ir a buscarla directamente, sin tener que volver a calcularlo, y evitando errores dinámicos.
 
@@ -49,9 +49,18 @@ La mayoría de los casos, como por ejemplo `Binary`, `Unary`, `Grouping` y `Logi
 
 Los casos más importantes son:
 
-- **Variables**: como mencionamos antes, al intentar usar una variable primero verifica que no se la esté usando dentro de su propia inicialización (el caso `var a = a;`). Si no es ese caso, calcula la distancia recorriendo la pila de scopes y al encontrarla, se la manda al intérprete, que la guarda en su propio `map`. De esta forma, cuando el intérprete tiene que resolver una expresión, primero verifica si sabe cuántos saltos tiene que dar entre los entornos para hallarla e ir directo. Si no sabe, la busca dinámicamente, sabiendo que se trata de una variable global y no local.
+- **Variables**: como mencionamos antes, al intentar usar una variable primero verifica que no se la esté usando dentro de su propia inicialización (el caso `var a = a;`). Si no es ese caso, calcula la distancia recorriendo la pila de scopes y al encontrarla, se la manda al intérprete (más abajo se explica cómo la usa). Si no la encuentra en ningún scope, no le manda nada: la variable se considera global.
 
 - **Asignaciones**: las asignaciones están compuestas de la forma: `<variable> = <expresión>`. Como esa expresión del lado derecho puede contener más variables (por ejemplo `x = y + 1;`), primero resuelve esa expresión. Luego calcula la distancia de la variable a asignar, de la misma forma que al usar variables, y se la manda al intérprete.
+
+
+### Como utiliza esto el intérprete
+
+El intérprete ya no cuenta solamente con un **environment**, sino tambien con:
+
+- **`Locals`**: un `map` que guarda, para cada expresión que el resolver resolvió, su distancia. Al evaluar una variable o una asignación, el intérprete consulta primero acá: si hay distancia, va directo al entorno que está a esa cantidad de saltos (`GetAt` / `AssignAt`), sin recorrer la cadena.
+
+- **`globals`**: el entorno raíz, donde vive por ejemplo `clock`. Si la expresión no tiene distancia, es porque el resolver no la encontró en ningún scope local, así que es una variable global y se busca directamente ahí.
 
 ### Tests
 

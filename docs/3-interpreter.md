@@ -34,10 +34,12 @@ Acá es que también debemos manejar "a mano" el caso `default` y estar atentos 
 
 ### Funciones y llamadas
 
-Cuando el intérprete va a evaluar una llamada a una función, primero que nada evalúa la expresión de lo que quiere llamar. Después, evalúa todos los argumentos de izquierda a derecha. Se fija si lo que se quiere llamar realmente es una función, por ejemplo si intentás hacer `"hola"()` ahí se corta de una con un error de runtime, un dato es que el error lo dejamos como en el libro que habla de clases aunque en este momento no las soportamos, sabemos que vienen y ya quedó el error tal cual como está en el libro en el capítulo 10. Otra cosa que se fija es la arity, es decir la cantidad de argumentos que le pasaste tiene que ser la misma que la esperada, y si no coinciden tira error avisando cuántas obtuvo y las esperadas. 
+Cuando el intérprete va a evaluar una llamada a una función, primero que nada evalúa la expresión de lo que quiere llamar. Después, evalúa todos los argumentos de izquierda a derecha. Se fija si lo que se quiere llamar realmente es una función, por ejemplo si intentás hacer `"hola"()`, se corta con un error de runtime. Un dato es que el error lo dejamos como en el libro, que habla de clases aunque en este momento no las soportamos, sabemos que vienen y ya quedó el error tal cual como está en el libro en el capítulo 10.
+Otra cosa que se fija es la arity, es decir la cantidad de argumentos que le pasaste tiene que ser la misma que la esperada, y si no coinciden tira error avisando cuántas obtuvo y las esperadas.
 
 #### Función clock()
-Siguiendo un poco el libro fue que también implementamos la función nativa de `clock()` que tiene aridad 0 y devuelve el tiempo. Podríamos usarla para un propio benchmark. 
+
+Siguiendo un poco el libro fue que también implementamos la función nativa de `clock()` que tiene aridad 0 y devuelve el tiempo. Podríamos usarla para un propio benchmark.
 
 ### Errores en tiempo de ejecución
 
@@ -56,15 +58,17 @@ Al agregar estado este tiene que vivir en algún lugar, pero en vez de que sea d
 
 Es clave entender las decisiones semánticas sobre `define`, `get` y `assign`.
 
-Empezando por `define`, es que NUNCA mira para arriba al padre, sino que es local siempre. Otra cosa importante sobre el `define` es que si ya estaba en el scope actual la variable, y se lo llama de nuevo la pisa con el nuevo valor.
+- **`Define`**: nunca mira para arriba del entorno padre, sino que es local siempre. Además, si la variable vuelve a definirse en el scope actual, se pisa el valor.
 
-Sobre el `get`, primero se devuelve si es que existe en local, pero si no existe se consulta recursivamente al padre. En caso de llegar a la raíz, ahí sí corresponde el error de que la variable no ha sido declarada, básicamente esto es, en ningún momento declaraste esa variable ni en este entorno local, ni más arriba.
+- **`Get`**: primero se devuelve si es que existe en local, pero si no existe se consulta recursivamente al padre. En caso de llegar a la raíz, ahí sí corresponde el error de que la variable no ha sido declarada: ni en este entorno local, ni más arriba.
 
-Y sobre el `assign` sigue una lógica similar de que si existe en local, actualiza el valor local. Si no existe pero tiene padre lo delega automáticamente, y si no existe en ninguna parte entonces ahí sí tira error. Esto porque en Lox no hay variables implícitas, y entonces si no fue declarada la variable antes del `assign` falla en runtime. Y por el contrario si todo sale bien, la asignación devuelve un valor porque es una expresión en Lox. Además hay un caso más borde que si solo hacés `var a;` se guarda con `nil`. 
+- **`Assign`**: si existe en local, actualiza el valor local. Si no existe pero tiene padre lo delega automáticamente, y si no existe en ninguna parte entonces ahí sí tira error. Esto porque en Lox no hay variables implícitas, y entonces si no fue declarada la variable antes del `assign` falla en runtime. Y por el contrario si todo sale bien, la asignación devuelve un valor porque es una expresión en Lox. Además hay un caso más borde donde si solo se hace `var a;` se guarda con `nil`.
 
-Lo bastante interesante de estos métodos y sus combinaciones, es tener en claro lo del shadowing, es decir, al usar `define` en local sobre una variable que ya existe afuera, en ese entorno lo "tapa". Entonces si en local luego consultás por eso mismo, te responde el local, pero nunca modificaste lo de afuera.
+Lo interesante de estos métodos y sus combinaciones, es tener en claro lo del _shadowing_, es decir: al usar `define` en local sobre una variable que ya existe afuera, en ese entorno lo "tapa". Entonces si en local luego consultás por eso mismo, te responde el valor local, pero nunca se modifica lo de afuera.
 
-Otro caso muy interesante es el de mutación de las variables externas. Es decir, si en local hacés un `assign` a una variable que en local no existe, entonces se va para el padre y se la modifica al padre (si es que él tiene esa). Entonces, terminado el entorno local, pasa que modificaste lo de afuera. 
+Otro caso muy interesante es el de _mutación de las variables externas_. Es decir, si en local hacés un `assign` a una variable que en local no existe, entonces se va para el padre y se la modifica al padre (si es que él tiene esa). Entonces, terminado el entorno local, pasa que modificaste lo de afuera.
+
+Más adelante, al incorporar el resolver, esta búsqueda cambia: el intérprete ya no recorre la cadena de entornos para encontrar una variable. Si el resolver calculó una distancia para ella, el intérprete va directo al entorno correcto. Si no hay distancia, es una variable global y se busca en `globals`. Detallado en [Resolver](4-resolver.md).
 
 #### Ejecución de bloques
 
@@ -73,7 +77,6 @@ Para ejecutar un bloque implementamos el siguiente método: la idea es primero g
 Un detalle propio de implementar Glox, es que en el libro al usar Java se usa un `try` y `finally`, pero en Go no existe, por lo que la forma más idiomática de Go fue usar un `defer`. Esto ayuda a que si una sentencia del bloque falla al ejecutarse, se corta y Go termina ejecutando sí o sí `in.environment = previous` que es el scope del padre, y no se queda atrapado en el del hijo. 
 
 Y un detalle interesante de nuestra implementación es que, hasta el momento, no tenemos un método para destruir los scopes explícitamente. Acá hay que distinguir dos punteros distintos: por un lado el `enclosing`: puntero de un entorno hijo hacia su padre, que se define una sola vez al crearlo y nunca cambia después. Por otro lado el `environment`: el puntero de "cuál entorno está activo ahora" en el intérprete: al entrar al bloque apunta al hijo, y al salir (por el `defer`) vuelve a apuntar al padre. Una vez que eso pasa, y la variable local `env` del método sale de scope, nadie en el programa referencia más al entorno del hijo, y eso es lo que le permite al garbage collector de Go detectarlo y liberarlo solo. Al momento de agregar funciones y closures nos acordamos de esto, pero como una función intenta quedarse con ese entorno, si la función sigue "viva", la referencia también y el garbage collector no lo borra, así que las variables de afuera de la función que necesita de contexto siguen, hasta que finalmente se quedan sin referencia. 
- 
 
 Al agregar los ciclos sucede que, cuando el cuerpo es un bloque, se crea un nuevo `environment` en cada iteración. Por lo tanto, las variables definidas dentro del cuerpo se re-declaran en cada vuelta (cada una en su entorno, que vive exactamente una sola iteración), si se quisiera utilizar una variable más a modo acumuladora, debe declararse fuera del ciclo (como sucede en todos los lenguajes). 
 
