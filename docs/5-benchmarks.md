@@ -109,3 +109,14 @@ Los resultados son los siguientes:
 |---|---|---|:---:|
 | `fibonacci` | 1824.40 | 127.80 | **14.3x más rápido** |
 | `minsky` | 361.80 | 62.60 | **5.8x más rápido** |
+
+# Análisis y conclusión
+
+Particularmente sobre glox, como corremos con go run eso trae un costo fijo que es el de compilar el código, que por lo que vemos aproximadamente en las mediciones es de 50 ms. El tema que en programas cortos como el de fizzbuzz o el de minsky, es mucho más representativo porque casi todo el tiempo se va ahí y no en la ejecución de lox.
+
+Por eso es que directamente cuando tenés el binario compilado es notoria la diferencia, por ejemplo en el de fizzbuzz baja de 67 a 16ms (aprox los 50ms que decimos de compilación).
+
+Un detalle a tener en cuenta es que como agregamos a nuestro glox la función nativa de clock() podemos medir como lo hacemos en el primer caso, y ahí la diferencia es mucho más drástica donde fizzbuzz cae aproximadamente su tiempo a unos 3.6 ms. Y fibonacci de 25, que tiene mucha recursión, solo a 45 ms. 
+
+Es notoria también la diferencia del tiempo contra plox de la cátedra particularmente en fibonacci, donde el orden de magnitud cambia de los milisegundos a segundos.
+Una de las causas es que go es compilado, mientras que python interpretado. Entonces si partimos que tenemos lox corriendo en python que se tiene que interpretar también, eso hace que sea más lento frente a nuestro glox. 
