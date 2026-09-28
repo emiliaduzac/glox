@@ -29,7 +29,7 @@ func (l *Lox) start() {
 	args := flag.Args()
 
 	if len(args) > 1 {
-		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing] [script]")
+		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing|--resolve] [script]")
 		os.Exit(EX_USAGE)
 	} else if len(args) == 1 {
 		l.runFile(args[0])

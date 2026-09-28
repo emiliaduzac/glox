@@ -88,7 +88,7 @@ arguments  → expression ( "," expression )* ;
 
 4. **operadores lógicos**: estos nos permiten anidar varias condiciones, y se evalúan de una forma particular: contienen "cortocircuitos", una manera distinta de evaluarse que no permite que sean simples operadores binarios. En el caso del `or`, se evalúa primero la expresión de la izquierda. Si esta es verdadera, ya no se necesita evaluar la expresión de la derecha, ya cumple. En el caso del `and`, si el término de la izquierda es falso, ya no hay más nada que evaluar, ya que sin importar el resultado de la expresión derecha, no va a cumplirse que ambas sean verdaderas. En cuanto a su precedencia, el `or` tiene menor precedencia. Por ejemplo `TRUE or FALSE and TRUE` se resuelve a: `TRUE or (FALSE and TRUE)` → `TRUE or FALSE` → `TRUE`. Por último, destacar que en lox los operadores lógicos son considerados expresiones ya que devuelven el valor del operando (no un booleano).
 
-5. **call** queda en precedencia entre primary y unary, y esto porque los paréntesis de la llamada tienen que resolverse antes del unary. Un ejemplo sería si uno hace `!esVerdadero()`, primero debería resolver la función `esVerdadero()` y después negar eso.
+5. **call** queda en precedencia entre primary y unary, esto porque los paréntesis de la llamada tienen que resolverse antes del unary. Un ejemplo sería: si uno hace `!esVerdadero()`, primero debería resolver la función `esVerdadero()` y después negar ese resultado.
 
 
 Para **resolver** una expresión, el proceso va de arriba hacia abajo: **Recursive Descent Parser**. Es decir: de menor a mayor precedencia: `expression → assignment → logic_or → logic_and → equality → comparison → term → factor → unary → call → primary`, y el árbol se arma de izquierda a derecha a medida que se desciende y se vuelve.
@@ -99,10 +99,16 @@ Como se evalúa dicho árbol será explicado en la implementación del interpret
 
 Como nuestro parser mira solo de a un token, al leer `x` no puede saber que viene después: si una asignación (`x = 1`) o una expresión (`x + 1`). En el libro se propone un truco: parsear el lado izquierdo como si fuera una expresión y luego fijarse si lo que sigue es un `=`. Si lo es, volvés a mirar hacia atrás: si lo anterior era válido (una variable), es correcto y se convierte en un nodo `Assign`. Si no, es un error.
 
-#### Manejo de errores
+#### Manejo de errores en expressions
 
-Al encontrarse con un error, el parser devuelve un error detallado explicando la linea y error hallado, sin seguir parseando el resto de tokens. Inicialmente, como `primary()` era el último nivel de la tabla de precedencia, todos los errores ocurrían allí: si ningún nivel anterior pudo consumir el token, ahí es donde se sabe que no hay una expresión válida.
-Con el agregado del truco del libro, se agrega el error "invalid assignment target". Ejemplo `1 + 2 = 3` es inválido, o un `(a) = 3` en Lox es inválido. Y se lanza ese error sintáctico. 
+Al encontrarse con un error, el parser devuelve un error detallado explicando la línea y el error hallado, sin seguir parseando el resto de tokens.
+
+Cuando el parser necesita sí o sí un token para poder continuar (por ejemplo el `)` que cierra una llamada a función, como en `foo(1, 2`) y no lo encuentra, se informa qué esperaba y qué encontró en su lugar. El caso más general es el de `primary()`: como es el último nivel de la tabla de precedencia, si ningún nivel anterior pudo consumir el token, ahí es donde se sabe que no es una expresión válida.
+
+Además, hay otros casos que tienen su propio error:
+
+- **`invalid assignment target`**: aparece con el truco del libro para asignaciones. Por ejemplo, `1 + 2 = 3` o `(a) = 3` son inválidos en Lox, porque el lado izquierdo no es una variable.
+- **Más de 255 argumentos** en una llamada a función: se levanta un error.
 
 ### Statements
 
@@ -127,17 +133,17 @@ func (p *PrintStmt) Statement() {}
 
 - **Var statements**: declara una variable nueva en el entorno actual, que puede o no tener un valor inicial. Como Expr es una interfaz, `nil` ya es un valor válido para ese campo, por lo que no necesitamos ningún `Optional` ni similares para poder declarar el valor inicial (ya que Go no tiene `Optionals`).
 
-- **Block statements**: declara una lista de sentencias y declaraciones entre llaves `{ ... }`. Agregar esto a Glox le permite ahora delimitar en scope local y dentro de él declarar las variables locales y también con esto soporta declarar variables locales dentro.
+- **Block statements**: declara una lista de sentencias y declaraciones entre llaves `{ ... }`. Agregar esto a Glox le permite tener scopes locales: lo que se declara dentro de las llaves solo existe dentro del bloque, y afuera no se puede usar.
 
 - **If statements**: al incorporar control de flujo aparecen los condicionales. Nos permiten guiar el flujo de ejecución: dada una condición, ejecutar una porción de código u otra. Glox no contiene `elif` ni `if else`, por lo que para tener varias condiciones si o si hay que anidar (o si se quiere varias condiciones en un mismo `if`, utilizar operadores lógicos). Para evitar ambiguedades, se resuelve que en caso de haber varios `if`, cada `else` se resuelve al más cercano. En el código esto se da naturalmente por como parseamos y construimos recursivamente el árbol AST. Al encontrar un `if statement`, se consume su `else` más cercano directamente. Esto es: cuando el parser encuentra el primer `if`, comienza una llamada recursiva que parsea su cuerpo (la rama que se ejecuta si se cumple la condición). Al resolverse primero ese cuerpo, si se vuelve a encontrar un `if`, cuando termine de analizar esa nueva rama, saldrá y se encontrará con un `else`, que quedará asociado a ese último `if`. Cuando salga de esa llamada recursiva, el `if` más externo no tendrá ningún else, porque ya fue asignado al más interno.
 
 - **While statements**: permiten repetir una porción de código una cantidad de veces indefinida: mientras se cumpla una condición.
 
-- **For statements (?)**: técnicamente son lo mismo que un while, pero como repiten una semántica muy utilizada por los usuarios, se resuelve con syntactic sugar para facilitar su uso. Entonces se implementan por detrás con un while (no es un statement nuevo), pero se mantiene la palabra reservada `for` con su semántica, para que el usuario pueda hacer uso del mismo, sin saber como se implementa por detrás. Un `for` entonces contiene: (1) inicializador, (2) condición e (3) incremento: `for ( <initializer> ; <condition> ; <increment>) <body>`.
+- **For "statements" (?)**: técnicamente son lo mismo que un while, pero como repiten una semántica muy utilizada por los usuarios, se resuelve con syntactic sugar para facilitar su uso. Entonces se implementan por detrás con un while (no es un statement nuevo), pero se mantiene la palabra reservada `for` con su semántica, para que el usuario pueda hacer uso del mismo, sin saber como se implementa por detrás. Un `for` entonces contiene: (1) inicializador, (2) condición e (3) incremento: `for ( <initializer> ; <condition> ; <increment>) <body>`.
 
 - **Function statements**: nos sirven para poder declarar una función con su nombre, sus parámetros (si es que tiene) y su cuerpo que es un bloque. 
 
-- **Return statements**: en sí devuelve un valor, si lo escribiste es el valor que le asignaste para devolver, ej: `return 5;` devuelve 5, pero también es válido solo un `return;` porque termina devolviendo `nil` aunque no lo pongas explícito. Entonces te permite salir de una función en el momento que vos quieras y retornando el valor deseado.
+- **Return statements**: en sí devuelve un valor. Si va seguido de una expresión, por ej: `return 5;`: devuelve 5. Pero si no va seguido de una expresión, termina devolviendo `nil`, por ej: `return;`. Esto permite salir de una función en cualquier momento y retornando el valor deseado.
 
 Se expande nuestra gramática:
 
@@ -174,13 +180,14 @@ primary     → NUMBER | STRING | "true" | "false" | "nil" | "(" expression ")" 
 arguments   → expression ( "," expression )* ;
 ```
 
-#### Manejo de errores
+#### Manejo de errores en statements
 
-Al incorporar statements surge un nuevo error: toda sentencia debe terminar en `;`. Si falta, el parser lanza un error indicando qué encontró en su lugar.
-Además agregamos el chequeo del error de no cerrar con `}` porque también podría pasar que siga y se tope con un EOF, así que en ese caso se informa con el error "expected '}' after block". 
-Con `if` y `while` aparecen errores análogos: falta del `(` o del `)` alrededor de la condición, o una condición vacía.
+Además de los errores de expresiones, al incorporar statements aparecen otros:
 
-Siguiendo un poco el libro para el parser, se levanta un error si se pasan más de 255 argumentos o parámetros.
+- **`;` faltante**: toda sentencia debe terminar en `;`. Si falta, el parser lanza un error indicando qué encontró en su lugar.
+- **`}` faltante**: si un bloque no se cierra, el parser puede llegar hasta el EOF sin encontrar el `}`. En ese caso informa `expected '}' after block`.
+- **`if` y `while`**: aparecen errores análogos, por la falta del `(` o del `)` alrededor de la condición.
+- **Más de 255 parámetros** en la declaración de una función: se levanta un error, como en el libro.
 
 #### Tests
 
