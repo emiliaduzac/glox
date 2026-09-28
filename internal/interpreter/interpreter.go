@@ -114,6 +114,11 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 			}
 		}
 		return nil
+	case *statements.FunctionStmt:
+		function := NewFunction(s)
+		in.environment.Define(s.Name.Lexeme, function)
+
+		return nil
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}

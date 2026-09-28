@@ -314,6 +314,118 @@ func TestExecuteWhileStatement(t *testing.T) {
 	})
 }
 
+func TestExecuteFunctionStatement(t *testing.T) {
+	t.Run("Declare function binds callable with name and arity to environment", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "sayHello", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			nil,
+			[]statements.Stmt{printStmt("Hello")},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		val, err := in.Evaluate(expression.NewVariable(tokFn))
+		AssertNoError(t, err)
+		callable, ok := val.(Callable)
+		if !ok {
+			t.Fatalf("expected Callable in environment, got %T", val)
+		}
+		AssertValue(t, callable.String(), "<fn sayHello>")
+		AssertValue(t, callable.Arity(), 0)
+	})
+
+	t.Run("Execute function call passes arguments to parameters and executes body", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "say", nil, 1)
+		tokParam := *token.NewToken(token.IDENTIFIER, "msg", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			[]token.Token{tokParam},
+			[]statements.Stmt{
+				statements.NewPrintStmt(expression.NewVariable(tokParam)),
+			},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			[]expression.Expr{expression.NewLiteral("hello")},
+		)
+		out := CaptureOutput(t, func() {
+			val, err := in.Evaluate(call)
+			AssertNoError(t, err)
+			AssertValue(t, val, nil)
+		})
+		AssertValue(t, out, "hello\n")
+	})
+
+	t.Run("Function parameters are not accessible outside function scope", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "f", nil, 1)
+		tokParam := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			[]token.Token{tokParam},
+			[]statements.Stmt{},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			[]expression.Expr{expression.NewLiteral(14.0)},
+		)
+		_, err := in.Evaluate(call)
+		AssertNoError(t, err)
+
+		_, err = in.Evaluate(expression.NewVariable(tokParam))
+		AssertErrorMessage(t, err, "undefined variable 'x'")
+	})
+
+	t.Run("Error when invoking function with incorrect arity", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "oneArg", nil, 1)
+		tokParam := *token.NewToken(token.IDENTIFIER, "a", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			[]token.Token{tokParam},
+			[]statements.Stmt{},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+		_, err := in.Evaluate(call)
+		AssertErrorMessage(t, err, "expected 1 arguments but got 0")
+	})
+
+	t.Run("Error inside function body propagates to caller", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokFn := *token.NewToken(token.IDENTIFIER, "failing", nil, 1)
+		fnStmt := statements.NewFunctionStmt(
+			tokFn,
+			nil,
+			[]statements.Stmt{
+				statements.NewExpressionStmt(invalidExpr()),
+			},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		call := expression.NewCall(
+			expression.NewVariable(tokFn),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+		_, err := in.Evaluate(call)
+		AssertError(t, err)
+	})
+}
+
 func TestInterpret(t *testing.T) {
 	in := SetUpInterpreter(t)
 
