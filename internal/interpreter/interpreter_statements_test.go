@@ -424,6 +424,68 @@ func TestExecuteFunctionStatement(t *testing.T) {
 		_, err := in.Evaluate(call)
 		AssertError(t, err)
 	})
+
+	t.Run("Closure captures and mutates outer function variable across calls", func(t *testing.T) {
+		in := SetUpInterpreter(t)
+		tokMakeCounter := *token.NewToken(token.IDENTIFIER, "makeCounter", nil, 1)
+		tokI := *token.NewToken(token.IDENTIFIER, "i", nil, 1)
+		tokCount := *token.NewToken(token.IDENTIFIER, "count", nil, 1)
+		tokCounter := *token.NewToken(token.IDENTIFIER, "counter", nil, 1)
+
+		fnStmt := statements.NewFunctionStmt(
+			tokMakeCounter,
+			nil,
+			[]statements.Stmt{
+				statements.NewVarStmt(tokI, expression.NewLiteral(0.0)),
+				statements.NewFunctionStmt(
+					tokCount,
+					nil,
+					[]statements.Stmt{
+						statements.NewExpressionStmt(
+							expression.NewAssign(
+								tokI,
+								expression.NewBinary(
+									expression.NewVariable(tokI),
+									*token.NewToken(token.PLUS, "+", nil, 1),
+									expression.NewLiteral(1.0),
+								),
+							),
+						),
+						statements.NewReturnStmt(
+							*token.NewToken(token.RETURN, "return", nil, 1),
+							expression.NewVariable(tokI),
+						),
+					},
+				),
+				statements.NewReturnStmt(
+					*token.NewToken(token.RETURN, "return", nil, 1),
+					expression.NewVariable(tokCount),
+				),
+			},
+		)
+		AssertNoError(t, in.Execute(fnStmt))
+
+		callMakeCounter := expression.NewCall(
+			expression.NewVariable(tokMakeCounter),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+		AssertNoError(t, in.Execute(statements.NewVarStmt(tokCounter, callMakeCounter)))
+
+		callCounter := expression.NewCall(
+			expression.NewVariable(tokCounter),
+			*token.NewToken(token.RIGHT_PAREN, ")", nil, 1),
+			nil,
+		)
+
+		val1, err := in.Evaluate(callCounter)
+		AssertNoError(t, err)
+		AssertValue(t, val1, 1.0)
+
+		val2, err := in.Evaluate(callCounter)
+		AssertNoError(t, err)
+		AssertValue(t, val2, 2.0)
+	})
 }
 
 func TestExecuteReturnStatement(t *testing.T) {

@@ -123,7 +123,7 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 		}
 		return nil
 	case *statements.FunctionStmt:
-		function := NewFunction(s)
+		function := NewFunction(s, in.environment)
 		in.environment.Define(s.Name.Lexeme, function)
 
 		return nil
