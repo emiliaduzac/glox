@@ -11,7 +11,6 @@ Implementación de una variante propia del lenguaje [Lox](https://craftinginterp
 - [Cómo correr lox](#cómo-correr-lox)
 - [Tests unitarios](#tests-unitarios)
 - [Tests de la cátedra](#tests-de-la-cátedra)
-- [Benchmarks](#benchmarks)
 
 ## Integrantes
 
@@ -28,6 +27,7 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Parser](docs/2-parser.md)
 - [Interpreter](docs/3-interpreter.md)
 - [Resolver](docs/4-resolver.md)
+- [Benchmarks](docs/5-benchmarks.md)
 
 ## Cómo correr lox
 
@@ -88,7 +88,3 @@ python3 real-tests/script.py "go run ./cmd"
 ```
 
 Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
-
-## Benchmarks
-
-TBD

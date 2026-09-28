@@ -1,0 +1,20 @@
+fun fizzbuzz(n) {
+  var res = "";
+  for (var i = 1; i <= n; i = i + 1) {
+    if (i % 3 == 0 and i % 5 == 0) {
+      res = res + "FizzBuzz";
+    } else if (i % 3 == 0) {
+      res = res + "Fizz";
+    } else if (i % 5 == 0) {
+      res = res + "Buzz";
+    }
+  }
+  return res;
+}
+
+var start = clock();
+var result = fizzbuzz(5000);
+var end = clock();
+
+print "done";
+print end - start;
