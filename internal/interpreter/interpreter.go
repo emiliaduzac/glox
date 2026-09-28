@@ -12,11 +12,13 @@ import (
 
 type Interpreter struct {
 	environment *environment.Environment
+	locals      map[expression.Expr]int
 }
 
 func NewInterpreter() *Interpreter {
 	return &Interpreter{
 		environment: environment.NewEnvironment(),
+		locals:      make(map[expression.Expr]int),
 	}
 }
 
@@ -32,7 +34,7 @@ func (in *Interpreter) Interpret(stmts []statements.Stmt) error {
 }
 
 func (in *Interpreter) Resolve(expr expression.Expr, depth int) {
-	// pass
+	in.locals[expr] = depth
 }
 
 // Execute ejecuta una sentencia.
@@ -127,17 +129,9 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 	case *expression.Binary:
 		return in.evaluateBinary(e)
 	case *expression.Variable:
-		return in.environment.Get(e.Name)
+		return in.lookupVariable(e)
 	case *expression.Assign:
-		value, err := in.Evaluate(e.Value)
-		if err != nil {
-			return nil, err
-		}
-		err = in.environment.Assign(e.Name, value)
-		if err != nil {
-			return nil, err
-		}
-		return value, nil
+		return in.assignVariable(e)
 	case *expression.Logical:
 		left, err := in.Evaluate(e.Left)
 		if err != nil {
@@ -258,6 +252,35 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 	default:
 		return nil, errors.NewLoxError(expr.Operator.Line, fmt.Sprintf("unknown binary operator: %s", expr.Operator.Lexeme))
 	}
+}
+
+func (in *Interpreter) lookupVariable(expr *expression.Variable) (any, error) {
+	distance, ok := in.locals[expr]
+	if ok {
+		return in.environment.GetAt(distance, expr.Name.Lexeme)
+	} else {
+		return in.environment.Get(expr.Name)
+	}
+}
+
+func (in *Interpreter) assignVariable(expr *expression.Assign) (any, error) {
+	value, err := in.Evaluate(expr.Value)
+	if err != nil {
+		return nil, err
+	}
+	distance, ok := in.locals[expr]
+	if ok {
+		err = in.environment.AssignAt(distance, expr.Name, value)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err = in.environment.Assign(expr.Name, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return value, nil
 }
 
 func isTruthy(value any) bool {
