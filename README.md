@@ -30,6 +30,8 @@ para facilitar su lectura y comprensión. Toda la documentación técnica se enc
 - [Scanner](docs/scanner.md)
 - [Parser](docs/parser.md)
 - [Interpreter](docs/interpreter.md)
+- [Benchmarks](docs/benchmarks.md)
+
 
 ## Cómo correr lox
 
@@ -87,7 +89,10 @@ TBD
 
 ## Benchmarks
 
-TBD
+Las mediciones y la comparativa de rendimiento se encuentran detalladas en [docs/benchmarks.md](docs/benchmarks.md).
+
+Los scripts de prueba utilizados se encuentran bajo la carpeta [benchmarks/](benchmarks).
+
 
 ## To Dos
 
