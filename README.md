@@ -12,7 +12,6 @@ aproximaciones vistas en clase. Desarrollado en [Go](https://go.dev/).
 - [Cómo correr lox](#cómo-correr-lox)
 - [Tests unitarios](#tests-unitarios)
 - [Tests de la cátedra](#tests-de-la-cátedra)
-- [Benchmarks](#benchmarks)
 - [To Dos](#to-dos)
 
 ## Integrantes
@@ -86,13 +85,6 @@ go test -v ./...
 ## Tests de la cátedra
 
 TBD
-
-## Benchmarks
-
-Las mediciones y la comparativa de rendimiento se encuentran detalladas en [docs/benchmarks.md](docs/benchmarks.md).
-
-Los scripts de prueba utilizados se encuentran bajo la carpeta [benchmarks/](benchmarks).
-
 
 ## To Dos
 
