@@ -6,6 +6,17 @@ Para cada benchmark se realizaron 5 iteraciones.
 
 Medición del tiempo neto de ejecución dentro de Lox mediante la función nativa `clock()`. No incluye el arranque de Go ni del sistema operativo.
 
+Para correr las pruebas:
+```bash
+go run ./cmd benchmarks/fib-clock.lox
+```
+```bash
+go run ./cmd benchmarks/minsky-clock.lox
+```
+```bash
+go run ./cmd benchmarks/fizzbuzz-clock.lox
+```
+
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
 | `fib-clock.lox` | 146.92 | 199.11 | **166.63** | 21.73 ms |
@@ -16,6 +27,18 @@ Medición del tiempo neto de ejecución dentro de Lox mediante la función nativ
 
 Tiempo total medido desde la terminal con `time`. Incluye la compilación al vuelo de Go (`go run`), la inicialización del runtime y la ejecución de Lox.
 
+Para correr las pruebas:
+```bash
+time go run ./cmd benchmarks/fibonacci.lox
+```
+```bash
+time go run ./cmd benchmarks/minsky.lox
+```
+```bash
+time go run ./cmd benchmarks/fizzbuzz.lox
+```
+
+
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
 | `fibonacci.lox` | 230.00 | 316.00 | **253.40** | 35.54 ms |
@@ -25,6 +48,21 @@ Tiempo total medido desde la terminal con `time`. Incluye la compilación al vue
 ## 3. Mediciones externas con binario precompilado (`time ./glox`)
 
 Tiempo total medido desde la terminal ejecutando el binario compilado con `go build -o glox ./cmd`. Elimina la compilación al vuelo de Go, midiendo únicamente su ejecución.
+
+Para correr las pruebas primero:
+```bash
+go build -o glox ./cmd
+```
+Después:
+```bash
+time ./glox benchmarks/fibonacci.lox
+```
+```bash
+time ./glox benchmarks/minsky.lox
+```
+```bash
+time ./glox benchmarks/fizzbuzz.lox
+```
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
@@ -45,6 +83,14 @@ Tiempo total medido desde la terminal ejecutando el binario compilado con `go bu
 # Benchmarks de plox
 
 Viendo que en `plox` no tiene la función nativa `clock()` y que no soporta el operador `%`, la medición la hicmos con `time plox benchmarks/<script>.lox` únicamente sobre los compatibles (`fibonacci.lox` y `minsky.lox`).
+
+Para correr las pruebas:
+```bash
+time plox benchmarks/fibonacci.lox
+```
+```bash
+time plox benchmarks/minsky.lox
+```
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
