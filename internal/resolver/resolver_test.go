@@ -394,3 +394,77 @@ func TestResolveFunctionNameUsableInsideOwnBody(t *testing.T) {
 		t.Errorf("expected distance 1, got %d", distance)
 	}
 }
+
+func TestResolveReturnResolvesItsValue(t *testing.T) {
+	r, interp := SetUpResolver(t)
+
+	tokFoo := *token.NewToken(token.IDENTIFIER, "foo", nil, 1)
+	tokX := *token.NewToken(token.IDENTIFIER, "x", nil, 1)
+	tokReturn := *token.NewToken(token.RETURN, "return", nil, 1)
+	varX := expression.NewVariable(tokX)
+	fn := statements.NewFunctionStmt(tokFoo, []token.Token{tokX}, []statements.Stmt{
+		statements.NewReturnStmt(tokReturn, varX),
+	})
+
+	err := r.Resolve([]statements.Stmt{fn})
+	AssertNoError(t, err)
+
+	distance, ok := interp.Locals[varX]
+	if !ok {
+		t.Fatalf("expected a resolved distance for the returned variable, got none")
+	}
+	if distance != 0 {
+		t.Errorf("expected distance 0, got %d", distance)
+	}
+}
+
+func TestResolveCallResolvesCallee(t *testing.T) {
+	r, interp := SetUpResolver(t)
+
+	tokFoo := *token.NewToken(token.IDENTIFIER, "foo", nil, 1)
+	tokParen := *token.NewToken(token.RIGHT_PAREN, ")", nil, 1)
+	calleeFoo := expression.NewVariable(tokFoo)
+	block := statements.NewBlockStmt([]statements.Stmt{
+		statements.NewFunctionStmt(tokFoo, []token.Token{}, []statements.Stmt{}),
+		statements.NewExpressionStmt(expression.NewCall(calleeFoo, tokParen, []expression.Expr{})),
+	})
+
+	err := r.Resolve([]statements.Stmt{block})
+	AssertNoError(t, err)
+
+	distance, ok := interp.Locals[calleeFoo]
+	if !ok {
+		t.Fatalf("expected a resolved distance for the callee, got none")
+	}
+	if distance != 0 {
+		t.Errorf("expected distance 0, got %d", distance)
+	}
+}
+
+func TestResolveCallResolvesArguments(t *testing.T) {
+	r, interp := SetUpResolver(t)
+
+	tokFoo := *token.NewToken(token.IDENTIFIER, "foo", nil, 1)
+	tokP := *token.NewToken(token.IDENTIFIER, "p", nil, 1)
+	tokA := *token.NewToken(token.IDENTIFIER, "a", nil, 1)
+	tokParen := *token.NewToken(token.RIGHT_PAREN, ")", nil, 1)
+	argA := expression.NewVariable(tokA)
+	block := statements.NewBlockStmt([]statements.Stmt{
+		statements.NewVarStmt(tokA, expression.NewLiteral(1.0)),
+		statements.NewFunctionStmt(tokFoo, []token.Token{tokP}, []statements.Stmt{}),
+		statements.NewExpressionStmt(expression.NewCall(
+			expression.NewVariable(tokFoo), tokParen, []expression.Expr{argA},
+		)),
+	})
+
+	err := r.Resolve([]statements.Stmt{block})
+	AssertNoError(t, err)
+
+	distance, ok := interp.Locals[argA]
+	if !ok {
+		t.Fatalf("expected a resolved distance for the argument, got none")
+	}
+	if distance != 0 {
+		t.Errorf("expected distance 0, got %d", distance)
+	}
+}

@@ -37,6 +37,8 @@ El resolver almacena una **pila de scopes** de la siguiente forma `[]map[string]
 
 - **Funciones**: a diferencia de una variable, el nombre de la función se declara y define a la vez, antes de resolver el cuerpo, porque una función sí puede usarse a sí misma para definirse: recursividad. Después de eso, el resolver abre un scope nuevo, declara y define cada parámetro dentro de ese scope, resuelve el body con ese scope activo, y al terminar lo elimina. Esta es la parte clave: el cuerpo se resuelve una sola vez en el momento de la declaración de la función usando el scope definido en ese momento. Por eso las variables que usa la función quedan con una distancia fija y estática, sin importar desde dónde se la llame después. Esto es lo que evita el bug de closures visto en clase, que se ocasionaba porque el intérprete define un entorno para cada llamada de la función y se buscaba entre esos entornos (definidos en runtime, no en la declaración).
 
+- **Returns**: en caso de haber un valor por resolver, resuelve dicha expresión.
+
 Es importante entender que el resolver mantiene los scopes casi como una copia de los entornos que mantiene el intérprete: se define un scope nuevo exactamente en los mismos lugares donde el intérprete definiría un entorno nuevo. La diferencia es que estos scopes no guardan valores, y por más que guarden booleanos (`declarado`/`definido`), el objetivo principal de todo el resolver es calcular las distancias.
 
 ### Como resuelve expresiones

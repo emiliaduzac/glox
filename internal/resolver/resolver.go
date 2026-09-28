@@ -97,6 +97,14 @@ func (r *Resolver) resolveStmt(stmt statements.Stmt) error {
 			return err
 		}
 
+	case *statements.ReturnStmt:
+		if s.Value != nil {
+			err := r.resolveExpr(s.Value)
+			if err != nil {
+				return err
+			}
+		}
+
 	default:
 		return errors.NewLoxError(0, fmt.Sprintf("unknown statement: %T", stmt))
 	}
@@ -178,6 +186,18 @@ func (r *Resolver) resolveExpr(expr expression.Expr) error {
 		err := r.resolveExpr(e.Right)
 		if err != nil {
 			return err
+		}
+
+	case *expression.Call:
+		err := r.resolveExpr(e.Callee)
+		if err != nil {
+			return err
+		}
+		for _, arg := range e.Arguments {
+			err = r.resolveExpr(arg)
+			if err != nil {
+				return err
+			}
 		}
 
 	default:
