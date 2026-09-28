@@ -91,6 +91,36 @@ func NewWhileStmt(condition expression.Expr, body Stmt) *WhileStmt {
 
 func (w *WhileStmt) Statement() {}
 
+type FunctionStmt struct {
+	Name   token.Token
+	Params []token.Token
+	Body   []Stmt
+}
+
+func NewFunctionStmt(name token.Token, params []token.Token, body []Stmt) *FunctionStmt {
+	return &FunctionStmt{
+		Name:   name,
+		Params: params,
+		Body:   body,
+	}
+}
+
+func (f *FunctionStmt) Statement() {}
+
+type ReturnStmt struct {
+	Keyword token.Token
+	Value   expression.Expr
+}
+
+func NewReturnStmt(keyword token.Token, value expression.Expr) *ReturnStmt {
+	return &ReturnStmt{
+		Keyword: keyword,
+		Value:   value,
+	}
+}
+
+func (r *ReturnStmt) Statement() {}
+
 func String(s Stmt) string {
 	switch s := s.(type) {
 	case *PrintStmt:
@@ -118,6 +148,24 @@ func String(s Stmt) string {
 		return fmt.Sprintf("(if %s %s %s)", expression.String(s.Condition), String(s.ThenBranch), String(s.ElseBranch))
 	case *WhileStmt:
 		return fmt.Sprintf("(while %s %s)", expression.String(s.Condition), String(s.Body))
+	case *FunctionStmt:
+		var params []string
+		for _, param := range s.Params {
+			params = append(params, param.Lexeme)
+		}
+		var body []string
+		for _, stmt := range s.Body {
+			body = append(body, String(stmt))
+		}
+		if len(body) == 0 {
+			return fmt.Sprintf("(fun %s (%s))", s.Name.Lexeme, strings.Join(params, " "))
+		}
+		return fmt.Sprintf("(fun %s (%s) %s)", s.Name.Lexeme, strings.Join(params, " "), strings.Join(body, " "))
+	case *ReturnStmt:
+		if s.Value == nil {
+			return "(return)"
+		}
+		return fmt.Sprintf("(return %s)", expression.String(s.Value))
 	}
 	return fmt.Sprintf("unknown statement: %T", s)
 }

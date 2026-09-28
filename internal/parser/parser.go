@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
@@ -33,6 +34,9 @@ func (p *Parser) Parse() ([]statements.Stmt, error) {
 }
 
 func (p *Parser) declaration() (statements.Stmt, error) {
+	if p.isInTokenTypes(token.FUN) {
+		return p.function("function")
+	}
 	if p.isInTokenTypes(token.VAR) {
 		stmt, err := p.varDeclaration()
 		if err != nil {
@@ -66,6 +70,9 @@ func (p *Parser) statement() (statements.Stmt, error) {
 	}
 	if p.isInTokenTypes(token.FOR) {
 		return p.forStatement()
+	}
+	if p.isInTokenTypes(token.RETURN) {
+		return p.returnStatement()
 	}
 
 	return p.expressionStatement()
@@ -234,6 +241,24 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 	return expr, nil
 }
 
+func (p *Parser) returnStatement() (statements.Stmt, error) {
+	keyword := p.getPrevious()
+	var value expression.Expr
+	if !p.isTokenType(token.SEMICOLON) {
+		var err error
+		value, err = p.expression()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !p.isInTokenTypes(token.SEMICOLON) {
+		return nil, p.expectedError("';' after return value")
+	}
+
+	return statements.NewReturnStmt(keyword, value), nil
+}
+
 // expression es el punto de entrada para parsear una expresión. Comienza el proceso
 // de llamadas recursivas para parsear la expresión completa, siguiendo la jerarquía de
 // precedencia de operadores.
@@ -383,7 +408,54 @@ func (p *Parser) unary() (expression.Expr, error) {
 		return expression.NewUnary(operator, right), nil
 	}
 
-	return p.primary()
+	return p.call()
+}
+
+func (p *Parser) call() (expression.Expr, error) {
+	expr, err := p.primary()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		if p.isInTokenTypes(token.LEFT_PAREN) {
+			expr, err = p.finishCall(expr)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
+		}
+	}
+
+	return expr, nil
+}
+
+func (p *Parser) finishCall(callee expression.Expr) (expression.Expr, error) {
+	var arguments []expression.Expr
+
+	if !p.isTokenType(token.RIGHT_PAREN) {
+		for {
+			if len(arguments) >= 255 {
+				return nil, p.expectedError("cannot have more than 255 arguments")
+			}
+			arg, err := p.expression()
+			if err != nil {
+				return nil, err
+			}
+			arguments = append(arguments, arg)
+			if !p.isInTokenTypes(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	if !p.isInTokenTypes(token.RIGHT_PAREN) {
+		return nil, p.expectedError("')' after arguments")
+	}
+
+	paren := p.getPrevious()
+	return expression.NewCall(callee, paren, arguments), nil
 }
 
 func (p *Parser) primary() (expression.Expr, error) {
@@ -417,4 +489,47 @@ func (p *Parser) primary() (expression.Expr, error) {
 	}
 
 	return nil, p.expectedError("expression")
+}
+
+func (p *Parser) function(kind string) (statements.Stmt, error) {
+	if !p.isInTokenTypes(token.IDENTIFIER) {
+		return nil, p.expectedError(fmt.Sprintf("expect %s name", kind))
+	}
+
+	name := p.getPrevious()
+
+	if !p.isInTokenTypes(token.LEFT_PAREN) {
+		return nil, p.expectedError(fmt.Sprintf("'(' after %s name", kind))
+	}
+
+	var parameters []token.Token
+	if !p.isTokenType(token.RIGHT_PAREN) {
+		for {
+			if len(parameters) >= 255 {
+				return nil, p.expectedError("cannot have more than 255 parameters")
+			}
+			if !p.isInTokenTypes(token.IDENTIFIER) {
+				return nil, p.expectedError("expect parameter name")
+			}
+			parameters = append(parameters, p.getPrevious())
+			if !p.isInTokenTypes(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	if !p.isInTokenTypes(token.RIGHT_PAREN) {
+		return nil, p.expectedError("')' after parameters")
+	}
+
+	if !p.isInTokenTypes(token.LEFT_BRACE) {
+		return nil, p.expectedError(fmt.Sprintf("'{' before %s body", kind))
+	}
+
+	body, err := p.block()
+	if err != nil {
+		return nil, err
+	}
+
+	return statements.NewFunctionStmt(name, parameters, body), nil
 }

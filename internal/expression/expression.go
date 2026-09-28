@@ -2,6 +2,7 @@ package expression
 
 import (
 	"fmt"
+	"strings"
 	"tp-lox/internal/token"
 )
 
@@ -105,6 +106,22 @@ func NewLogical(left Expr, operator token.Token, right Expr) *Logical {
 
 func (l *Logical) Expression() {}
 
+type Call struct {
+	Callee    Expr
+	Paren     token.Token
+	Arguments []Expr
+}
+
+func NewCall(callee Expr, paren token.Token, arguments []Expr) *Call {
+	return &Call{
+		Callee:    callee,
+		Paren:     paren,
+		Arguments: arguments,
+	}
+}
+
+func (c *Call) Expression() {}
+
 func stringLiteral(value any) string {
 	switch v := value.(type) {
 	case string:
@@ -137,6 +154,15 @@ func String(expr Expr) string {
 		return fmt.Sprintf("(= %s %s)", e.Name.Lexeme, String(e.Value))
 	case *Logical:
 		return fmt.Sprintf("(%s %s %s)", String(e.Left), e.Operator.TokenType, String(e.Right))
+	case *Call:
+		var args []string
+		for _, arg := range e.Arguments {
+			args = append(args, String(arg))
+		}
+		if len(args) == 0 {
+			return fmt.Sprintf("(call %s)", String(e.Callee))
+		}
+		return fmt.Sprintf("(call %s %s)", String(e.Callee), strings.Join(args, " "))
 	default:
 		return ""
 	}
