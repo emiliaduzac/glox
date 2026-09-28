@@ -48,3 +48,11 @@ Los casos más importantes son:
 - **Variables**: como mencionamos antes, al intentar usar una variable primero verifica que no se la esté usando dentro de su propia inicialización (el caso `var a = a;`). Si no es ese caso, calcula la distancia recorriendo la pila de scopes y al encontrarla, se la manda al intérprete, que la guarda en su propio `map`. De esta forma, cuando el intérprete tiene que resolver una expresión, primero verifica si sabe cuántos saltos tiene que dar entre los entornos para hallarla e ir directo. Si no sabe, la busca dinámicamente, sabiendo que se trata de una variable global y no local.
 
 - **Asignaciones**: las asignaciones están compuestas de la forma: `<variable> = <expresión>`. Como esa expresión del lado derecho puede contener más variables (por ejemplo `x = y + 1;`), primero resuelve esa expresión. Luego calcula la distancia de la variable a asignar, de la misma forma que al usar variables, y se la manda al intérprete.
+
+### Tests
+
+Implementamos tests unitarios que validan tanto los casos correctos (distancias calculadas para variables en el mismo scope, en scopes más externos, con shadowing, etc.) como los casos de error (usar una variable dentro de su propia inicialización, tipos de statement/expression no soportados).
+
+```bash
+go test ./internal/resolver
+```
