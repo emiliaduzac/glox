@@ -2,8 +2,7 @@
 
 Repositorio para el trabajo práctico de la materia Lenguajes y Compiladores.
 
-Implementación de una variante propia del lenguaje [Lox](https://craftinginterpreters.com/), combinando las dos
-aproximaciones vistas en clase. Desarrollado en [Go](https://go.dev/).
+Implementación de una variante propia del lenguaje [Lox](https://craftinginterpreters.com/), combinando las dos aproximaciones vistas en clase. Desarrollado en [Go](https://go.dev/).
 
 ## Tabla de contenidos
 
@@ -22,8 +21,7 @@ aproximaciones vistas en clase. Desarrollado en [Go](https://go.dev/).
 
 ## Documentación de la implementación
 
-Como la implementación será desarrollada en etapas, decidimos separar la documentación en un documento por etapa,
-para facilitar su lectura y comprensión. Toda la documentación técnica se encuentra bajo la carpeta **docs**.
+Como la implementación será desarrollada en etapas, decidimos separar la documentación en un documento por etapa, para facilitar su lectura y comprensión. Toda la documentación técnica se encuentra bajo la carpeta **docs**.
 
 > Indice de documentación
 
@@ -84,7 +82,13 @@ go test -v ./...
 
 ## Tests de la cátedra
 
-TBD
+Para ejecutar los tests de la cátedra:
+
+```bash
+python3 real-tests/script.py "go run ./cmd"
+```
+
+Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
 
 ## Benchmarks
 
@@ -92,7 +96,7 @@ TBD
 
 ## To Dos
 
-- [ ] Manejar errores: la verdad que me confunde un poco como hace el libro y como hace la versión de clase. No me termina de quedar claro, por ejemplo en el scanner, si tenemos que leer todos los tokens, mostrar el error y seguir leyendo o cortar con el primer error.
+- [ ] Manejar errores: la verdad que me confunde un poco como hace el libro y como hace la versión de clase. No me termina de quedar claro, por ejemplo en el scanner, si tenemos que leer todos los tokens, mostrar el error y seguir leyendo o cortar con el primer error. **Ahora con los tests de la catedra se nota mas, muestra solo el 1er error que se encuentra**
 - [X] Parser - expressions
 - [X] Interpreter - expressions
 - [X] Parser - statements
