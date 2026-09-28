@@ -8,9 +8,9 @@ Medición del tiempo neto de ejecución dentro de Lox mediante la función nativ
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
-| `fib-clock.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
-| `minsky-clock.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
-| `fizzbuzz-clock.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
+| `fib-clock.lox` | 146.92 | 199.11 | **166.63** | 21.73 ms |
+| `minsky-clock.lox` | 19.52 | 20.64 | **20.24** | 0.46 ms |
+| `fizzbuzz-clock.lox` | 10.51 | 13.72 | **11.86** | 1.17 ms |
 
 ## 2. Mediciones externas con `time go run ./cmd`
 
@@ -18,9 +18,9 @@ Tiempo total medido desde la terminal con `time`. Incluye la compilación al vue
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
-| `fibonacci.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
-| `minsky.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
-| `fizzbuzz.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
+| `fibonacci.lox` | 230.00 | 316.00 | **253.40** | 35.54 ms |
+| `minsky.lox` | 91.00 | 98.00 | **95.00** | 2.74 ms |
+| `fizzbuzz.lox` | 83.00 | 90.00 | **85.60** | 2.70 ms |
 
 ## 3. Mediciones externas con binario precompilado (`time ./glox`)
 
@@ -28,17 +28,17 @@ Tiempo total medido desde la terminal ejecutando el binario compilado con `go bu
 
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
-| `fibonacci.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
-| `minsky.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
-| `fizzbuzz.lox` | 0.00 | 0.00 | **0.00** | 0.00 ms |
+| `fibonacci.lox` | 151.00 | 308.00 | **213.40** | 57.75 ms |
+| `minsky.lox` | 24.00 | 27.00 | **25.20** | 1.30 ms |
+| `fizzbuzz.lox` | 15.00 | 17.00 | **15.60** | 0.89 ms |
 
 ## 4. Comparativa interna glox
 
 | Benchmark | 1. `clock()` interno (ms) | 2. `go run ./cmd` (ms) | 3. Binario `./glox` (ms) |
 |---|---|---|---|
-| `fibonacci` | 0.00 | 0.00 | 0.00 |
-| `minsky` | 0.00 | 0.00 | 0.00 |
-| `fizzbuzz` | 0.00 | 0.00 | 0.00 |
+| `fibonacci` | 166.63 | 253.40 | 213.40 |
+| `minsky` | 20.24 | 95.00 | 25.20 |
+| `fizzbuzz` | 11.86 | 85.60 | 15.60 |
 
 ---
 
@@ -61,6 +61,5 @@ Los resultados son los siguientes:
 
 | Benchmark | `plox` Promedio (ms) | `glox` (`go run`) Promedio (ms) | Speedup (`glox` vs `plox`) |
 |---|---|---|:---:|
-| `fibonacci` | 8749.00 | 0.00 | - |
-| `minsky` | 1595.80 | 0.00 | - |
-
+| `fibonacci` | 8749.00 | 253.40 | **34.5x más rápido** |
+| `minsky` | 1595.80 | 95.00 | **16.8x más rápido** |
