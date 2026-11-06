@@ -1,48 +1,18 @@
 package resolver
 
 import (
-	"strings"
 	"testing"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/interpreter"
 	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
+	"tp-lox/internal/utils"
 )
-
-type UnsupportedStmt struct{}
-
-func (u UnsupportedStmt) Statement() {}
-
-type UnsupportedExpr struct{}
-
-func (u UnsupportedExpr) Expression() {}
 
 func SetUpResolver(t *testing.T) (*Resolver, *interpreter.Interpreter) {
 	t.Helper()
 	interp := interpreter.NewInterpreter()
 	return NewResolver(interp), interp
-}
-
-func AssertNoError(t *testing.T, err error) {
-	t.Helper()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func AssertError(t *testing.T, err error) {
-	t.Helper()
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-}
-
-func AssertErrorMessage(t *testing.T, err error, expected string) {
-	t.Helper()
-	AssertError(t, err)
-	if !strings.Contains(err.Error(), expected) {
-		t.Fatalf("expected error containing %q, got %q", expected, err.Error())
-	}
 }
 
 func TestResolveVariableInSameScope(t *testing.T) {
@@ -56,7 +26,7 @@ func TestResolveVariableInSameScope(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varExpr]
 	if !ok {
@@ -81,7 +51,7 @@ func TestResolveVariableOneScopeUp(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{outer})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varExpr]
 	if !ok {
@@ -103,7 +73,7 @@ func TestResolveGlobalVariableIsNotResolved(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{global, block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	if _, ok := interp.Locals[varExpr]; ok {
 		t.Fatalf("expected no resolved distance for a global variable, but found one")
@@ -121,7 +91,7 @@ func TestResolveAssignmentInSameScope(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[assignExpr]
 	if !ok {
@@ -147,7 +117,7 @@ func TestResolveMultipleVariablesIndependently(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distanceA, okA := interp.Locals[varA]
 	if !okA || distanceA != 0 {
@@ -171,7 +141,7 @@ func TestResolveVariableInIfBranchWithoutBlock(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varExpr]
 	if !ok {
@@ -194,7 +164,7 @@ func TestResolveVariableInWhileBodyWithoutBlock(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varExpr]
 	if !ok {
@@ -221,7 +191,7 @@ func TestResolveVariableNestedInsideBinaryExpression(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{outer})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varX]
 	if !ok {
@@ -241,22 +211,22 @@ func TestResolveVariableUsedInOwnInitializer(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertErrorMessage(t, err, "Cannot read local variable in its own initializer")
+	utils.AssertErrorMessage(t, err, "Cannot read local variable in its own initializer")
 }
 
 func TestResolveUnsupportedStatement(t *testing.T) {
 	r, _ := SetUpResolver(t)
 
-	err := r.Resolve([]statements.Stmt{UnsupportedStmt{}})
-	AssertError(t, err)
+	err := r.Resolve([]statements.Stmt{utils.UnsupportedStmt{}})
+	utils.AssertError(t, err)
 }
 
 func TestResolveUnsupportedExpression(t *testing.T) {
 	r, _ := SetUpResolver(t)
 
-	stmt := statements.NewExpressionStmt(UnsupportedExpr{})
+	stmt := statements.NewExpressionStmt(utils.UnsupportedExpr{})
 	err := r.Resolve([]statements.Stmt{stmt})
-	AssertError(t, err)
+	utils.AssertError(t, err)
 }
 
 func TestResolveVariableAtTwoScopesUp(t *testing.T) {
@@ -281,7 +251,7 @@ func TestResolveVariableAtTwoScopesUp(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{outer})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distanceX, okX := interp.Locals[varX]
 	if !okX || distanceX != 2 {
@@ -311,7 +281,7 @@ func TestResolveShadowedVariableResolvesToNearestDeclaration(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{outer})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	innerDistance, innerOk := interp.Locals[innerVar]
 	if !innerOk || innerDistance != 0 {
@@ -334,7 +304,7 @@ func TestResolveFunctionParameterResolvesInSameScope(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{fn})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varX]
 	if !ok {
@@ -360,7 +330,7 @@ func TestResolveFunctionCapturesOuterVariable(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varX]
 	if !ok {
@@ -384,7 +354,7 @@ func TestResolveFunctionNameUsableInsideOwnBody(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varFoo]
 	if !ok {
@@ -407,7 +377,7 @@ func TestResolveReturnResolvesItsValue(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{fn})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[varX]
 	if !ok {
@@ -430,7 +400,7 @@ func TestResolveCallResolvesCallee(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[calleeFoo]
 	if !ok {
@@ -458,7 +428,7 @@ func TestResolveCallResolvesArguments(t *testing.T) {
 	})
 
 	err := r.Resolve([]statements.Stmt{block})
-	AssertNoError(t, err)
+	utils.AssertNoError(t, err)
 
 	distance, ok := interp.Locals[argA]
 	if !ok {

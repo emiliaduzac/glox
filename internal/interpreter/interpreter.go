@@ -10,6 +10,7 @@ import (
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
+	"tp-lox/internal/utils"
 )
 
 type Callable interface {
@@ -79,7 +80,7 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(Stringify(val))
+		fmt.Println(utils.Stringify(val))
 		return nil
 
 	case *statements.ExpressionStmt:
@@ -107,7 +108,7 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 			return err
 		}
 
-		if isTruthy(condition) {
+		if utils.IsTruthy(condition) {
 			return in.Execute(s.ThenBranch)
 		} else if s.ElseBranch != nil {
 			return in.Execute(s.ElseBranch)
@@ -119,7 +120,7 @@ func (in *Interpreter) Execute(stmt statements.Stmt) error {
 			if err != nil {
 				return err
 			}
-			if !isTruthy(condition) {
+			if !utils.IsTruthy(condition) {
 				break
 			}
 
@@ -187,9 +188,9 @@ func (in *Interpreter) Evaluate(expr expression.Expr) (any, error) {
 			return nil, err
 		}
 
-		if e.Operator.TokenType == token.OR && isTruthy(left) {
+		if e.Operator.TokenType == token.OR && utils.IsTruthy(left) {
 			return left, nil
-		} else if e.Operator.TokenType == token.AND && !isTruthy(left) {
+		} else if e.Operator.TokenType == token.AND && !utils.IsTruthy(left) {
 			return left, nil
 		}
 		right, err := in.Evaluate(e.Right)
@@ -241,7 +242,7 @@ func (in *Interpreter) evaluateUnary(expr *expression.Unary) (any, error) {
 		}
 		return -num, nil
 	case token.BANG:
-		return !isTruthy(right), nil
+		return !utils.IsTruthy(right), nil
 	default:
 		return nil, errors.NewLoxError(expr.Operator.Line, fmt.Sprintf("unknown unary operator: %s", expr.Operator.Lexeme))
 	}
@@ -320,9 +321,9 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 		}
 		return leftNum <= rightNum, nil
 	case token.EQUAL_EQUAL:
-		return isEqual(left, right), nil
+		return utils.IsEqual(left, right), nil
 	case token.BANG_EQUAL:
-		return !isEqual(left, right), nil
+		return !utils.IsEqual(left, right), nil
 	default:
 		return nil, errors.NewLoxError(expr.Operator.Line, fmt.Sprintf("unknown binary operator: %s", expr.Operator.Lexeme))
 	}
@@ -357,23 +358,6 @@ func (in *Interpreter) assignVariable(expr *expression.Assign) (any, error) {
 	return value, nil
 }
 
-func isTruthy(value any) bool {
-	if value == nil {
-		return false
-	}
-	if b, ok := value.(bool); ok {
-		return b
-	}
-	return true
-}
-
-func Stringify(value any) string {
-	if value == nil {
-		return "nil"
-	}
-	return fmt.Sprintf("%v", value)
-}
-
 func LocalsString(locals map[expression.Expr]int) string {
 	parts := make([]string, 0, len(locals))
 	for expr, depth := range locals {
@@ -387,16 +371,6 @@ func LocalsString(locals map[expression.Expr]int) string {
 		parts = append(parts, fmt.Sprintf("%s: %d", name, depth))
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
-}
-
-func isEqual(a, b any) bool {
-	if a == nil && b == nil {
-		return true
-	}
-	if a == nil {
-		return false
-	}
-	return a == b
 }
 
 func checkNumberOperand(operator token.Token, operand any) (float64, error) {

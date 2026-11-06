@@ -1,9 +1,9 @@
 package scanner
 
 import (
-	"strings"
 	"testing"
 	"tp-lox/internal/token"
+	"tp-lox/internal/utils"
 )
 
 // HELPERS
@@ -12,9 +12,7 @@ func setUpScanner(t *testing.T, source string) []token.Token {
 	t.Helper()
 	s := NewScanner(source)
 	tokens, err := s.Scan()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	utils.AssertNoError(t, err)
 	return tokens
 }
 
@@ -65,11 +63,9 @@ func assertInvalid(t *testing.T, source string, expectedErrorContent string) {
 	t.Helper()
 	s := NewScanner(source)
 	_, err := s.Scan()
-	if err == nil {
-		t.Fatalf("expected error for source %q, got nil", source)
-	}
-	if expectedErrorContent != "" && !strings.Contains(err.Error(), expectedErrorContent) {
-		t.Errorf("expected error to contain %q, got %q", expectedErrorContent, err.Error())
+	utils.AssertError(t, err)
+	if expectedErrorContent != "" {
+		utils.AssertErrorMessage(t, err, expectedErrorContent)
 	}
 }
 

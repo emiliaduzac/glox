@@ -4,21 +4,8 @@ import (
 	"testing"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/token"
+	"tp-lox/internal/utils"
 )
-
-func assertString(t *testing.T, expr expression.Expr, expected string) {
-	t.Helper()
-	if got := expression.String(expr); got != expected {
-		t.Errorf("expected %q, got %q", expected, got)
-	}
-}
-
-func assertValue(t *testing.T, got any, expected any) {
-	t.Helper()
-	if got != expected {
-		t.Errorf("got %v, expected %v", got, expected)
-	}
-}
 
 func TestCallExpression(t *testing.T) {
 	paren := *token.NewToken(token.RIGHT_PAREN, ")", nil, 1)
@@ -31,8 +18,8 @@ func TestCallExpression(t *testing.T) {
 		if call.Callee != callee {
 			t.Errorf("expected callee %v, got %v", callee, call.Callee)
 		}
-		assertValue(t, call.Paren.TokenType, token.RIGHT_PAREN)
-		assertValue(t, len(call.Arguments), 1)
+		utils.AssertValue(t, call.Paren.TokenType, token.RIGHT_PAREN)
+		utils.AssertValue(t, len(call.Arguments), 1)
 
 		var expr expression.Expr = call
 		expr.Expression()
@@ -40,25 +27,25 @@ func TestCallExpression(t *testing.T) {
 
 	t.Run("Format call without arguments", func(t *testing.T) {
 		call := expression.NewCall(callee, paren, nil)
-		assertString(t, call, "(call <foo>)")
+		utils.AssertString(t, call, "(call <foo>)")
 	})
 
 	t.Run("Format call with single argument", func(t *testing.T) {
 		arg := expression.NewLiteral(10.0)
 		call := expression.NewCall(callee, paren, []expression.Expr{arg})
-		assertString(t, call, "(call <foo> <10>)")
+		utils.AssertString(t, call, "(call <foo> <10>)")
 	})
 
 	t.Run("Format call with multiple arguments", func(t *testing.T) {
 		arg1 := expression.NewLiteral(1.0)
 		arg2 := expression.NewLiteral("bar")
 		call := expression.NewCall(callee, paren, []expression.Expr{arg1, arg2})
-		assertString(t, call, "(call <foo> <1> <\"bar\">)")
+		utils.AssertString(t, call, "(call <foo> <1> <\"bar\">)")
 	})
 
 	t.Run("Format chained nested calls", func(t *testing.T) {
 		innerCall := expression.NewCall(callee, paren, nil)
 		outerCall := expression.NewCall(innerCall, paren, nil)
-		assertString(t, outerCall, "(call (call <foo>))")
+		utils.AssertString(t, outerCall, "(call (call <foo>))")
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/token"
+	"tp-lox/internal/utils"
 )
 
 // Tests de la gramática de expresiones: literales, unary, binary, grouping, assignment y sus
@@ -232,7 +233,7 @@ func TestParseAssignment(t *testing.T) {
 
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(= a <5>)")
+		utils.AssertString(t, expr, "(= a <5>)")
 	})
 
 	t.Run("Assignment with binary expression on right", func(t *testing.T) {
@@ -247,7 +248,7 @@ func TestParseAssignment(t *testing.T) {
 
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(= a (<5> PLUS <3>))")
+		utils.AssertString(t, expr, "(= a (<5> PLUS <3>))")
 	})
 }
 
@@ -300,7 +301,7 @@ func TestParseLogical(t *testing.T) {
 		}
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(<1> OR <2>)")
+		utils.AssertString(t, expr, "(<1> OR <2>)")
 	})
 
 	t.Run("and", func(t *testing.T) {
@@ -312,7 +313,7 @@ func TestParseLogical(t *testing.T) {
 		}
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(<1> AND <2>)")
+		utils.AssertString(t, expr, "(<1> AND <2>)")
 	})
 }
 
@@ -341,7 +342,7 @@ func TestPrecedenceAssignment(t *testing.T) {
 
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(= a (= b <5>))")
+		utils.AssertString(t, expr, "(= a (= b <5>))")
 	})
 
 	t.Run("Assignment has lower precedence than equality", func(t *testing.T) {
@@ -356,7 +357,7 @@ func TestPrecedenceAssignment(t *testing.T) {
 
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(= a (<b> EQUAL_EQUAL <5>))")
+		utils.AssertString(t, expr, "(= a (<b> EQUAL_EQUAL <5>))")
 	})
 }
 
@@ -422,7 +423,7 @@ func TestPrecedenceLogical(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
 			expr := assertExpressionStatement(t, stmts)
-			assertString(t, expr, test.expected)
+			utils.AssertString(t, expr, test.expected)
 		})
 	}
 }
@@ -465,7 +466,7 @@ func TestPrecedenceEquality(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
 			expr := assertExpressionStatement(t, stmts)
-			assertString(t, expr, test.expected)
+			utils.AssertString(t, expr, test.expected)
 		})
 	}
 }
@@ -508,7 +509,7 @@ func TestPrecedenceComparison(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
 			expr := assertExpressionStatement(t, stmts)
-			assertString(t, expr, test.expected)
+			utils.AssertString(t, expr, test.expected)
 		})
 	}
 }
@@ -549,7 +550,7 @@ func TestPrecedenceTerm(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
 			expr := assertExpressionStatement(t, stmts)
-			assertString(t, expr, test.expected)
+			utils.AssertString(t, expr, test.expected)
 		})
 	}
 }
@@ -589,7 +590,7 @@ func TestPrecedenceFactor(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			stmts := setUpParser(t, test.tokens)
 			expr := assertExpressionStatement(t, stmts)
-			assertString(t, expr, test.expected)
+			utils.AssertString(t, expr, test.expected)
 		})
 	}
 }
@@ -609,7 +610,7 @@ func TestPrecedenceGrouping(t *testing.T) {
 	t.Run("grouping rompe la precedencia default", func(t *testing.T) {
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "((group (<1> PLUS <2>)) STAR <3>)")
+		utils.AssertString(t, expr, "((group (<1> PLUS <2>)) STAR <3>)")
 	})
 
 }
@@ -625,7 +626,7 @@ func TestCallExpressions(t *testing.T) {
 
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(call <foo>)")
+		utils.AssertString(t, expr, "(call <foo>)")
 	})
 
 	t.Run("Call with arguments", func(t *testing.T) {
@@ -641,7 +642,7 @@ func TestCallExpressions(t *testing.T) {
 
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(call <add> <1> <2>)")
+		utils.AssertString(t, expr, "(call <add> <1> <2>)")
 	})
 
 	t.Run("Chained calls", func(t *testing.T) {
@@ -656,7 +657,7 @@ func TestCallExpressions(t *testing.T) {
 
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(call (call <getCallback>))")
+		utils.AssertString(t, expr, "(call (call <getCallback>))")
 	})
 
 	t.Run("Call precedence higher than unary", func(t *testing.T) {
@@ -670,7 +671,7 @@ func TestCallExpressions(t *testing.T) {
 
 		stmts := setUpParser(t, tokens)
 		expr := assertExpressionStatement(t, stmts)
-		assertString(t, expr, "(BANG (call <fn>))")
+		utils.AssertString(t, expr, "(BANG (call <fn>))")
 	})
 
 	t.Run("Missing right paren error", func(t *testing.T) {
