@@ -236,7 +236,7 @@ func (in *Interpreter) evaluateUnary(expr *expression.Unary) (any, error) {
 
 	switch expr.Operator.TokenType {
 	case token.MINUS:
-		num, err := checkNumberOperand(expr.Operator, right)
+		num, err := utils.CheckNumberOperand(expr.Operator.Line, right)
 		if err != nil {
 			return nil, err
 		}
@@ -273,49 +273,49 @@ func (in *Interpreter) evaluateBinary(expr *expression.Binary) (any, error) {
 		}
 		return nil, errors.NewLoxError(expr.Operator.Line, "operands must be two numbers or two strings")
 	case token.MINUS:
-		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		leftNum, rightNum, err := utils.CheckNumberOperands(expr.Operator.Line, left, right)
 		if err != nil {
 			return nil, err
 		}
 		return leftNum - rightNum, nil
 	case token.STAR:
-		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		leftNum, rightNum, err := utils.CheckNumberOperands(expr.Operator.Line, left, right)
 		if err != nil {
 			return nil, err
 		}
 		return leftNum * rightNum, nil
 	case token.SLASH:
-		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		leftNum, rightNum, err := utils.CheckNumberOperands(expr.Operator.Line, left, right)
 		if err != nil {
 			return nil, err
 		}
 		return leftNum / rightNum, nil
 	case token.PERCENT:
-		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		leftNum, rightNum, err := utils.CheckNumberOperands(expr.Operator.Line, left, right)
 		if err != nil {
 			return nil, err
 		}
 		return math.Mod(leftNum, rightNum), nil
 	case token.GREATER:
-		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		leftNum, rightNum, err := utils.CheckNumberOperands(expr.Operator.Line, left, right)
 		if err != nil {
 			return nil, err
 		}
 		return leftNum > rightNum, nil
 	case token.GREATER_EQUAL:
-		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		leftNum, rightNum, err := utils.CheckNumberOperands(expr.Operator.Line, left, right)
 		if err != nil {
 			return nil, err
 		}
 		return leftNum >= rightNum, nil
 	case token.LESS:
-		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		leftNum, rightNum, err := utils.CheckNumberOperands(expr.Operator.Line, left, right)
 		if err != nil {
 			return nil, err
 		}
 		return leftNum < rightNum, nil
 	case token.LESS_EQUAL:
-		leftNum, rightNum, err := checkNumberOperands(expr.Operator, left, right)
+		leftNum, rightNum, err := utils.CheckNumberOperands(expr.Operator.Line, left, right)
 		if err != nil {
 			return nil, err
 		}
@@ -371,21 +371,4 @@ func LocalsString(locals map[expression.Expr]int) string {
 		parts = append(parts, fmt.Sprintf("%s: %d", name, depth))
 	}
 	return "{" + strings.Join(parts, ", ") + "}"
-}
-
-func checkNumberOperand(operator token.Token, operand any) (float64, error) {
-	num, ok := operand.(float64)
-	if !ok {
-		return 0, errors.NewLoxError(operator.Line, "operand must be a number")
-	}
-	return num, nil
-}
-
-func checkNumberOperands(operator token.Token, left, right any) (float64, float64, error) {
-	leftNum, okLeft := left.(float64)
-	rightNum, okRight := right.(float64)
-	if !okLeft || !okRight {
-		return 0, 0, errors.NewLoxError(operator.Line, "operands must be numbers")
-	}
-	return leftNum, rightNum, nil
 }

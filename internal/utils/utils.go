@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 )
 
@@ -32,6 +33,23 @@ func Stringify(value any) string {
 		return "nil"
 	}
 	return fmt.Sprintf("%v", value)
+}
+
+func CheckNumberOperand(line int, operand any) (float64, error) {
+	num, ok := operand.(float64)
+	if !ok {
+		return 0, errors.NewLoxError(line, "operand must be a number")
+	}
+	return num, nil
+}
+
+func CheckNumberOperands(line int, left, right any) (float64, float64, error) {
+	leftNum, okLeft := left.(float64)
+	rightNum, okRight := right.(float64)
+	if !okLeft || !okRight {
+		return 0, 0, errors.NewLoxError(line, "operands must be numbers")
+	}
+	return leftNum, rightNum, nil
 }
 
 // Funciones comunes para los tests

@@ -106,3 +106,40 @@ func TestStringify(t *testing.T) {
 		AssertValue(t, Stringify(false), "false")
 	})
 }
+
+func TestCheckNumberOperand(t *testing.T) {
+	t.Run("Operand is a number", func(t *testing.T) {
+		num, err := CheckNumberOperand(1, 10.0)
+		AssertNoError(t, err)
+		AssertValue(t, num, 10.0)
+	})
+
+	t.Run("Operand is not a number", func(t *testing.T) {
+		_, err := CheckNumberOperand(1, "not a number")
+		AssertErrorMessage(t, err, "operand must be a number")
+	})
+}
+
+func TestCheckNumberOperands(t *testing.T) {
+	t.Run("Both operands are numbers", func(t *testing.T) {
+		left, right, err := CheckNumberOperands(1, 10.0, 20.0)
+		AssertNoError(t, err)
+		AssertValue(t, left, 10.0)
+		AssertValue(t, right, 20.0)
+	})
+
+	t.Run("Left operand is not a number", func(t *testing.T) {
+		_, _, err := CheckNumberOperands(1, "not a number", 20.0)
+		AssertErrorMessage(t, err, "operands must be numbers")
+	})
+
+	t.Run("Right operand is not a number", func(t *testing.T) {
+		_, _, err := CheckNumberOperands(1, 10.0, "not a number")
+		AssertErrorMessage(t, err, "operands must be numbers")
+	})
+
+	t.Run("Neither operand is a number", func(t *testing.T) {
+		_, _, err := CheckNumberOperands(1, "a", "b")
+		AssertErrorMessage(t, err, "operands must be numbers")
+	})
+}

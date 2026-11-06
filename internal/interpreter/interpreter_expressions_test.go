@@ -142,21 +142,6 @@ func TestEvaluateUnaryMinus(t *testing.T) {
 	})
 }
 
-func TestCheckNumberOperand(t *testing.T) {
-	op := *token.NewToken(token.MINUS, "-", nil, 1)
-
-	t.Run("Operand is a number", func(t *testing.T) {
-		num, err := checkNumberOperand(op, 10.0)
-		utils.AssertNoError(t, err)
-		utils.AssertValue(t, num, 10.0)
-	})
-
-	t.Run("Operand is not a number", func(t *testing.T) {
-		_, err := checkNumberOperand(op, "not a number")
-		utils.AssertError(t, err)
-	})
-}
-
 func TestEvaluateUnaryBang(t *testing.T) {
 	in := SetUpInterpreter(t)
 
@@ -243,32 +228,6 @@ func TestEvaluateBinary(t *testing.T) {
 			expression.NewLiteral(20.0),
 		)
 		_, err := in.Evaluate(expr)
-		utils.AssertError(t, err)
-	})
-}
-
-func TestCheckNumberOperands(t *testing.T) {
-	op := *token.NewToken(token.PLUS, "+", nil, 1)
-
-	t.Run("Both operands are numbers", func(t *testing.T) {
-		left, right, err := checkNumberOperands(op, 10.0, 20.0)
-		utils.AssertNoError(t, err)
-		utils.AssertValue(t, left, 10.0)
-		utils.AssertValue(t, right, 20.0)
-	})
-
-	t.Run("Left operand is not a number", func(t *testing.T) {
-		_, _, err := checkNumberOperands(op, "not a number", 20.0)
-		utils.AssertError(t, err)
-	})
-
-	t.Run("Right operand is not a number", func(t *testing.T) {
-		_, _, err := checkNumberOperands(op, 10.0, "not a number")
-		utils.AssertError(t, err)
-	})
-
-	t.Run("Neither operand is a number", func(t *testing.T) {
-		_, _, err := checkNumberOperands(op, "a", "b")
 		utils.AssertError(t, err)
 	})
 }
