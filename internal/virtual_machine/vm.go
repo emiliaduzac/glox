@@ -140,15 +140,11 @@ func (vm *VirtualMachine) popNumberOperand() (float64, error) {
 
 // popNumberOperands saca dos números del stack y los devuelve en orden (izquierdo, derecho)
 func (vm *VirtualMachine) popNumberOperands() (float64, float64, error) {
-	right, err := vm.popNumberOperand()
+	left, right, err := vm.popOperands()
 	if err != nil {
 		return 0, 0, err
 	}
-	left, err := vm.popNumberOperand()
-	if err != nil {
-		return 0, 0, err
-	}
-	return left, right, nil
+	return utils.CheckNumberOperands(0, left, right)
 }
 
 // popOperands saca los dos operandos del stack y los devuelve en orden (izquierdo, derecho)
