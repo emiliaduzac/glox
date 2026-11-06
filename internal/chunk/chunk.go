@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type OpCode int
+type OpCode byte
 
 const (
 	OP_RETURN OpCode = iota
