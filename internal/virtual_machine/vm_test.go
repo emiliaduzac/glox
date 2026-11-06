@@ -8,10 +8,11 @@ import (
 
 var line = 1
 
-func setUpVM(t *testing.T) *VirtualMachine {
+func setUpVM(t *testing.T) (*VirtualMachine, *c.Chunk) {
 	t.Helper()
 	vm := NewVirtualMachine()
-	return vm
+	chunk := c.NewChunk()
+	return vm, chunk
 }
 
 func writeConstant(chunk *c.Chunk, value any) {
@@ -22,8 +23,7 @@ func writeConstant(chunk *c.Chunk, value any) {
 
 func TestOpReturn(t *testing.T) {
 	t.Run("Stack vacío no da error", func(t *testing.T) {
-		vm := setUpVM(t)
-		chunk := c.NewChunk()
+		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_RETURN), line)
 
 		err := vm.Run(*chunk)
@@ -32,8 +32,7 @@ func TestOpReturn(t *testing.T) {
 	})
 
 	t.Run("Stack con elementos da error", func(t *testing.T) {
-		vm := setUpVM(t)
-		chunk := c.NewChunk()
+		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_RETURN), line)
 
@@ -43,8 +42,7 @@ func TestOpReturn(t *testing.T) {
 	})
 
 	t.Run("Corta la ejecución", func(t *testing.T) {
-		vm := setUpVM(t)
-		chunk := c.NewChunk()
+		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_RETURN), line)
 		chunk.Write(byte(c.OP_NIL), line)
 
@@ -56,7 +54,6 @@ func TestOpReturn(t *testing.T) {
 }
 
 func TestOpConstant(t *testing.T) {
-	line := 1
 	tests := []struct {
 		name  string
 		value any
@@ -70,8 +67,7 @@ func TestOpConstant(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			vm := setUpVM(t)
-			chunk := c.NewChunk()
+			vm, chunk := setUpVM(t)
 			writeConstant(chunk, test.value)
 
 			err := vm.Run(*chunk)
@@ -83,8 +79,7 @@ func TestOpConstant(t *testing.T) {
 	}
 
 	t.Run("Dos constantes mantienen el orden", func(t *testing.T) {
-		vm := setUpVM(t)
-		chunk := c.NewChunk()
+		vm, chunk := setUpVM(t)
 		writeConstant(chunk, 1.0)
 		writeConstant(chunk, 2.0)
 
@@ -97,8 +92,7 @@ func TestOpConstant(t *testing.T) {
 	})
 
 	t.Run("Usa el operando como índice para obtener constantes del pool, no el orden del pool", func(t *testing.T) {
-		vm := setUpVM(t)
-		chunk := c.NewChunk()
+		vm, chunk := setUpVM(t)
 
 		// Pool de constantes: [10.0, 20.0]
 		chunk.AddConstant(10.0)
@@ -120,8 +114,7 @@ func TestOpConstant(t *testing.T) {
 	})
 
 	t.Run("Error si el índice no existe en el pool", func(t *testing.T) {
-		vm := setUpVM(t)
-		chunk := c.NewChunk()
+		vm, chunk := setUpVM(t)
 		chunk.AddConstant(10.0)
 		chunk.Write(byte(c.OP_CONSTANT), line)
 		chunk.Write(5, 1)
@@ -132,13 +125,188 @@ func TestOpConstant(t *testing.T) {
 	})
 
 	t.Run("Error si falta el operando", func(t *testing.T) {
-		vm := setUpVM(t)
-		chunk := c.NewChunk()
+		vm, chunk := setUpVM(t)
 		chunk.AddConstant(10.0)
 		chunk.Write(byte(c.OP_CONSTANT), line)
 
 		err := vm.Run(*chunk)
 
 		utils.AssertError(t, err)
+	})
+}
+
+func TestOpLiterals(t *testing.T) {
+	tests := []struct {
+		name     string
+		op       c.OpCode
+		expected any
+	}{
+		{"nil", c.OP_NIL, nil},
+		{"true", c.OP_TRUE, true},
+		{"false", c.OP_FALSE, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			chunk.Write(byte(test.op), line)
+
+			err := vm.Run(*chunk)
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, len(vm.stack), 1)
+			utils.AssertValue(t, vm.stack[0], test.expected)
+		})
+	}
+}
+
+func TestOpNegate(t *testing.T) {
+	tests := []struct {
+		name     string
+		operand  float64
+		expected float64
+	}{
+		{"número positivo", 5.0, -5.0},
+		{"número negativo", -5.0, 5.0},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.operand)
+			chunk.Write(byte(c.OP_NEGATE), line)
+
+			err := vm.Run(*chunk)
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, len(vm.stack), 1)
+			utils.AssertValue(t, vm.stack[0], test.expected)
+		})
+	}
+
+	t.Run("Negar dos veces devuelve el valor original", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 5.0)
+		chunk.Write(byte(c.OP_NEGATE), line)
+		chunk.Write(byte(c.OP_NEGATE), line)
+
+		err := vm.Run(*chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(vm.stack), 1)
+		utils.AssertValue(t, vm.stack[0], 5.0)
+	})
+
+	errorTests := []struct {
+		name    string
+		operand any
+	}{
+		{"string", "not a number"},
+		{"nil", nil},
+		{"booleano", true},
+	}
+
+	for _, test := range errorTests {
+		t.Run("Error si el operando es "+test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.operand)
+			chunk.Write(byte(c.OP_NEGATE), line)
+
+			err := vm.Run(*chunk)
+
+			utils.AssertErrorMessage(t, err, "operand must be a number")
+		})
+	}
+
+	t.Run("Error si el stack está vacío", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_NEGATE), line)
+
+		err := vm.Run(*chunk)
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+}
+
+func TestOpAdd(t *testing.T) {
+	tests := []struct {
+		name     string
+		left     float64
+		right    float64
+		expected float64
+	}{
+		{"dos positivos", 1.0, 2.0, 3.0},
+		{"positivo y negativo", 5.0, -3.0, 2.0},
+		{"dos negativos", -1.0, -2.0, -3.0},
+		{"decimales", 0.5, 0.25, 0.75},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.left)
+			writeConstant(chunk, test.right)
+			chunk.Write(byte(c.OP_ADD), line)
+
+			err := vm.Run(*chunk)
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, len(vm.stack), 1)
+			utils.AssertValue(t, vm.stack[0], test.expected)
+		})
+	}
+
+	t.Run("Concatena dos strings", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, "Hello")
+		writeConstant(chunk, " World")
+		chunk.Write(byte(c.OP_ADD), line)
+
+		err := vm.Run(*chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(vm.stack), 1)
+		utils.AssertValue(t, vm.stack[0], "Hello World")
+	})
+
+	incompatibleTests := []struct {
+		name  string
+		left  any
+		right any
+	}{
+		{"número y string", 1.0, "a"},
+		{"número y otro", 1.0, nil},
+	}
+
+	for _, test := range incompatibleTests {
+		t.Run("Error si se suma "+test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.left)
+			writeConstant(chunk, test.right)
+			chunk.Write(byte(c.OP_ADD), line)
+
+			err := vm.Run(*chunk)
+
+			utils.AssertErrorMessage(t, err, "operands must be two numbers or two strings")
+		})
+	}
+
+	t.Run("Error si el stack tiene un solo elemento", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_ADD), line)
+
+		err := vm.Run(*chunk)
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+
+	t.Run("Error si el stack está vacío", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_ADD), line)
+
+		err := vm.Run(*chunk)
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
 }

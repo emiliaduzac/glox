@@ -55,27 +55,27 @@ func (vm *VirtualMachine) Run(chunk c.Chunk) error {
 			vm.push(-num)
 
 		case c.OP_ADD:
-			if err := vm.binaryOp(func(a, b float64) any { return b + a }); err != nil {
+			if err := vm.add(); err != nil {
 				return err
 			}
 		case c.OP_SUBTRACT:
-			if err := vm.binaryOp(func(a, b float64) any { return b - a }); err != nil {
+			if err := vm.binaryOp(func(left, right float64) any { return left - right }); err != nil {
 				return err
 			}
 		case c.OP_MULTIPLY:
-			if err := vm.binaryOp(func(a, b float64) any { return b * a }); err != nil {
+			if err := vm.binaryOp(func(left, right float64) any { return left * right }); err != nil {
 				return err
 			}
 		case c.OP_DIVIDE:
-			if err := vm.binaryOp(func(a, b float64) any { return b / a }); err != nil {
+			if err := vm.binaryOp(func(left, right float64) any { return left / right }); err != nil {
 				return err
 			}
 		case c.OP_GREATER:
-			if err := vm.binaryOp(func(a, b float64) any { return b > a }); err != nil {
+			if err := vm.binaryOp(func(left, right float64) any { return left > right }); err != nil {
 				return err
 			}
 		case c.OP_LESS:
-			if err := vm.binaryOp(func(a, b float64) any { return b < a }); err != nil {
+			if err := vm.binaryOp(func(left, right float64) any { return left < right }); err != nil {
 				return err
 			}
 		}
@@ -138,24 +138,60 @@ func (vm *VirtualMachine) popNumberOperand() (float64, error) {
 	return utils.CheckNumberOperand(0, operand)
 }
 
+// popNumberOperands saca dos números del stack y los devuelve en orden (izquierdo, derecho)
 func (vm *VirtualMachine) popNumberOperands() (float64, float64, error) {
-	a, err := vm.popNumberOperand()
+	right, err := vm.popNumberOperand()
 	if err != nil {
 		return 0, 0, err
 	}
-	b, err := vm.popNumberOperand()
+	left, err := vm.popNumberOperand()
 	if err != nil {
 		return 0, 0, err
 	}
-	return a, b, nil
+	return left, right, nil
 }
 
-// binaryOp saca dos números del stack, les aplica op y deja el resultado en el stack
-func (vm *VirtualMachine) binaryOp(op func(a, b float64) any) error {
-	a, b, err := vm.popNumberOperands()
+// popOperands saca los dos operandos del stack y los devuelve en orden (izquierdo, derecho)
+func (vm *VirtualMachine) popOperands() (any, any, error) {
+	right, err := vm.pop()
+	if err != nil {
+		return nil, nil, err
+	}
+	left, err := vm.pop()
+	if err != nil {
+		return nil, nil, err
+	}
+	return left, right, nil
+}
+
+// add suma dos números o concatena dos strings y deja el resultado en el stack
+func (vm *VirtualMachine) add() error {
+	left, right, err := vm.popOperands()
 	if err != nil {
 		return err
 	}
-	vm.push(op(a, b))
+
+	switch l := left.(type) {
+	case float64:
+		if r, ok := right.(float64); ok {
+			vm.push(l + r)
+			return nil
+		}
+	case string:
+		if r, ok := right.(string); ok {
+			vm.push(l + r)
+			return nil
+		}
+	}
+	return errors.NewLoxError(0, "operands must be two numbers or two strings")
+}
+
+// binaryOp saca dos números del stack, les aplica op y deja el resultado en el stack
+func (vm *VirtualMachine) binaryOp(op func(left, right float64) any) error {
+	left, right, err := vm.popNumberOperands()
+	if err != nil {
+		return err
+	}
+	vm.push(op(left, right))
 	return nil
 }
