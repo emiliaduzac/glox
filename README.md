@@ -11,6 +11,7 @@ Implementación de una variante propia del lenguaje [Lox](https://craftinginterp
 - [Cómo correr lox](#cómo-correr-lox)
 - [Tests unitarios](#tests-unitarios)
 - [Tests de la cátedra](#tests-de-la-cátedra)
+- [To Do List](#to-do-list)
 
 ## Integrantes
 
@@ -88,3 +89,14 @@ python3 real-tests/script.py "go run ./cmd"
 ```
 
 Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
+
+## To Do List
+
+- [ ] Base del compilador (chunk, pool de constantes, VM con su stack y el loop que ejecuta instrucciones)
+- [ ] Expresiones, statements, variables globales y variables locales
+- [ ] Control de flujo
+- [ ] Funciones y closures
+- [ ] Clases y herencia
+- [ ] Extra propio (?)
+- [ ] Uso real del lenguaje
+- [ ] Benchmarks contra la entrega parcial, mejorar la que teniamos y documentación final

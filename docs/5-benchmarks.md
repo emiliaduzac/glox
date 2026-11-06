@@ -22,9 +22,11 @@ Utilizamos tres programas, realizando 5 iteraciones en cada caso y reportando m�
 - `minsky.lox`: simula una máquina de registros con un `while` (n = 20000). Pone a prueba ciclos, asignaciones y condicionales.
 - `fizzbuzz.lox`: FizzBuzz acumulando en un string (n = 5000). Pone a prueba ciclos, condicionales, el operador `%` y concatenación de strings.
 
-**glox** se mide de tres formas, para separar el tiempo de ejecución de Lox del de compilar y arrancar Go: con `clock()` interno, con `time go run ./cmd` y con `time ./glox`.
+→ **glox** se mide de tres formas, para separar el tiempo de ejecución de Lox del de compilar y arrancar Go: con `clock()` interno, con `time go run ./cmd` y con `time ./glox`.
 
-**plox** se mide solo con `time`, porque no tiene `clock()`, y solo con `fibonacci` y `minsky`, porque no soporta el operador `%`.
+→ **plox** se mide solo con `time`, porque no tiene `clock()`, y solo con `fibonacci` y `minsky`, porque no soporta el operador `%`.
+
+Los programas se encuentran en la carpeta **benchmarks**.∫
 
 ## Resultados de glox
 
