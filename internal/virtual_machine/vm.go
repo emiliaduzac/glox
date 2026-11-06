@@ -11,19 +11,33 @@ type VirtualMachine struct {
 	stack []any
 }
 
+func NewVirtualMachine() *VirtualMachine {
+	return &VirtualMachine{
+		ip:    0,
+		stack: []any{},
+	}
+}
+
 func (vm *VirtualMachine) Run(chunk c.Chunk) error {
-	for i := 0; i < len(chunk.Bytes); {
-		op := c.OpCode(vm.readByte(chunk))
+	for vm.ip < len(chunk.Bytes) {
+		b, err := vm.readByte(chunk)
+		if err != nil {
+			return err
+		}
+		op := c.OpCode(b)
 
 		switch op {
 		case c.OP_RETURN:
-			if len(vm.stack) >= 0 {
+			if len(vm.stack) > 0 {
 				return errors.NewLoxError(0, "Inconsistent Stack Height: should be empty at exit")
 			}
 			return nil
 
 		case c.OP_CONSTANT:
-			constant := vm.readConstant(chunk)
+			constant, err := vm.readConstant(chunk)
+			if err != nil {
+				return err
+			}
 			vm.push(constant)
 
 		case c.OP_NIL:
@@ -70,16 +84,25 @@ func (vm *VirtualMachine) Run(chunk c.Chunk) error {
 }
 
 // readByte devuelve el byte al que apunta el instruction pointer y lo avanza al siguiente
-func (vm *VirtualMachine) readByte(chunk c.Chunk) byte {
+func (vm *VirtualMachine) readByte(chunk c.Chunk) (byte, error) {
+	if vm.ip >= len(chunk.Bytes) {
+		return 0, errors.NewLoxError(0, "unexpected end of bytecode")
+	}
 	b := chunk.Bytes[vm.ip]
 	vm.ip++
-	return b
+	return b, nil
 }
 
 // readConstant lee el operando y devuelve la constante del pool en ese índice
-func (vm *VirtualMachine) readConstant(chunk c.Chunk) any {
-	index := vm.readByte(chunk)
-	return chunk.Constants[index]
+func (vm *VirtualMachine) readConstant(chunk c.Chunk) (any, error) {
+	index, err := vm.readByte(chunk)
+	if err != nil {
+		return nil, err
+	}
+	if int(index) >= len(chunk.Constants) {
+		return nil, errors.NewLoxError(0, "constant index out of range")
+	}
+	return chunk.Constants[index], nil
 }
 
 // push agrega un elemento al tope del stack
