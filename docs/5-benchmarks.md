@@ -1,10 +1,36 @@
-# Benchmarks de glox
+# Benchmarks
 
-Para cada benchmark se realizaron 5 iteraciones.
+## Introducción
 
-## 1. Mediciones internas con `clock()`
+El objetivo de este documento es evaluar el rendimiento de _glox_, nuestra implementación de Lox en Go, y compararlo con _plox_, la implementación en Python de la cátedra.
+Primero realizamos las mediciones en _glox_, luego en _plox_ y por último comparamos.
 
-Medición del tiempo neto de ejecución dentro de Lox mediante la función nativa `clock()`. No incluye el arranque de Go ni del sistema operativo.
+> TO DO: agregar comparaciones con otras implementaciones de lox en go, quizá contra go.
+
+## Entorno utilizado
+
+- Máquina: Apple M4, 16GB RAM
+- SO: macOS 15.3
+- Go: 1.25.0
+- Python (plox): 3.14.7
+
+## Metodología y programas
+
+Utilizamos tres programas, realizando 5 iteraciones en cada caso y reportando mínimo, máximo, promedio y desvío estándar:
+
+- `fibonacci.lox`: fibonacci recursivo (n = 25). Pone a prueba llamadas a funciones y recursión.
+- `minsky.lox`: simula una máquina de registros con un `while` (n = 20000). Pone a prueba ciclos, asignaciones y condicionales.
+- `fizzbuzz.lox`: FizzBuzz acumulando en un string (n = 5000). Pone a prueba ciclos, condicionales, el operador `%` y concatenación de strings.
+
+**glox** se mide de tres formas, para separar el tiempo de ejecución de Lox del de compilar y arrancar Go: con `clock()` interno, con `time go run ./cmd` y con `time ./glox`.
+
+**plox** se mide solo con `time`, porque no tiene `clock()`, y solo con `fibonacci` y `minsky`, porque no soporta el operador `%`.
+
+## Resultados de glox
+
+### 1. Mediciones internas con `clock()`
+
+En primer lugar, tomamos la medición del tiempo neto de ejecución dentro de Lox mediante la función nativa `clock()` (que devuelve segundos, pero los convertimos a ms para la comparación). Esto no incluye el arranque de Go ni del sistema operativo.
 
 Para correr las pruebas:
 ```bash
@@ -23,9 +49,9 @@ go run ./cmd benchmarks/fizzbuzz-clock.lox
 | `minsky-clock.lox` | 4.812 | 6.103 | **5.816** | 0.503 ms |
 | `fizzbuzz-clock.lox` | 3.346 | 3.898 | **3.663** | 0.178 ms |
 
-## 2. Mediciones externas con `time go run ./cmd`
+### 2. Mediciones externas con `time go run ./cmd`
 
-Tiempo total medido desde la terminal con `time`. Incluye la compilación al vuelo de Go (`go run`), la inicialización del runtime y la ejecución de Lox.
+Luego, tomamos el tiempo total medido desde la terminal con `time`. Incluye la compilación al vuelo de Go (`go run`), la inicialización del runtime y la ejecución de Lox.
 
 Para correr las pruebas:
 ```bash
@@ -38,16 +64,15 @@ time go run ./cmd benchmarks/minsky.lox
 time go run ./cmd benchmarks/fizzbuzz.lox
 ```
 
-
 | Benchmark | Mínimo (ms) | Máximo (ms) | Promedio (ms) | Desvío Estándar ($\sigma$) |
 |---|---|---|---|---|
 | `fibonacci.lox` | 108.00 | 203.00 | **127.80** | 42.04 ms |
 | `minsky.lox` | 47.00 | 67.00 | **62.60** | 8.73 ms |
 | `fizzbuzz.lox` | 62.00 | 79.00 | **67.00** | 6.86 ms |
 
-## 3. Mediciones externas con binario precompilado (`time ./glox`)
+### 3. Mediciones externas con binario precompilado (`time ./glox`)
 
-Tiempo total medido desde la terminal ejecutando el binario compilado con `go build -o glox ./cmd`. Elimina la compilación al vuelo de Go, midiendo únicamente su ejecución.
+Por último, medimos el tiempo total desde la terminal ejecutando el binario compilado con `go build -o glox ./cmd`. Esto elimina la compilación al vuelo de Go, midiendo únicamente la ejecución del binario.
 
 Para correr las pruebas primero:
 ```bash
@@ -70,7 +95,9 @@ time ./glox benchmarks/fizzbuzz.lox
 | `minsky.lox` | 9.00 | 37.00 | **22.40** | 9.91 ms |
 | `fizzbuzz.lox` | 12.00 | 17.00 | **16.00** | 2.24 ms |
 
-## 4. Comparativa interna glox
+### Comparativa interna glox
+
+En esta sección, comparamos el promedio de las 3 mediciones anteriores, para cada programa utilizado:
 
 | Benchmark | 1. `clock()` interno (ms) | 2. `go run ./cmd` (ms) | 3. Binario `./glox` (ms) |
 |---|---|---|---|
@@ -78,11 +105,11 @@ time ./glox benchmarks/fizzbuzz.lox
 | `minsky` | 5.82 | 62.60 | 22.40 |
 | `fizzbuzz` | 3.66 | 67.00 | 16.00 |
 
----
+Como podemos ver, en los 3 programas la medición mediante `go run ./cmd` fue la más larga. La diferencia entre esta y el binario es de unos 40-50 ms en los tres casos, que lo atribuimos a la compilación. Por otro lado, `clock()` es siempre la más corta porque mide solo la ejecución de Lox.
 
-# Benchmarks de plox
+## Resultados de plox
 
-Viendo que en `plox` no tiene la función nativa `clock()` y que no soporta el operador `%`, la medición la hicmos con `time plox benchmarks/<script>.lox` únicamente sobre los compatibles (`fibonacci.lox` y `minsky.lox`).
+Como se mencionó al inicio, para plox la medición fue realizada únicamente con `time plox benchmarks/<script>.lox` sobre los programas compatibles (`fibonacci.lox` y `minsky.lox`).
 
 Para correr las pruebas:
 ```bash
@@ -97,26 +124,19 @@ time plox benchmarks/minsky.lox
 | `fibonacci.lox` | 1816.00 | 1837.00 | **1824.40** | 9.50 ms |
 | `minsky.lox` | 345.00 | 372.00 | **361.80** | 10.33 ms |
 
----
+## Comparativa glox vs plox
 
-# Comparativa glox vs plox
-
-Teniendo en cuenta que en el uso común es ejecutar directamente desde la terminal `go run ./cmd <archivo>` en `glox` y `plox <archivo>` en `plox`, la comparativa la hacemos midiendo con `time` la ejecución de ambos.
-
-Los resultados son los siguientes:
+Dado que el uso más común es ejecutar directamente desde la terminal `go run ./cmd <archivo>` en glox y `plox <archivo>` en plox, la comparativa se hace midiendo la ejecución de ambos con `time`, que es la única medición posible para plox.
 
 | Benchmark | `plox` Promedio (ms) | `glox` (`go run`) Promedio (ms) | Speedup (`glox` vs `plox`) |
 |---|---|---|:---:|
 | `fibonacci` | 1824.40 | 127.80 | **14.3x más rápido** |
 | `minsky` | 361.80 | 62.60 | **5.8x más rápido** |
 
-# Análisis y conclusión
+## Análisis y conclusiones
 
-Particularmente sobre glox, como corremos con go run eso trae un costo fijo que es el de compilar el código, que por lo que vemos aproximadamente en las mediciones es de 50 ms. El tema que en programas cortos como el de fizzbuzz o el de minsky, es mucho más representativo porque casi todo el tiempo se va ahí y no en la ejecución de lox.
+Como se ve en las secciones 2 y 3, correr glox con `go run` trae un costo fijo: **compilar el código**, que suma unos 40-50 ms. En programas cortos como `fizzbuzz` o `minsky`, esto es lo que termina dominando: casi todo el tiempo se va en la compilación y no en la ejecución de Lox. Con `clock()` la diferencia es todavía más drástica: `fizzbuzz` tarda unos 3.6 ms y `fibonacci` de 25, pese a su recursión, unos 45 ms.
 
-Por eso es que directamente cuando tenés el binario compilado es notoria la diferencia, por ejemplo en el de fizzbuzz baja de 67 a 16ms (aprox los 50ms que decimos de compilación).
+En cuanto a la comparativa de glox y plox, es notoria la diferencia del tiempo, particularmente en `fibonacci`, donde el orden de magnitud cambia de los milisegundos a segundos. Una de las causas es que Go es **compilado**, mientras que Python es **interpretado**. Entonces, como plox corre sobre Python, termina siendo un intérprete corriendo sobre otro intérprete, y eso lo hace más lento frente a nuestro glox.
 
-Un detalle a tener en cuenta es que como agregamos a nuestro glox la función nativa de clock() podemos medir como lo hacemos en el primer caso, y ahí la diferencia es mucho más drástica donde fizzbuzz cae aproximadamente su tiempo a unos 3.6 ms. Y fibonacci de 25, que tiene mucha recursión, solo a 45 ms. 
-
-Es notoria también la diferencia del tiempo contra plox de la cátedra particularmente en fibonacci, donde el orden de magnitud cambia de los milisegundos a segundos.
-Una de las causas es que go es compilado, mientras que python interpretado. Entonces si partimos que tenemos lox corriendo en python que se tiene que interpretar también, eso hace que sea más lento frente a nuestro glox. 
+En resumen, glox resulta entre 5.8 y 14.3 veces más rápido que plox en los programas medidos, aun incluyendo el costo de compilar con `go run`. Si se lo ejecuta como binario precompilado, la diferencia es todavía mayor ya que se elimina ese costo fijo de compilar. Además, la diferencia depende del tipo de programa: es más marcada en `fibonacci`, que hace mucha recursión y es el de mayor duración, que en `minsky`, donde el costo de compilar pesa más sobre un programa corto.
