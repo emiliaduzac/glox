@@ -20,8 +20,11 @@ func NewCompiler(tokens []token.Token) *Compiler {
 }
 
 func (c *Compiler) Compile() (*chunk.Chunk, error) {
-	for !c.cursor.IsAtEnd() {
-
+	if err := c.expression(); err != nil {
+		return nil, err
+	}
+	if err := c.cursor.Consume(token.EOF, "end of expression"); err != nil {
+		return nil, err
 	}
 	c.emitReturn()
 	return c.chunk, nil
@@ -88,11 +91,46 @@ func (c *Compiler) grouping() error {
 }
 
 func (c *Compiler) unary() error {
+	operatorType := c.cursor.Previous().TokenType
+
+	if err := c.parsePrecedence(PREC_UNARY); err != nil {
+		return err
+	}
+
+	switch operatorType {
+	case token.MINUS:
+		c.emit(byte(chunk.OP_NEGATE))
+	default:
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "unexpected unary operator")
+	}
 	return nil
 }
+
 func (c *Compiler) binary() error {
+	operatorType := c.cursor.Previous().TokenType
+	rule := getRule(operatorType)
+	if err := c.parsePrecedence(rule.precedence + 1); err != nil {
+		return err
+	}
+
+	switch operatorType {
+	case token.PLUS:
+		c.emit(byte(chunk.OP_ADD))
+	case token.MINUS:
+		c.emit(byte(chunk.OP_SUBTRACT))
+	case token.STAR:
+		c.emit(byte(chunk.OP_MULTIPLY))
+	case token.SLASH:
+		c.emit(byte(chunk.OP_DIVIDE))
+	case token.PERCENT:
+		c.emit(byte(chunk.OP_MODULO))
+	default:
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "unexpected binary operator")
+	}
 	return nil
 }
+
+// TO DO:
 func (c *Compiler) literal() error {
 	return nil
 }
