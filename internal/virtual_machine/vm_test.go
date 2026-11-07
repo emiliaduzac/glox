@@ -566,7 +566,6 @@ func TestOpModulo(t *testing.T) {
 		})
 	}
 
-	// NaN != NaN, por eso no se puede comparar con AssertValue
 	nanTests := []struct {
 		name  string
 		left  float64

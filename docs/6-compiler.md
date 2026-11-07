@@ -18,4 +18,42 @@ Para mantener ambos enfoques y evitar duplicar código, se agregó un `TokenCurs
 
 ### Pratt Parser
 
-Para la etapa de parseo, se utiliza el algoritmo _Pratt Parser_, que se basa en una tabla declarativa, donde se especifica la precedencia y asociatividad de cada operador.
+Para la etapa de parseo de expresiones, se utiliza el algoritmo _Pratt Parser_. A diferencia del _Recursive Descent Parser_ de nuestro [parser](2-parser.md), donde cada nivel de precedencia tiene su propia regla y su propia función, el Pratt Parser usa una **tabla** y una única función: a medida que recorre los tokens, obtiene la información de cada uno desde la tabla y ejecuta lo que corresponda.
+
+La tabla ([`precedence.go`](../internal/compiler/precedence.go)) indica para cada tipo de token:
+
+- **prefix**: dice que hacer si el token empieza una expresión
+- **infix**: que hacer si el token aparece después de un operando. Por ejemplo, el `+` en `1 + 2`.
+- **precedence**: qué tan fuerte es el token como operador infijo (es lo que nos dice precedencia. Por ejemplo, `*` tiene un nivel mayor de precedencia que `+`)
+
+#### Expresiones
+
+Para compilar expresiones, la función `parsePrecedence(precedence)` recibe una precedencia, que indica la mínima que puede aceptar. Funciona así:
+
+1. Obtiene el token actual y, si tiene un _prefix_ asociado, lo ejecuta. Si no lo tiene, es un error: ese token no debería estar empezando una expresión.
+2. Itera los tokens siguientes, obteniendo sus _infix_ y ejecutándolos.
+3. Si encuentra un token de menor precedencia a la recibida, deja de iterar, porque quiere decir que ese token no pertenece a la expresión actual.
+
+Un truco que aplica el libro es no generar instrucciones nuevas para `!=`, `>=` y `<=`, sino aprovechar las existentes y negarlas. Por ejemplo, `a != b` sería `!(a == b)`.
+
+#### Asociatividad
+
+A diferencia de la precedencia, la asociatividad no está en la tabla, sino que sale de cómo cada función compila sus operandos.
+En el caso de los binarios, `binary()` compila su operando **derecho** llamando a `parsePrecedence` con la precedencia del operador más uno. Así, el operando derecho no puede quedarse con otro operador del mismo nivel, y este queda para la expresión de afuera.
+
+Paso a paso para el ejemplo `1 - 2 - 3`:
+
+1. `parsePrecedence(PREC_ASSIGNMENT)` acepta cualquier operador. Compila el `1`.
+2. Encuentra el primer `-` (`PREC_TERM`). Como es mayor o igual a `PREC_ASSIGNMENT`, lo toma y llama a `binary()`.
+3. `binary()` compila el lado derecho con `parsePrecedence(PREC_FACTOR)` (suma 1 a la precedencia actual, que era `PREC_TERM`), que solo acepta operadores de `PREC_FACTOR` o mayor. Compila el `2`.
+4. Encuentra el segundo `-` (`PREC_TERM`). Como es menor a `PREC_FACTOR`, corta. Se emite la resta: `1 - 2`.
+5. De vuelta en el primer nivel, encuentra el segundo `-`. Como es mayor o igual a `PREC_ASSIGNMENT`, lo toma y llama a `binary()`.
+6. `binary()` compila el `3` y se emite la segunda resta: `(1 - 2) - 3`.
+
+### Tests
+
+Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
+
+```bash
+go test ./internal/compiler
+```
