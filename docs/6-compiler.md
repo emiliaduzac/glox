@@ -13,3 +13,9 @@ Otras implementaciones de compiladores aprovechan el AST parseado, pero el libro
 **Tree-walk**: scanner → parser → resolver → interpreter
 
 **Bytecode**: scanner → compiler → VM
+
+Para mantener ambos enfoques y evitar duplicar código, se agregó un `TokenCursor` ([`cursor.go`](../internal/token/cursor.go)), que incluye el listado de tokens y el índice del token actual. De esta forma, centralizamos la lógica de recorrer los tokens del `parser` y del `compiler`.
+
+### Pratt Parser
+
+Para la etapa de parseo, se utiliza el algoritmo _Pratt Parser_, que se basa en una tabla declarativa, donde se especifica la precedencia y asociatividad de cada operador.

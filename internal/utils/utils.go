@@ -8,6 +8,8 @@ import (
 	"tp-lox/internal/expression"
 )
 
+// -- INTERPRETER & VM --
+
 func IsEqual(a, b any) bool {
 	if a == nil && b == nil {
 		return true
@@ -52,7 +54,7 @@ func CheckNumberOperands(line int, left, right any) (float64, float64, error) {
 	return leftNum, rightNum, nil
 }
 
-// Funciones comunes para los tests
+// -- TESTS --
 
 func AssertValue(t *testing.T, got any, expected any) {
 	t.Helper()
