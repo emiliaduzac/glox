@@ -42,6 +42,11 @@ func (c *TokenCursor) GetLexeme() string {
 	return c.Current().Lexeme
 }
 
+// GetPreviousType devuelve el TokenType del último token consumido.
+func (c *TokenCursor) GetPreviousType() TokenType {
+	return c.Previous().TokenType
+}
+
 // GetPreviousLine devuelve la línea del último token consumido.
 func (c *TokenCursor) GetPreviousLine() int {
 	return c.Previous().Line

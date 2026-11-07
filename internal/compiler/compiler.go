@@ -91,8 +91,7 @@ func (c *Compiler) grouping() error {
 }
 
 func (c *Compiler) unary() error {
-	operatorType := c.cursor.Previous().TokenType
-
+	operatorType := c.cursor.GetPreviousType()
 	if err := c.parsePrecedence(PREC_UNARY); err != nil {
 		return err
 	}
@@ -100,6 +99,8 @@ func (c *Compiler) unary() error {
 	switch operatorType {
 	case token.MINUS:
 		c.emit(byte(chunk.OP_NEGATE))
+	case token.BANG:
+		c.emit(byte(chunk.OP_NOT))
 	default:
 		return errors.NewLoxError(c.cursor.GetPreviousLine(), "unexpected unary operator")
 	}
@@ -107,7 +108,7 @@ func (c *Compiler) unary() error {
 }
 
 func (c *Compiler) binary() error {
-	operatorType := c.cursor.Previous().TokenType
+	operatorType := c.cursor.GetPreviousType()
 	rule := getRule(operatorType)
 	if err := c.parsePrecedence(rule.precedence + 1); err != nil {
 		return err
@@ -130,10 +131,23 @@ func (c *Compiler) binary() error {
 	return nil
 }
 
-// TO DO:
 func (c *Compiler) literal() error {
+	operatorType := c.cursor.GetPreviousType()
+
+	switch operatorType {
+	case token.FALSE:
+		c.emit(byte(chunk.OP_FALSE))
+	case token.TRUE:
+		c.emit(byte(chunk.OP_TRUE))
+	case token.NIL:
+		c.emit(byte(chunk.OP_NIL))
+	default:
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "unexpected literal")
+	}
 	return nil
 }
+
+// TO DO:
 func (c *Compiler) logicAnd() error {
 	return nil
 }

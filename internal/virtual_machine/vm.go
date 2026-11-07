@@ -82,6 +82,13 @@ func (vm *VirtualMachine) Run() error {
 				return err
 			}
 
+		case c.OP_NOT:
+			value, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			vm.push(!utils.IsTruthy(value))
+
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
