@@ -38,7 +38,7 @@ func TestOpReturn(t *testing.T) {
 
 		err := vm.Run()
 
-		utils.AssertErrorMessage(t, err, "Inconsistent Stack Height")
+		utils.AssertErrorMessage(t, err, "inconsistent Stack Height")
 	})
 
 	t.Run("Corta la ejecución", func(t *testing.T) {
