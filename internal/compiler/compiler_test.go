@@ -182,6 +182,53 @@ func TestCompileGrouping(t *testing.T) {
 	})
 }
 
+func TestCompileComparison(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		expected []c.OpCode
+	}{
+		{"igual", "1 == 2", []c.OpCode{c.OP_EQUAL}},
+		{"mayor", "1 > 2", []c.OpCode{c.OP_GREATER}},
+		{"menor", "1 < 2", []c.OpCode{c.OP_LESS}},
+		{"distinto", "1 != 2", []c.OpCode{c.OP_EQUAL, c.OP_NOT}},
+		{"mayor o igual", "1 >= 2", []c.OpCode{c.OP_LESS, c.OP_NOT}},
+		{"menor o igual", "1 <= 2", []c.OpCode{c.OP_GREATER, c.OP_NOT}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			chunk := compileSource(t, test.source)
+
+			expected := []byte{byte(c.OP_CONSTANT), 0, byte(c.OP_CONSTANT), 1}
+			for _, op := range test.expected {
+				expected = append(expected, byte(op))
+			}
+			expected = append(expected, byte(c.OP_RETURN))
+			assertBytes(t, chunk, expected...)
+		})
+	}
+
+	t.Run("Se puede comparar con nil y booleanos", func(t *testing.T) {
+		chunk := compileSource(t, "nil == false")
+
+		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_FALSE), byte(c.OP_EQUAL), byte(c.OP_RETURN))
+	})
+
+	t.Run("La suma tiene precedencia sobre la comparación", func(t *testing.T) {
+		chunk := compileSource(t, "1 + 2 < 3")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_ADD),
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_LESS),
+			byte(c.OP_RETURN),
+		)
+	})
+}
+
 func TestCompileErrors(t *testing.T) {
 	tests := []struct {
 		name          string

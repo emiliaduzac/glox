@@ -2,6 +2,7 @@ package virtualmachine
 
 import (
 	"fmt"
+	"math"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/utils"
@@ -56,7 +57,7 @@ func (vm *VirtualMachine) Run() error {
 				return err
 			}
 			vm.push(-num)
-
+		// Aritméticos
 		case c.OP_ADD:
 			if err := vm.add(); err != nil {
 				return err
@@ -73,6 +74,21 @@ func (vm *VirtualMachine) Run() error {
 			if err := vm.binaryOp(func(left, right float64) any { return left / right }); err != nil {
 				return err
 			}
+		case c.OP_MODULO:
+			if err := vm.binaryOp(func(left, right float64) any { return math.Mod(left, right) }); err != nil {
+				return err
+			}
+
+		// Comparación
+		case c.OP_EQUAL:
+			left, right, err := vm.peekOperands()
+			if err != nil {
+				return err
+			}
+			if err := vm.popTwo(); err != nil {
+				return err
+			}
+			vm.push(utils.IsEqual(left, right))
 		case c.OP_GREATER:
 			if err := vm.binaryOp(func(left, right float64) any { return left > right }); err != nil {
 				return err

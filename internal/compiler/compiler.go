@@ -30,6 +30,10 @@ func (c *Compiler) Compile() (*chunk.Chunk, error) {
 	return c.chunk, nil
 }
 
+func (c *Compiler) expression() error {
+	return c.parsePrecedence(PREC_ASSIGNMENT)
+}
+
 // emit escribe uno o más bytes en el chunk, con la línea del último token consumido
 func (c *Compiler) emit(bytes ...byte) {
 	for _, b := range bytes {
@@ -69,10 +73,6 @@ func (c *Compiler) parsePrecedence(precedence Precedence) error {
 	}
 
 	return nil
-}
-
-func (c *Compiler) expression() error {
-	return c.parsePrecedence(PREC_ASSIGNMENT)
 }
 
 func (c *Compiler) value() error {
@@ -115,6 +115,7 @@ func (c *Compiler) binary() error {
 	}
 
 	switch operatorType {
+	// Aritméticos
 	case token.PLUS:
 		c.emit(byte(chunk.OP_ADD))
 	case token.MINUS:
@@ -125,6 +126,21 @@ func (c *Compiler) binary() error {
 		c.emit(byte(chunk.OP_DIVIDE))
 	case token.PERCENT:
 		c.emit(byte(chunk.OP_MODULO))
+
+	// Comparación
+	case token.EQUAL_EQUAL:
+		c.emit(byte(chunk.OP_EQUAL))
+	case token.BANG_EQUAL:
+		c.emit(byte(chunk.OP_EQUAL), byte(chunk.OP_NOT))
+	case token.GREATER:
+		c.emit(byte(chunk.OP_GREATER))
+	case token.GREATER_EQUAL:
+		c.emit(byte(chunk.OP_LESS), byte(chunk.OP_NOT))
+	case token.LESS:
+		c.emit(byte(chunk.OP_LESS))
+	case token.LESS_EQUAL:
+		c.emit(byte(chunk.OP_GREATER), byte(chunk.OP_NOT))
+
 	default:
 		return errors.NewLoxError(c.cursor.GetPreviousLine(), "unexpected binary operator")
 	}
