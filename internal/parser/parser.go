@@ -103,16 +103,16 @@ func (p *Parser) block() ([]statements.Stmt, error) {
 		statements = append(statements, decl)
 	}
 
-	if !p.cursor.Match(token.RIGHT_BRACE) {
-		return nil, p.expectedError("'}' after block")
+	if err := p.cursor.Consume(token.RIGHT_BRACE, "'}' after block"); err != nil {
+		return nil, err
 	}
 
 	return statements, nil
 }
 
 func (p *Parser) varDeclaration() (statements.Stmt, error) {
-	if !p.cursor.Match(token.IDENTIFIER) {
-		return nil, p.expectedError("identifier after 'var'")
+	if err := p.cursor.Consume(token.IDENTIFIER, "identifier after 'var'"); err != nil {
+		return nil, err
 	}
 
 	varName := p.cursor.Previous()
@@ -128,23 +128,23 @@ func (p *Parser) varDeclaration() (statements.Stmt, error) {
 		initializer = nil
 	}
 
-	if !p.cursor.Match(token.SEMICOLON) {
-		return nil, p.expectedError("';' after variable declaration")
+	if err := p.cursor.Consume(token.SEMICOLON, "';' after variable declaration"); err != nil {
+		return nil, err
 	}
 
 	return statements.NewVarStmt(varName, initializer), nil
 }
 
 func (p *Parser) ifStatement() (statements.Stmt, error) {
-	if !p.cursor.Match(token.LEFT_PAREN) {
-		return nil, p.expectedError("'(' after 'if'")
+	if err := p.cursor.Consume(token.LEFT_PAREN, "'(' after 'if'"); err != nil {
+		return nil, err
 	}
 	condition, err := p.expression()
 	if err != nil {
 		return nil, err
 	}
-	if !p.cursor.Match(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after if condition")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after if condition"); err != nil {
+		return nil, err
 	}
 
 	thenBranch, err := p.statement()
@@ -164,15 +164,15 @@ func (p *Parser) ifStatement() (statements.Stmt, error) {
 }
 
 func (p *Parser) whileStatement() (statements.Stmt, error) {
-	if !p.cursor.Match(token.LEFT_PAREN) {
-		return nil, p.expectedError("'(' after 'while'")
+	if err := p.cursor.Consume(token.LEFT_PAREN, "'(' after 'while'"); err != nil {
+		return nil, err
 	}
 	condition, err := p.expression()
 	if err != nil {
 		return nil, err
 	}
-	if !p.cursor.Match(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after while condition")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after while condition"); err != nil {
+		return nil, err
 	}
 
 	body, err := p.statement()
@@ -184,8 +184,8 @@ func (p *Parser) whileStatement() (statements.Stmt, error) {
 }
 
 func (p *Parser) forStatement() (statements.Stmt, error) {
-	if !p.cursor.Match(token.LEFT_PAREN) {
-		return nil, p.expectedError("'(' after 'for'")
+	if err := p.cursor.Consume(token.LEFT_PAREN, "'(' after 'for'"); err != nil {
+		return nil, err
 	}
 
 	// obtenemos las partes del for: inicializador, condición e incremento
@@ -233,8 +233,8 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !p.cursor.Match(token.SEMICOLON) {
-		return nil, p.expectedError("';' after statement")
+	if err := p.cursor.Consume(token.SEMICOLON, "';' after statement"); err != nil {
+		return nil, err
 	}
 	return expr, nil
 }
@@ -250,8 +250,8 @@ func (p *Parser) returnStatement() (statements.Stmt, error) {
 		}
 	}
 
-	if !p.cursor.Match(token.SEMICOLON) {
-		return nil, p.expectedError("';' after return value")
+	if err := p.cursor.Consume(token.SEMICOLON, "';' after return value"); err != nil {
+		return nil, err
 	}
 
 	return statements.NewReturnStmt(keyword, value), nil
@@ -435,7 +435,7 @@ func (p *Parser) finishCall(callee expression.Expr) (expression.Expr, error) {
 	if !p.cursor.Check(token.RIGHT_PAREN) {
 		for {
 			if len(arguments) >= 255 {
-				return nil, p.expectedError("cannot have more than 255 arguments")
+				return nil, p.cursor.ExpectedError("cannot have more than 255 arguments")
 			}
 			arg, err := p.expression()
 			if err != nil {
@@ -448,8 +448,8 @@ func (p *Parser) finishCall(callee expression.Expr) (expression.Expr, error) {
 		}
 	}
 
-	if !p.cursor.Match(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after arguments")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after arguments"); err != nil {
+		return nil, err
 	}
 
 	paren := p.cursor.Previous()
@@ -486,28 +486,28 @@ func (p *Parser) primary() (expression.Expr, error) {
 		return expression.NewVariable(p.cursor.Previous()), nil
 	}
 
-	return nil, p.expectedError("expression")
+	return nil, p.cursor.ExpectedError("expression")
 }
 
 func (p *Parser) function(kind string) (statements.Stmt, error) {
-	if !p.cursor.Match(token.IDENTIFIER) {
-		return nil, p.expectedError(fmt.Sprintf("expect %s name", kind))
+	if err := p.cursor.Consume(token.IDENTIFIER, fmt.Sprintf("expect %s name", kind)); err != nil {
+		return nil, err
 	}
 
 	name := p.cursor.Previous()
 
-	if !p.cursor.Match(token.LEFT_PAREN) {
-		return nil, p.expectedError(fmt.Sprintf("'(' after %s name", kind))
+	if err := p.cursor.Consume(token.LEFT_PAREN, fmt.Sprintf("'(' after %s name", kind)); err != nil {
+		return nil, err
 	}
 
 	var parameters []token.Token
 	if !p.cursor.Check(token.RIGHT_PAREN) {
 		for {
 			if len(parameters) >= 255 {
-				return nil, p.expectedError("cannot have more than 255 parameters")
+				return nil, p.cursor.ExpectedError("cannot have more than 255 parameters")
 			}
-			if !p.cursor.Match(token.IDENTIFIER) {
-				return nil, p.expectedError("expect parameter name")
+			if err := p.cursor.Consume(token.IDENTIFIER, "expect parameter name"); err != nil {
+				return nil, err
 			}
 			parameters = append(parameters, p.cursor.Previous())
 			if !p.cursor.Match(token.COMMA) {
@@ -516,12 +516,12 @@ func (p *Parser) function(kind string) (statements.Stmt, error) {
 		}
 	}
 
-	if !p.cursor.Match(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after parameters")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after parameters"); err != nil {
+		return nil, err
 	}
 
-	if !p.cursor.Match(token.LEFT_BRACE) {
-		return nil, p.expectedError(fmt.Sprintf("'{' before %s body", kind))
+	if err := p.cursor.Consume(token.LEFT_BRACE, fmt.Sprintf("'{' before %s body", kind)); err != nil {
+		return nil, err
 	}
 
 	body, err := p.block()

@@ -22,5 +22,17 @@ func (c *Compiler) Compile() (*chunk.Chunk, error) {
 	for !c.cursor.IsAtEnd() {
 
 	}
+	c.emitReturn()
 	return c.chunk, nil
+}
+
+// emit escribe uno o más bytes en el chunk, con la línea del último token consumido
+func (c *Compiler) emit(bytes ...byte) {
+	for _, b := range bytes {
+		c.chunk.Write(b, c.cursor.GetPreviousLine())
+	}
+}
+
+func (c *Compiler) emitReturn() {
+	c.chunk.Write(byte(chunk.OP_RETURN), c.cursor.GetPreviousLine())
 }

@@ -1,20 +1,10 @@
 package parser
 
 import (
-	"fmt"
-	"tp-lox/internal/errors"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
 )
-
-func (p *Parser) expectedError(expected string) error {
-	got := fmt.Sprintf("`%s`", p.cursor.GetLexeme())
-	if p.cursor.Check(token.EOF) {
-		got = "EOF"
-	}
-	return errors.NewLoxError(p.cursor.GetLine(), fmt.Sprintf("expected %s, got %s instead", expected, got))
-}
 
 func (p *Parser) parseForInitializer() (statements.Stmt, error) {
 	var initializer statements.Stmt
@@ -36,8 +26,8 @@ func (p *Parser) parseForCondition() (expression.Expr, error) {
 			return nil, err
 		}
 	}
-	if !p.cursor.Match(token.SEMICOLON) {
-		return nil, p.expectedError("';' after for condition")
+	if err := p.cursor.Consume(token.SEMICOLON, "';' after for condition"); err != nil {
+		return nil, err
 	}
 	return condition, nil
 }
@@ -51,8 +41,8 @@ func (p *Parser) parseForIncrement() (expression.Expr, error) {
 			return nil, err
 		}
 	}
-	if !p.cursor.Match(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after for clauses")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after for clauses"); err != nil {
+		return nil, err
 	}
 	return increment, nil
 }

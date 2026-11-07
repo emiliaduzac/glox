@@ -1,5 +1,10 @@
 package token
 
+import (
+	"fmt"
+	"tp-lox/internal/errors"
+)
+
 // TokenCursor recorre una lista de tokens, manteniendo la posición actual.
 // Lo comparten el parser y el compiler para no repetir la lógica de avanzar y consultar tokens.
 type TokenCursor struct {
@@ -37,6 +42,11 @@ func (c *TokenCursor) GetLexeme() string {
 	return c.Current().Lexeme
 }
 
+// GetPreviousLine devuelve la línea del último token consumido.
+func (c *TokenCursor) GetPreviousLine() int {
+	return c.Previous().Line
+}
+
 // Advance consume el token actual y devuelve el token consumido. No avanza más allá del EOF.
 func (c *TokenCursor) Advance() Token {
 	if !c.IsAtEnd() {
@@ -59,4 +69,21 @@ func (c *TokenCursor) Match(types ...TokenType) bool {
 		}
 	}
 	return false
+}
+
+// ExpectedError devuelve un error en la línea del token actual, indicando qué se esperaba y qué se encontró.
+func (c *TokenCursor) ExpectedError(expected string) error {
+	got := fmt.Sprintf("`%s`", c.GetLexeme())
+	if c.Check(EOF) {
+		got = "EOF"
+	}
+	return errors.NewLoxError(c.GetLine(), fmt.Sprintf("expected %s, got %s instead", expected, got))
+}
+
+// Consume avanza si el token actual es del tipo esperado. Si no, devuelve un error.
+func (c *TokenCursor) Consume(tokenType TokenType, expected string) error {
+	if c.Match(tokenType) {
+		return nil
+	}
+	return c.ExpectedError(expected)
 }
