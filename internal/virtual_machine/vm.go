@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"fmt"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/utils"
@@ -9,18 +10,20 @@ import (
 type VirtualMachine struct {
 	ip    int
 	stack []any
+	chunk *c.Chunk
 }
 
-func NewVirtualMachine() *VirtualMachine {
+func NewVirtualMachine(chunk *c.Chunk) *VirtualMachine {
 	return &VirtualMachine{
 		ip:    0,
 		stack: []any{},
+		chunk: chunk,
 	}
 }
 
-func (vm *VirtualMachine) Run(chunk c.Chunk) error {
-	for vm.ip < len(chunk.Bytes) {
-		b, err := vm.readByte(chunk)
+func (vm *VirtualMachine) Run() error {
+	for vm.ip < len(vm.chunk.Bytes) {
+		b, err := vm.readByte()
 		if err != nil {
 			return err
 		}
@@ -29,12 +32,12 @@ func (vm *VirtualMachine) Run(chunk c.Chunk) error {
 		switch op {
 		case c.OP_RETURN:
 			if len(vm.stack) > 0 {
-				return errors.NewLoxError(0, "Inconsistent Stack Height: should be empty at exit")
+				return errors.NewLoxError(vm.currentLine(), "Inconsistent Stack Height: should be empty at exit")
 			}
 			return nil
 
 		case c.OP_CONSTANT:
-			constant, err := vm.readConstant(chunk)
+			constant, err := vm.readConstant()
 			if err != nil {
 				return err
 			}
@@ -78,31 +81,34 @@ func (vm *VirtualMachine) Run(chunk c.Chunk) error {
 			if err := vm.binaryOp(func(left, right float64) any { return left < right }); err != nil {
 				return err
 			}
+
+		default:
+			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("UNKOWN %b", op))
 		}
 	}
 	return nil
 }
 
 // readByte devuelve el byte al que apunta el instruction pointer y lo avanza al siguiente
-func (vm *VirtualMachine) readByte(chunk c.Chunk) (byte, error) {
-	if vm.ip >= len(chunk.Bytes) {
-		return 0, errors.NewLoxError(0, "unexpected end of bytecode")
+func (vm *VirtualMachine) readByte() (byte, error) {
+	if vm.ip >= len(vm.chunk.Bytes) {
+		return 0, errors.NewLoxError(vm.currentLine(), "unexpected end of bytecode")
 	}
-	b := chunk.Bytes[vm.ip]
+	b := vm.chunk.Bytes[vm.ip]
 	vm.ip++
 	return b, nil
 }
 
 // readConstant lee el operando y devuelve la constante del pool en ese índice
-func (vm *VirtualMachine) readConstant(chunk c.Chunk) (any, error) {
-	index, err := vm.readByte(chunk)
+func (vm *VirtualMachine) readConstant() (any, error) {
+	index, err := vm.readByte()
 	if err != nil {
 		return nil, err
 	}
-	if int(index) >= len(chunk.Constants) {
-		return nil, errors.NewLoxError(0, "constant index out of range")
+	if int(index) >= len(vm.chunk.Constants) {
+		return nil, errors.NewLoxError(vm.currentLine(), "constant index out of range")
 	}
-	return chunk.Constants[index], nil
+	return vm.chunk.Constants[index], nil
 }
 
 // push agrega un elemento al tope del stack
@@ -113,7 +119,7 @@ func (vm *VirtualMachine) push(value any) {
 // pop saca el elemento del tope del stack y lo devuelve
 func (vm *VirtualMachine) pop() (any, error) {
 	if len(vm.stack) == 0 {
-		return nil, errors.NewLoxError(0, "stack underflow")
+		return nil, errors.NewLoxError(vm.currentLine(), "stack underflow")
 	}
 
 	top := vm.stack[len(vm.stack)-1]
@@ -135,7 +141,7 @@ func (vm *VirtualMachine) popNumberOperand() (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return utils.CheckNumberOperand(0, operand)
+	return utils.CheckNumberOperand(vm.currentLine(), operand)
 }
 
 // popNumberOperands saca dos números del stack y los devuelve en orden (izquierdo, derecho)
@@ -144,7 +150,7 @@ func (vm *VirtualMachine) popNumberOperands() (float64, float64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	return utils.CheckNumberOperands(0, left, right)
+	return utils.CheckNumberOperands(vm.currentLine(), left, right)
 }
 
 // popOperands saca los dos operandos del stack y los devuelve en orden (izquierdo, derecho)
@@ -179,7 +185,7 @@ func (vm *VirtualMachine) add() error {
 			return nil
 		}
 	}
-	return errors.NewLoxError(0, "operands must be two numbers or two strings")
+	return errors.NewLoxError(vm.currentLine(), "operands must be two numbers or two strings")
 }
 
 // binaryOp saca dos números del stack, les aplica op y deja el resultado en el stack
@@ -190,4 +196,8 @@ func (vm *VirtualMachine) binaryOp(op func(left, right float64) any) error {
 	}
 	vm.push(op(left, right))
 	return nil
+}
+
+func (vm *VirtualMachine) currentLine() int {
+	return vm.chunk.Lines[vm.ip-1]
 }

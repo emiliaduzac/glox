@@ -16,12 +16,14 @@ import (
 type Lox struct {
 	mode        int
 	interpreter *interpreter.Interpreter
+	// vm   *vm.VirtualMachine
 }
 
 func newLox(mode int) *Lox {
 	return &Lox{
 		mode:        mode,
 		interpreter: interpreter.NewInterpreter(),
+		// vm:   vm.NewVirtualMachine(),
 	}
 }
 

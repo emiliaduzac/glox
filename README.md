@@ -92,7 +92,8 @@ Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de hab
 
 ## To Do List
 
-- [ ] Base del compilador (chunk, pool de constantes, VM con su stack y el loop que ejecuta instrucciones)
+- [X] Chunk y VM
+- [ ] Compilador base
 - [ ] Expresiones, statements, variables globales y variables locales
 - [ ] Control de flujo
 - [ ] Funciones y closures

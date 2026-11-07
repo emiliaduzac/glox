@@ -10,8 +10,8 @@ var line = 1
 
 func setUpVM(t *testing.T) (*VirtualMachine, *c.Chunk) {
 	t.Helper()
-	vm := NewVirtualMachine()
 	chunk := c.NewChunk()
+	vm := NewVirtualMachine(chunk)
 	return vm, chunk
 }
 
@@ -26,7 +26,7 @@ func TestOpReturn(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_RETURN), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertNoError(t, err)
 	})
@@ -36,7 +36,7 @@ func TestOpReturn(t *testing.T) {
 		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_RETURN), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "Inconsistent Stack Height")
 	})
@@ -46,7 +46,7 @@ func TestOpReturn(t *testing.T) {
 		chunk.Write(byte(c.OP_RETURN), line)
 		chunk.Write(byte(c.OP_NIL), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertNoError(t, err)
 		utils.AssertValue(t, len(vm.stack), 0)
@@ -70,7 +70,7 @@ func TestOpConstant(t *testing.T) {
 			vm, chunk := setUpVM(t)
 			writeConstant(chunk, test.value)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -83,7 +83,7 @@ func TestOpConstant(t *testing.T) {
 		writeConstant(chunk, 1.0)
 		writeConstant(chunk, 2.0)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertNoError(t, err)
 		utils.AssertValue(t, len(vm.stack), 2)
@@ -104,7 +104,7 @@ func TestOpConstant(t *testing.T) {
 		chunk.Write(byte(c.OP_CONSTANT), line)
 		chunk.Write(0, line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertNoError(t, err)
 		utils.AssertValue(t, len(vm.stack), 2)
@@ -119,7 +119,7 @@ func TestOpConstant(t *testing.T) {
 		chunk.Write(byte(c.OP_CONSTANT), line)
 		chunk.Write(5, 1)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertError(t, err)
 	})
@@ -129,7 +129,7 @@ func TestOpConstant(t *testing.T) {
 		chunk.AddConstant(10.0)
 		chunk.Write(byte(c.OP_CONSTANT), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertError(t, err)
 	})
@@ -151,7 +151,7 @@ func TestOpLiterals(t *testing.T) {
 			vm, chunk := setUpVM(t)
 			chunk.Write(byte(test.op), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -176,7 +176,7 @@ func TestOpNegate(t *testing.T) {
 			writeConstant(chunk, test.operand)
 			chunk.Write(byte(c.OP_NEGATE), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -190,7 +190,7 @@ func TestOpNegate(t *testing.T) {
 		chunk.Write(byte(c.OP_NEGATE), line)
 		chunk.Write(byte(c.OP_NEGATE), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertNoError(t, err)
 		utils.AssertValue(t, len(vm.stack), 1)
@@ -212,17 +212,29 @@ func TestOpNegate(t *testing.T) {
 			writeConstant(chunk, test.operand)
 			chunk.Write(byte(c.OP_NEGATE), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertErrorMessage(t, err, "operand must be a number")
 		})
 	}
 
+	t.Run("El error indica la línea de la instrucción", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		index := chunk.AddConstant("a")
+		chunk.Write(byte(c.OP_CONSTANT), 7)
+		chunk.Write(byte(index), 7)
+		chunk.Write(byte(c.OP_NEGATE), 7)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "[line 7]")
+	})
+
 	t.Run("Error si el stack está vacío", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_NEGATE), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -248,7 +260,7 @@ func TestOpAdd(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_ADD), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -262,7 +274,7 @@ func TestOpAdd(t *testing.T) {
 		writeConstant(chunk, " World")
 		chunk.Write(byte(c.OP_ADD), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertNoError(t, err)
 		utils.AssertValue(t, len(vm.stack), 1)
@@ -285,7 +297,7 @@ func TestOpAdd(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_ADD), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertErrorMessage(t, err, "operands must be two numbers or two strings")
 		})
@@ -296,7 +308,7 @@ func TestOpAdd(t *testing.T) {
 		writeConstant(chunk, 1.0)
 		chunk.Write(byte(c.OP_ADD), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -305,7 +317,7 @@ func TestOpAdd(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_ADD), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -331,7 +343,7 @@ func TestOpSubtract(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_SUBTRACT), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -355,7 +367,7 @@ func TestOpSubtract(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_SUBTRACT), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertErrorMessage(t, err, "operands must be numbers")
 		})
@@ -366,7 +378,7 @@ func TestOpSubtract(t *testing.T) {
 		writeConstant(chunk, 1.0)
 		chunk.Write(byte(c.OP_SUBTRACT), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -375,7 +387,7 @@ func TestOpSubtract(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_SUBTRACT), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -402,7 +414,7 @@ func TestOpMultiply(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_MULTIPLY), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -426,7 +438,7 @@ func TestOpMultiply(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_MULTIPLY), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertErrorMessage(t, err, "operands must be numbers")
 		})
@@ -437,7 +449,7 @@ func TestOpMultiply(t *testing.T) {
 		writeConstant(chunk, 1.0)
 		chunk.Write(byte(c.OP_MULTIPLY), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -446,7 +458,7 @@ func TestOpMultiply(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_MULTIPLY), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -472,7 +484,7 @@ func TestOpDivide(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_DIVIDE), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -496,7 +508,7 @@ func TestOpDivide(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_DIVIDE), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertErrorMessage(t, err, "operands must be numbers")
 		})
@@ -507,7 +519,7 @@ func TestOpDivide(t *testing.T) {
 		writeConstant(chunk, 1.0)
 		chunk.Write(byte(c.OP_DIVIDE), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -516,7 +528,7 @@ func TestOpDivide(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_DIVIDE), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -542,7 +554,7 @@ func TestOpGreater(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_GREATER), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -566,7 +578,7 @@ func TestOpGreater(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_GREATER), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertErrorMessage(t, err, "operands must be numbers")
 		})
@@ -577,7 +589,7 @@ func TestOpGreater(t *testing.T) {
 		writeConstant(chunk, 1.0)
 		chunk.Write(byte(c.OP_GREATER), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -586,7 +598,7 @@ func TestOpGreater(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_GREATER), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -612,7 +624,7 @@ func TestOpLess(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_LESS), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertNoError(t, err)
 			utils.AssertValue(t, len(vm.stack), 1)
@@ -636,7 +648,7 @@ func TestOpLess(t *testing.T) {
 			writeConstant(chunk, test.right)
 			chunk.Write(byte(c.OP_LESS), line)
 
-			err := vm.Run(*chunk)
+			err := vm.Run()
 
 			utils.AssertErrorMessage(t, err, "operands must be numbers")
 		})
@@ -647,7 +659,7 @@ func TestOpLess(t *testing.T) {
 		writeConstant(chunk, 1.0)
 		chunk.Write(byte(c.OP_LESS), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
@@ -656,7 +668,7 @@ func TestOpLess(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		chunk.Write(byte(c.OP_LESS), line)
 
-		err := vm.Run(*chunk)
+		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
