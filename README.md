@@ -28,7 +28,8 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Parser](docs/2-parser.md)
 - [Interpreter](docs/3-interpreter.md)
 - [Resolver](docs/4-resolver.md)
-- [Benchmarks](docs/5-benchmarks.md)
+- [Bytecode](docs/5-bytecode.md)
+- [Benchmarks](docs/z-benchmarks.md)
 
 ## Cómo correr lox
 
