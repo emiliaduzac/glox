@@ -28,7 +28,8 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Parser](docs/2-parser.md)
 - [Interpreter](docs/3-interpreter.md)
 - [Resolver](docs/4-resolver.md)
-- [Benchmarks](docs/5-benchmarks.md)
+- [Bytecode](docs/5-bytecode.md)
+- [Benchmarks](docs/z-benchmarks.md)
 
 ## Cómo correr lox
 
@@ -92,7 +93,8 @@ Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de hab
 
 ## To Do List
 
-- [ ] Base del compilador (chunk, pool de constantes, VM con su stack y el loop que ejecuta instrucciones)
+- [X] Chunk y VM
+- [ ] Compilador base
 - [ ] Expresiones, statements, variables globales y variables locales
 - [ ] Control de flujo
 - [ ] Funciones y closures

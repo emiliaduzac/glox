@@ -1,11 +1,11 @@
 package parser
 
 import (
-	"strings"
 	"testing"
 	"tp-lox/internal/expression"
 	"tp-lox/internal/statements"
 	"tp-lox/internal/token"
+	"tp-lox/internal/utils"
 )
 
 // HELPERS
@@ -29,9 +29,7 @@ func setUpParser(t *testing.T, tokens []token.Token) []statements.Stmt {
 	tokens = append(tokens, *token.NewToken(token.EOF, "", nil, 1))
 	s := NewParser(tokens)
 	stmts, err := s.Parse()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	utils.AssertNoError(t, err)
 	return stmts
 }
 
@@ -40,12 +38,7 @@ func setUpParserExpectError(t *testing.T, tokens []token.Token, expectedErrorCon
 	tokens = append(tokens, *token.NewToken(token.EOF, "", nil, 1))
 	s := NewParser(tokens)
 	_, err := s.Parse()
-	if err == nil {
-		t.Fatalf("expected an error, got none")
-	}
-	if !strings.Contains(err.Error(), expectedErrorContent) {
-		t.Errorf("expected error to contain %q, got %q", expectedErrorContent, err.Error())
-	}
+	utils.AssertErrorMessage(t, err, expectedErrorContent)
 }
 
 func assertExpressionStatement(t *testing.T, stmts []statements.Stmt) expression.Expr {
@@ -130,14 +123,6 @@ func assertBinary(t *testing.T, expr expression.Expr, expectedOperator token.Tok
 	}
 	assertLiteral(t, binary.Left, expectedLeft)
 	assertLiteral(t, binary.Right, expectedRight)
-}
-
-func assertString(t *testing.T, expr expression.Expr, expected string) {
-	t.Helper()
-
-	if got := expression.String(expr); got != expected {
-		t.Errorf("expected %q, got %q", expected, got)
-	}
 }
 
 func assertStatementString(t *testing.T, stmts []statements.Stmt, expected string) {
