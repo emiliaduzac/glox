@@ -29,6 +29,8 @@ La VM simula el comportamiento de una CPU, y será la encargada de ejecutar nues
 
 Igual que como hacía el intérprete, la VM recorre en un ciclo las instrucciones y las va ejecutando.
 
+Si la vm detecta un error de runtime como puede ser que se recibe un tipo incorrecto, entonces corta y devuelve el error con la linea. Pero como la vm mira con peek antes de sacar del stack, si falla queda basura en el stack. Entonces es por este motivo que cuando el run de la vm falla, invocamos a resetStack() utilizando el defer propio de Go.
+
 ### Diferencias con el libro
 
 1. Instruction Pointer: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
