@@ -22,7 +22,13 @@ func NewVirtualMachine(chunk *c.Chunk) *VirtualMachine {
 	}
 }
 
-func (vm *VirtualMachine) Run() error {
+func (vm *VirtualMachine) Run() (err error) {
+	defer func() {
+		if err != nil {
+			vm.resetStack()
+		}
+	}()
+
 	for vm.ip < len(vm.chunk.Bytes) {
 		b, err := vm.readByte()
 		if err != nil {
@@ -110,6 +116,11 @@ func (vm *VirtualMachine) Run() error {
 		}
 	}
 	return nil
+}
+
+// resetStack descarta todos los valores del stack
+func (vm *VirtualMachine) resetStack() {
+	vm.stack = vm.stack[:0]
 }
 
 // readByte devuelve el byte al que apunta el instruction pointer y lo avanza al siguiente

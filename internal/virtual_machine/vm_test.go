@@ -867,3 +867,40 @@ func TestOpLess(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
 }
+
+func TestRuntimeErrorResetsStack(t *testing.T) {
+	t.Run("Un error en un operador unario vacía el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_FALSE), line)
+		chunk.Write(byte(c.OP_NEGATE), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "operand must be a number")
+		utils.AssertValue(t, len(vm.stack), 0)
+	})
+
+	t.Run("Un error en un operador binario vacía el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, "a")
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_ADD), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "operands must be two numbers or two strings")
+		utils.AssertValue(t, len(vm.stack), 0)
+	})
+
+	t.Run("También se descartan los valores que había debajo de la operación que falla", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 10.0)
+		chunk.Write(byte(c.OP_TRUE), line)
+		chunk.Write(byte(c.OP_NEGATE), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "operand must be a number")
+		utils.AssertValue(t, len(vm.stack), 0)
+	})
+}
