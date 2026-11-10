@@ -29,12 +29,27 @@ func compileSourceError(t *testing.T, source string) error {
 	return err
 }
 
+func compileExpr(t *testing.T, expr string) *c.Chunk {
+	t.Helper()
+	return compileSource(t, "print "+expr+";")
+}
+
+func compileExprError(t *testing.T, expr string) error {
+	t.Helper()
+	return compileSourceError(t, "print "+expr+";")
+}
+
 // assertBytes verifica que los bytes del chunk sean exactamente los esperados.
 func assertBytes(t *testing.T, chunk *c.Chunk, expected ...byte) {
 	t.Helper()
 	if !slices.Equal(chunk.Bytes, expected) {
 		t.Errorf("expected bytes %v, got %v", expected, chunk.Bytes)
 	}
+}
+
+func assertExprBytes(t *testing.T, chunk *c.Chunk, expected ...byte) {
+	t.Helper()
+	assertBytes(t, chunk, slices.Concat(expected, []byte{byte(c.OP_PRINT), byte(c.OP_RETURN)})...)
 }
 
 func TestCompileLiterals(t *testing.T) {
@@ -50,10 +65,10 @@ func TestCompileLiterals(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunk := compileSource(t, test.source)
+			chunk := compileExpr(t, test.source)
 
-			// opcode del literal y se cierra siempre con OP_RETURN
-			assertBytes(t, chunk, byte(test.op), byte(c.OP_RETURN))
+			// opcode del literal y se cierra siempre con OP_PRINT y OP_RETURN
+			assertExprBytes(t, chunk, byte(test.op))
 		})
 	}
 }
@@ -71,10 +86,10 @@ func TestCompileNumbers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunk := compileSource(t, test.source)
+			chunk := compileExpr(t, test.source)
 
-			// NUM -> CONSTANT 0 (el indice del pool), RETURN
-			assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_RETURN))
+			// NUM -> CONSTANT 0 (el indice del pool), PRINT, RETURN
+			assertExprBytes(t, chunk, byte(c.OP_CONSTANT), 0)
 			utils.AssertValue(t, len(chunk.Constants), 1)
 			utils.AssertValue(t, chunk.Constants[0], test.expected)
 		})
@@ -82,32 +97,32 @@ func TestCompileNumbers(t *testing.T) {
 }
 
 func TestCompileStrings(t *testing.T) {
-	chunk := compileSource(t, `"hola"`)
+	chunk := compileExpr(t, `"hola"`)
 
-	assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_RETURN))
+	assertExprBytes(t, chunk, byte(c.OP_CONSTANT), 0)
 	utils.AssertValue(t, len(chunk.Constants), 1)
 	utils.AssertValue(t, chunk.Constants[0], "hola")
 }
 
 func TestCompileUnary(t *testing.T) {
 	t.Run("Negación de un número", func(t *testing.T) {
-		chunk := compileSource(t, "-1")
+		chunk := compileExpr(t, "-1")
 
-		// -1 -> CONSTANT 0 (el indice del 1 en el pool), NEGATE, RETURN
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NEGATE), byte(c.OP_RETURN))
+		// -1 -> CONSTANT 0 (el indice del 1 en el pool), NEGATE, PRINT, RETURN
+		assertExprBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NEGATE))
 		utils.AssertValue(t, chunk.Constants[0], 1.0)
 	})
 
 	t.Run("Not de un booleano", func(t *testing.T) {
-		chunk := compileSource(t, "!true")
+		chunk := compileExpr(t, "!true")
 
-		assertBytes(t, chunk, byte(c.OP_TRUE), byte(c.OP_NOT), byte(c.OP_RETURN))
+		assertExprBytes(t, chunk, byte(c.OP_TRUE), byte(c.OP_NOT))
 	})
 
 	t.Run("Operadores negacion anidados", func(t *testing.T) {
-		chunk := compileSource(t, "--1")
+		chunk := compileExpr(t, "--1")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NEGATE), byte(c.OP_NEGATE), byte(c.OP_RETURN))
+		assertExprBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NEGATE), byte(c.OP_NEGATE))
 	})
 }
 
@@ -126,14 +141,13 @@ func TestCompileBinary(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunk := compileSource(t, test.source)
+			chunk := compileExpr(t, test.source)
 
-			// 1 OP 2 -> CONSTANT 0 (el primer numero), CONSTANT 1 (el 2do), OP, RETURN
-			assertBytes(t, chunk,
+			// 1 OP 2 -> CONSTANT 0 (el primer numero), CONSTANT 1 (el 2do), OP, PRINT, RETURN
+			assertExprBytes(t, chunk,
 				byte(c.OP_CONSTANT), 0,
 				byte(c.OP_CONSTANT), 1,
 				byte(test.op),
-				byte(c.OP_RETURN),
 			)
 			utils.AssertValue(t, len(chunk.Constants), 2)
 			utils.AssertValue(t, chunk.Constants[0], 1.0)
@@ -142,49 +156,46 @@ func TestCompileBinary(t *testing.T) {
 	}
 
 	t.Run("La multiplicación tiene precedencia sobre la suma", func(t *testing.T) {
-		chunk := compileSource(t, "1 + 2 * 3")
+		chunk := compileExpr(t, "1 + 2 * 3")
 
-		// 1 + 2 * 3 -> CONSTANT 0, CONSTANT 1, CONSTANT 2, MULTIPLY, ADD, RETURN
-		assertBytes(t, chunk,
+		// 1 + 2 * 3 -> CONSTANT 0, CONSTANT 1, CONSTANT 2, MULTIPLY, ADD, PRINT, RETURN
+		assertExprBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0,
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_CONSTANT), 2,
 			byte(c.OP_MULTIPLY),
 			byte(c.OP_ADD),
-			byte(c.OP_RETURN),
 		)
 	})
 
 	t.Run("Los operadores del mismo nivel asocian a izquierda", func(t *testing.T) {
-		chunk := compileSource(t, "1 - 2 - 3")
+		chunk := compileExpr(t, "1 - 2 - 3")
 
-		assertBytes(t, chunk,
+		assertExprBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0,
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_SUBTRACT),
 			byte(c.OP_CONSTANT), 2,
 			byte(c.OP_SUBTRACT),
-			byte(c.OP_RETURN),
 		)
 	})
 }
 
 func TestCompileGrouping(t *testing.T) {
 	t.Run("Los paréntesis cambian el orden de evaluación", func(t *testing.T) {
-		chunk := compileSource(t, "(1 + 2) * 3")
+		chunk := compileExpr(t, "(1 + 2) * 3")
 
-		assertBytes(t, chunk,
+		assertExprBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0,
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_ADD),
 			byte(c.OP_CONSTANT), 2,
 			byte(c.OP_MULTIPLY),
-			byte(c.OP_RETURN),
 		)
 	})
 
 	t.Run("Error si falta el paréntesis de cierre", func(t *testing.T) {
-		err := compileSourceError(t, "(1 + 2")
+		err := compileExprError(t, "(1 + 2")
 
 		utils.AssertErrorMessage(t, err, "')' after expression")
 	})
@@ -206,33 +217,31 @@ func TestCompileComparison(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chunk := compileSource(t, test.source)
+			chunk := compileExpr(t, test.source)
 
 			expected := []byte{byte(c.OP_CONSTANT), 0, byte(c.OP_CONSTANT), 1}
 			for _, op := range test.expected {
 				expected = append(expected, byte(op))
 			}
-			expected = append(expected, byte(c.OP_RETURN))
-			assertBytes(t, chunk, expected...)
+			assertExprBytes(t, chunk, expected...)
 		})
 	}
 
 	t.Run("Se puede comparar con nil y booleanos", func(t *testing.T) {
-		chunk := compileSource(t, "nil == false")
+		chunk := compileExpr(t, "nil == false")
 
-		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_FALSE), byte(c.OP_EQUAL), byte(c.OP_RETURN))
+		assertExprBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_FALSE), byte(c.OP_EQUAL))
 	})
 
 	t.Run("La suma tiene precedencia sobre la comparación", func(t *testing.T) {
-		chunk := compileSource(t, "1 + 2 < 3")
+		chunk := compileExpr(t, "1 + 2 < 3")
 
-		assertBytes(t, chunk,
+		assertExprBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0,
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_ADD),
 			byte(c.OP_CONSTANT), 2,
 			byte(c.OP_LESS),
-			byte(c.OP_RETURN),
 		)
 	})
 }
@@ -243,16 +252,42 @@ func TestCompileErrors(t *testing.T) {
 		source        string
 		expectedError string
 	}{
-		{"entrada vacía", "", "expected expression"},
+		{"falta la expresión", "", "expected expression"},
 		{"falta el operando derecho", "1 +", "expected expression"},
-		{"sobra un token", "1 2", "expected end of expression"},
+		{"sobra un token", "1 2", "expected ';' after statement"},
 	}
 
 	for _, test := range tests {
 		t.Run("Error si "+test.name, func(t *testing.T) {
-			err := compileSourceError(t, test.source)
+			err := compileExprError(t, test.source)
 
 			utils.AssertErrorMessage(t, err, test.expectedError)
 		})
 	}
+}
+
+func TestCompileProgram(t *testing.T) {
+	t.Run("Un programa vacío solo tiene OP_RETURN", func(t *testing.T) {
+		chunk := compileSource(t, "")
+
+		assertBytes(t, chunk, byte(c.OP_RETURN))
+	})
+
+	t.Run("Compila varias declaraciones en orden", func(t *testing.T) {
+		chunk := compileSource(t, "print 1; print 2;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el punto y coma", func(t *testing.T) {
+		err := compileSourceError(t, "print 1")
+
+		utils.AssertErrorMessage(t, err, "';' after statement")
+	})
 }

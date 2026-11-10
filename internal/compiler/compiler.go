@@ -20,11 +20,10 @@ func NewCompiler(tokens []token.Token) *Compiler {
 }
 
 func (c *Compiler) Compile() (*chunk.Chunk, error) {
-	if err := c.expression(); err != nil {
-		return nil, err
-	}
-	if err := c.cursor.Consume(token.EOF, "end of expression"); err != nil {
-		return nil, err
+	for !c.cursor.Match(token.EOF) {
+		if err := c.declaration(); err != nil {
+			return nil, err
+		}
 	}
 	c.emitReturn()
 	return c.chunk, nil
@@ -32,6 +31,28 @@ func (c *Compiler) Compile() (*chunk.Chunk, error) {
 
 func (c *Compiler) expression() error {
 	return c.parsePrecedence(PREC_ASSIGNMENT)
+}
+
+func (c *Compiler) declaration() error {
+	return c.statement()
+}
+
+func (c *Compiler) statement() error {
+	if c.cursor.Match(token.PRINT) {
+		return c.printStatement()
+	}
+	return c.cursor.ExpectedError("statement")
+}
+
+func (c *Compiler) printStatement() error {
+	if err := c.expression(); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after statement"); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_PRINT))
+	return nil
 }
 
 // emit escribe uno o más bytes en el chunk, con la línea del último token consumido
