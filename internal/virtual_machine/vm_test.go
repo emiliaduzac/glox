@@ -203,6 +203,30 @@ func TestOpPrint(t *testing.T) {
 	})
 }
 
+func TestOpPop(t *testing.T) {
+	t.Run("Saca solo el valor del tope", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 1.0)
+		writeConstant(chunk, 2.0)
+		chunk.Write(byte(c.OP_POP), line)
+
+		err := vm.Run()
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(vm.stack), 1)
+		utils.AssertValue(t, vm.stack[0], 1.0)
+	})
+
+	t.Run("Error si el stack está vacío", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_POP), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+}
+
 func TestOpNegate(t *testing.T) {
 	tests := []struct {
 		name     string
