@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/scanner"
@@ -274,6 +275,20 @@ func TestCompileErrors(t *testing.T) {
 			utils.AssertErrorMessage(t, err, test.expectedError)
 		})
 	}
+}
+
+func TestCompileConstantLimit(t *testing.T) {
+	t.Run("Un chunk admite hasta 256 constantes", func(t *testing.T) {
+		chunk := compileExpr(t, strings.Repeat("1 + ", 255)+"1")
+
+		utils.AssertValue(t, len(chunk.Constants), 256)
+	})
+
+	t.Run("Error si un chunk tiene más de 256 constantes", func(t *testing.T) {
+		err := compileExprError(t, strings.Repeat("1 + ", 256)+"1")
+
+		utils.AssertErrorMessage(t, err, "too many constants in one chunk")
+	})
 }
 
 func TestCompileProgram(t *testing.T) {

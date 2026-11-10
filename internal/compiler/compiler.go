@@ -100,12 +100,20 @@ func (c *Compiler) emitReturn() {
 }
 
 func (c *Compiler) emitConstant(value any) error {
+	index, err := c.makeConstant(value)
+	if err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_CONSTANT), index)
+	return nil
+}
+
+func (c *Compiler) makeConstant(value any) (byte, error) {
 	index := c.chunk.AddConstant(value)
 	if index > 255 {
-		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too many constants in one chunk")
+		return 0, errors.NewLoxError(c.cursor.GetPreviousLine(), "too many constants in one chunk")
 	}
-	c.emit(byte(chunk.OP_CONSTANT), byte(index))
-	return nil
+	return byte(index), nil
 }
 
 func (c *Compiler) parsePrecedence(precedence Precedence) error {
