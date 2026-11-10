@@ -227,6 +227,49 @@ func TestOpPop(t *testing.T) {
 	})
 }
 
+func TestOpDefineGlobal(t *testing.T) {
+	t.Run("Guarda el valor del tope con el nombre de la variable", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		name := chunk.AddConstant("a")
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_DEFINE_GLOBAL), line)
+		chunk.Write(byte(name), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, vm.globals["a"], 1.0)
+		utils.AssertValue(t, len(vm.stack), 0)
+	})
+
+	t.Run("Redefinir una variable pisa su valor", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		name := chunk.AddConstant("a")
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_DEFINE_GLOBAL), line)
+		chunk.Write(byte(name), line)
+		writeConstant(chunk, 2.0)
+		chunk.Write(byte(c.OP_DEFINE_GLOBAL), line)
+		chunk.Write(byte(name), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, vm.globals["a"], 2.0)
+	})
+
+	t.Run("Error si el stack está vacío", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		name := chunk.AddConstant("a")
+		chunk.Write(byte(c.OP_DEFINE_GLOBAL), line)
+		chunk.Write(byte(name), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+}
+
 func TestOpNegate(t *testing.T) {
 	tests := []struct {
 		name     string

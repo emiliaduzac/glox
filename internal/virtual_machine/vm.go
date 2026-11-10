@@ -11,16 +11,18 @@ import (
 )
 
 type VirtualMachine struct {
-	ip    int
-	stack []any
-	chunk *c.Chunk
-	out   io.Writer
+	ip      int
+	stack   []any
+	chunk   *c.Chunk
+	out     io.Writer
+	globals map[string]any
 }
 
 func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{
-		stack: []any{},
-		out:   os.Stdout,
+		stack:   []any{},
+		out:     os.Stdout,
+		globals: map[string]any{},
 	}
 }
 
@@ -129,6 +131,17 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 				return err
 			}
 
+		case c.OP_DEFINE_GLOBAL:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			value, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			vm.globals[name] = value
+
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
@@ -161,6 +174,18 @@ func (vm *VirtualMachine) readConstant() (any, error) {
 		return nil, errors.NewLoxError(vm.currentLine(), "constant index out of range")
 	}
 	return vm.chunk.Constants[index], nil
+}
+
+func (vm *VirtualMachine) readString() (string, error) {
+	constant, err := vm.readConstant()
+	if err != nil {
+		return "", err
+	}
+	name, ok := constant.(string)
+	if !ok {
+		return "", errors.NewLoxError(vm.currentLine(), "constant is not a string")
+	}
+	return name, nil
 }
 
 // push agrega un elemento al tope del stack
