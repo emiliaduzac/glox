@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"bytes"
 	"math"
 	"testing"
 	c "tp-lox/internal/chunk"
@@ -159,6 +160,47 @@ func TestOpLiterals(t *testing.T) {
 			utils.AssertValue(t, vm.stack[0], test.expected)
 		})
 	}
+}
+
+func TestOpPrint(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    any
+		expected string
+	}{
+		{"número", 1.0, "1\n"},
+		{"string", "hola", "hola\n"},
+		{"booleano", true, "true\n"},
+		{"nil", nil, "nil\n"},
+	}
+
+	for _, test := range tests {
+		t.Run("Imprime "+test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			var out bytes.Buffer
+			vm.out = &out
+			writeConstant(chunk, test.value)
+			chunk.Write(byte(c.OP_PRINT), line)
+
+			err := vm.Run()
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, out.String(), test.expected)
+			utils.AssertValue(t, len(vm.stack), 0)
+		})
+	}
+
+	t.Run("Error si el stack está vacío", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		chunk.Write(byte(c.OP_PRINT), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+		utils.AssertValue(t, out.String(), "")
+	})
 }
 
 func TestOpNegate(t *testing.T) {

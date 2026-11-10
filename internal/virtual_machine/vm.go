@@ -2,7 +2,9 @@ package virtualmachine
 
 import (
 	"fmt"
+	"io"
 	"math"
+	"os"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/utils"
@@ -12,6 +14,7 @@ type VirtualMachine struct {
 	ip    int
 	stack []any
 	chunk *c.Chunk
+	out   io.Writer
 }
 
 func NewVirtualMachine(chunk *c.Chunk) *VirtualMachine {
@@ -19,6 +22,7 @@ func NewVirtualMachine(chunk *c.Chunk) *VirtualMachine {
 		ip:    0,
 		stack: []any{},
 		chunk: chunk,
+		out:   os.Stdout,
 	}
 }
 
@@ -110,6 +114,15 @@ func (vm *VirtualMachine) Run() (err error) {
 				return err
 			}
 			vm.push(!utils.IsTruthy(value))
+
+		case c.OP_PRINT:
+			value, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintln(vm.out, utils.Stringify(value)); err != nil {
+				return err
+			}
 
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
