@@ -17,16 +17,16 @@ type VirtualMachine struct {
 	out   io.Writer
 }
 
-func NewVirtualMachine(chunk *c.Chunk) *VirtualMachine {
+func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{
-		ip:    0,
 		stack: []any{},
-		chunk: chunk,
 		out:   os.Stdout,
 	}
 }
 
-func (vm *VirtualMachine) Run() (err error) {
+func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
+	vm.chunk = chunk
+	vm.ip = 0
 	defer func() {
 		if err != nil {
 			vm.resetStack()
