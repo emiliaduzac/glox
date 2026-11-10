@@ -288,6 +288,7 @@ func TestOpAdd(t *testing.T) {
 		right any
 	}{
 		{"número y string", 1.0, "a"},
+		{"string y número", "a", 1.0},
 		{"número y otro", 1.0, nil},
 	}
 
