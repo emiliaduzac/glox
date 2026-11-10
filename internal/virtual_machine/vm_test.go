@@ -796,6 +796,21 @@ func TestOpEqual(t *testing.T) {
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
 	})
+
+	t.Run("Un string armado en runtime es igual a un literal con el mismo contenido", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, "st")
+		writeConstant(chunk, "ri")
+		chunk.Write(byte(c.OP_ADD), line)
+		writeConstant(chunk, "stri")
+		chunk.Write(byte(c.OP_EQUAL), line)
+
+		err := vm.Run()
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(vm.stack), 1)
+		utils.AssertValue(t, vm.stack[0], true)
+	})
 }
 
 func TestOpLess(t *testing.T) {
