@@ -81,6 +81,14 @@ func TestCompileNumbers(t *testing.T) {
 	}
 }
 
+func TestCompileStrings(t *testing.T) {
+	chunk := compileSource(t, `"hola"`)
+
+	assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_RETURN))
+	utils.AssertValue(t, len(chunk.Constants), 1)
+	utils.AssertValue(t, chunk.Constants[0], "hola")
+}
+
 func TestCompileUnary(t *testing.T) {
 	t.Run("Negación de un número", func(t *testing.T) {
 		chunk := compileSource(t, "-1")

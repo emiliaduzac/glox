@@ -36,6 +36,11 @@ Para compilar expresiones, la función `parsePrecedence(precedence)` recibe una 
 
 Un truco que aplica el libro es no generar instrucciones nuevas para `!=`, `>=` y `<=`, sino aprovechar las existentes y negarlas. Por ejemplo, `a != b` sería `!(a == b)`.
 
+#### Literales
+
+Los números y los strings se compilan de la misma forma, se guarda el valor en el pool de constantes del chunk y se crea un OP_CONSTANT con su índice. Es por esto mismo que en la tabla los números y strings apuntan a la misma funcion value que agarra el valor que el scanner dejó en el token y lo deja como constante.
+Un detalle de diferencia con el libro acá es que para los strings el compilador tiene que sacar las comillas pero para nuestra implementación eso no es necesario porque ya lo hace a eso el scanner. Y otra cosa interesante es que en el libro necesita copiar los caracteres al heap para que el mismo string sea dueño de su memoria, pero nosotros en glox no hacemos eso porque en go los strings son inmutables asi que se pueden compartir sin copiarlos. 
+
 #### Asociatividad
 
 A diferencia de la precedencia, la asociatividad no está en la tabla, sino que sale de cómo cada función compila sus operandos.
