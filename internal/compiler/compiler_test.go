@@ -362,3 +362,25 @@ func TestCompileErrorSynchronization(t *testing.T) {
 		utils.AssertValue(t, chunk == nil, true)
 	})
 }
+
+func TestCompileVarDeclaration(t *testing.T) {
+	t.Run("Una variable sin inicializador vale nil", func(t *testing.T) {
+		chunk := compileSource(t, "var a;")
+
+		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_RETURN))
+		utils.AssertValue(t, len(chunk.Constants), 1)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+	})
+
+	t.Run("Error si falta el nombre de la variable", func(t *testing.T) {
+		err := compileSourceError(t, "var 1;")
+
+		utils.AssertErrorMessage(t, err, "identifier after 'var'")
+	})
+
+	t.Run("Error si falta el punto y coma", func(t *testing.T) {
+		err := compileSourceError(t, "var a")
+
+		utils.AssertErrorMessage(t, err, "';' after variable declaration")
+	})
+}

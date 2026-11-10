@@ -39,11 +39,44 @@ func (c *Compiler) expression() error {
 }
 
 func (c *Compiler) declaration() error {
-	err := c.statement()
+	var err error
+	if c.cursor.Match(token.VAR) {
+		err = c.varDeclaration()
+	} else {
+		err = c.statement()
+	}
 	if err != nil {
 		c.synchronize()
 	}
 	return err
+}
+
+func (c *Compiler) varDeclaration() error {
+	global, err := c.parseVariable("identifier after 'var'")
+	if err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_NIL))
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after variable declaration"); err != nil {
+		return err
+	}
+	c.defineVariable(global)
+	return nil
+}
+
+func (c *Compiler) parseVariable(expected string) (byte, error) {
+	if err := c.cursor.Consume(token.IDENTIFIER, expected); err != nil {
+		return 0, err
+	}
+	return c.identifierConstant(c.cursor.Previous())
+}
+
+func (c *Compiler) identifierConstant(name token.Token) (byte, error) {
+	return c.makeConstant(name.Lexeme)
+}
+
+func (c *Compiler) defineVariable(global byte) {
+	c.emit(byte(chunk.OP_DEFINE_GLOBAL), global)
 }
 
 func (c *Compiler) synchronize() {
