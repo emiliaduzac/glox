@@ -19,6 +19,7 @@ const (
 	ParsingMode
 	ResolveMode
 	FullMode
+	VMMode
 )
 
 // manejo gracefull de SIGINT (Ctrl+C)
