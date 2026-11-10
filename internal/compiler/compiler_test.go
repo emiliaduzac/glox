@@ -39,6 +39,16 @@ func compileExprError(t *testing.T, expr string) error {
 	return compileSourceError(t, "print "+expr+";")
 }
 
+func compileErrors(t *testing.T, source string) []error {
+	t.Helper()
+	err := compileSourceError(t, source)
+	joined, ok := err.(interface{ Unwrap() []error })
+	if !ok {
+		t.Fatalf("expected a list of errors, got %v", err)
+	}
+	return joined.Unwrap()
+}
+
 // assertBytes verifica que los bytes del chunk sean exactamente los esperados.
 func assertBytes(t *testing.T, chunk *c.Chunk, expected ...byte) {
 	t.Helper()
@@ -301,5 +311,39 @@ func TestCompileProgram(t *testing.T) {
 		err := compileSourceError(t, "1 + 2")
 
 		utils.AssertErrorMessage(t, err, "';' after statement")
+	})
+}
+
+func TestCompileErrorSynchronization(t *testing.T) {
+	t.Run("Levanta un error por cada statement que falla", func(t *testing.T) {
+		errs := compileErrors(t, "print 1 +;\nprint 2 +;")
+
+		utils.AssertValue(t, len(errs), 2)
+		utils.AssertErrorMessage(t, errs[0], "[line 1] Error: expected expression")
+		utils.AssertErrorMessage(t, errs[1], "[line 2] Error: expected expression")
+	})
+
+	t.Run("Sincroniza en una palabra clave aunque falte el punto y coma", func(t *testing.T) {
+		errs := compileErrors(t, "print 1 2 3 print 4 +;")
+
+		utils.AssertValue(t, len(errs), 2)
+		utils.AssertErrorMessage(t, errs[0], "';' after statement")
+		utils.AssertErrorMessage(t, errs[1], "expected expression")
+	})
+
+	t.Run("Saltea los tokens que sobran hasta el punto y coma sin generar errores en cascada", func(t *testing.T) {
+		errs := compileErrors(t, "print 1 2 3;\nprint 4;")
+
+		utils.AssertValue(t, len(errs), 1)
+	})
+
+	t.Run("Un programa con errores no se compila aunque tenga statements válidos", func(t *testing.T) {
+		tokens, err := scanner.NewScanner("print 1 +; print 2;").Scan()
+		utils.AssertNoError(t, err)
+
+		chunk, err := NewCompiler(tokens).Compile()
+
+		utils.AssertError(t, err)
+		utils.AssertValue(t, chunk == nil, true)
 	})
 }

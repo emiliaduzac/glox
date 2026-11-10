@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	stderrors "errors"
 	"tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/token"
@@ -20,10 +21,14 @@ func NewCompiler(tokens []token.Token) *Compiler {
 }
 
 func (c *Compiler) Compile() (*chunk.Chunk, error) {
+	var errs []error
 	for !c.cursor.Match(token.EOF) {
 		if err := c.declaration(); err != nil {
-			return nil, err
+			errs = append(errs, err)
 		}
+	}
+	if len(errs) > 0 {
+		return nil, stderrors.Join(errs...)
 	}
 	c.emitReturn()
 	return c.chunk, nil
@@ -34,7 +39,24 @@ func (c *Compiler) expression() error {
 }
 
 func (c *Compiler) declaration() error {
-	return c.statement()
+	err := c.statement()
+	if err != nil {
+		c.synchronize()
+	}
+	return err
+}
+
+func (c *Compiler) synchronize() {
+	for !c.cursor.IsAtEnd() {
+		if c.cursor.GetPreviousType() == token.SEMICOLON {
+			return
+		}
+		switch c.cursor.Current().TokenType {
+		case token.CLASS, token.FUN, token.VAR, token.FOR, token.IF, token.WHILE, token.PRINT, token.RETURN:
+			return
+		}
+		c.cursor.Advance()
+	}
 }
 
 func (c *Compiler) statement() error {
@@ -89,7 +111,9 @@ func (c *Compiler) emitConstant(value any) error {
 func (c *Compiler) parsePrecedence(precedence Precedence) error {
 	prefix := getRule(c.cursor.Current().TokenType).prefix
 	if prefix == nil {
-		return c.cursor.ExpectedError("expression")
+		err := c.cursor.ExpectedError("expression")
+		c.cursor.Advance()
+		return err
 	}
 	c.cursor.Advance()
 	if err := prefix(c); err != nil {
