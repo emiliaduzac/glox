@@ -285,8 +285,20 @@ func TestCompileProgram(t *testing.T) {
 		)
 	})
 
-	t.Run("Error si falta el punto y coma", func(t *testing.T) {
+	t.Run("Error si falta el punto y coma después de un print", func(t *testing.T) {
 		err := compileSourceError(t, "print 1")
+
+		utils.AssertErrorMessage(t, err, "';' after statement")
+	})
+
+	t.Run("Una expresión como statement se descarta con OP_POP", func(t *testing.T) {
+		chunk := compileSource(t, "1;")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_RETURN))
+	})
+
+	t.Run("Error si falta el punto y coma en una expresión", func(t *testing.T) {
+		err := compileSourceError(t, "1 + 2")
 
 		utils.AssertErrorMessage(t, err, "';' after statement")
 	})

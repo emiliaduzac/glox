@@ -41,7 +41,7 @@ func (c *Compiler) statement() error {
 	if c.cursor.Match(token.PRINT) {
 		return c.printStatement()
 	}
-	return c.cursor.ExpectedError("statement")
+	return c.expressionStatement()
 }
 
 func (c *Compiler) printStatement() error {
@@ -52,6 +52,17 @@ func (c *Compiler) printStatement() error {
 		return err
 	}
 	c.emit(byte(chunk.OP_PRINT))
+	return nil
+}
+
+func (c *Compiler) expressionStatement() error {
+	if err := c.expression(); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after statement"); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
 	return nil
 }
 
