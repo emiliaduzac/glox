@@ -56,7 +56,13 @@ func (c *Compiler) varDeclaration() error {
 	if err != nil {
 		return err
 	}
-	c.emit(byte(chunk.OP_NIL))
+	if c.cursor.Match(token.EQUAL) {
+		if err := c.expression(); err != nil {
+			return err
+		}
+	} else {
+		c.emit(byte(chunk.OP_NIL))
+	}
 	if err := c.cursor.Consume(token.SEMICOLON, "';' after variable declaration"); err != nil {
 		return err
 	}
