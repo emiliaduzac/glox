@@ -1091,4 +1091,29 @@ func TestRunChunks(t *testing.T) {
 
 		utils.AssertValue(t, out.String(), "1\n2\n")
 	})
+
+	t.Run("Una variable definida en una ejecución se puede leer en la siguiente", func(t *testing.T) {
+		vm := NewVirtualMachine()
+		var out bytes.Buffer
+		vm.out = &out
+
+		define := c.NewChunk()
+		name := define.AddConstant("a")
+		writeConstant(define, 1.0)
+		define.Write(byte(c.OP_DEFINE_GLOBAL), line)
+		define.Write(byte(name), line)
+		define.Write(byte(c.OP_RETURN), line)
+
+		read := c.NewChunk()
+		name = read.AddConstant("a")
+		read.Write(byte(c.OP_GET_GLOBAL), line)
+		read.Write(byte(name), line)
+		read.Write(byte(c.OP_PRINT), line)
+		read.Write(byte(c.OP_RETURN), line)
+
+		utils.AssertNoError(t, vm.Run(define))
+		utils.AssertNoError(t, vm.Run(read))
+
+		utils.AssertValue(t, out.String(), "1\n")
+	})
 }
