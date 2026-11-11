@@ -163,14 +163,15 @@ func (c *Compiler) parsePrecedence(precedence Precedence) error {
 		return err
 	}
 	c.cursor.Advance()
-	if err := prefix(c); err != nil {
+	canAssign := precedence <= PREC_ASSIGNMENT
+	if err := prefix(c, canAssign); err != nil {
 		return err
 	}
 
 	for precedence <= getRule(c.cursor.Current().TokenType).precedence {
 		tok := c.cursor.Advance()
 		infix := getRule(tok.TokenType).infix
-		if err := infix(c); err != nil {
+		if err := infix(c, canAssign); err != nil {
 			return err
 		}
 	}
@@ -178,12 +179,12 @@ func (c *Compiler) parsePrecedence(precedence Precedence) error {
 	return nil
 }
 
-func (c *Compiler) value() error {
+func (c *Compiler) value(_ bool) error {
 	value := c.cursor.Previous().Literal
 	return c.emitConstant(value)
 }
 
-func (c *Compiler) grouping() error {
+func (c *Compiler) grouping(_ bool) error {
 	if err := c.expression(); err != nil {
 		return err
 	}
@@ -193,7 +194,7 @@ func (c *Compiler) grouping() error {
 	return nil
 }
 
-func (c *Compiler) unary() error {
+func (c *Compiler) unary(_ bool) error {
 	operatorType := c.cursor.GetPreviousType()
 	if err := c.parsePrecedence(PREC_UNARY); err != nil {
 		return err
@@ -210,7 +211,7 @@ func (c *Compiler) unary() error {
 	return nil
 }
 
-func (c *Compiler) binary() error {
+func (c *Compiler) binary(_ bool) error {
 	operatorType := c.cursor.GetPreviousType()
 	rule := getRule(operatorType)
 	if err := c.parsePrecedence(rule.precedence + 1); err != nil {
@@ -250,7 +251,7 @@ func (c *Compiler) binary() error {
 	return nil
 }
 
-func (c *Compiler) literal() error {
+func (c *Compiler) literal(_ bool) error {
 	operatorType := c.cursor.GetPreviousType()
 
 	switch operatorType {
@@ -282,14 +283,14 @@ func (c *Compiler) namedVariable(name token.Token) error {
 	return nil
 }
 
-func (c *Compiler) variable() error {
+func (c *Compiler) variable(_ bool) error {
 	return c.namedVariable(c.cursor.Previous())
 }
 
 // TO DO:
-func (c *Compiler) logicAnd() error {
+func (c *Compiler) logicAnd(_ bool) error {
 	return nil
 }
-func (c *Compiler) logicOr() error {
+func (c *Compiler) logicOr(_ bool) error {
 	return nil
 }

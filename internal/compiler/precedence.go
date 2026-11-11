@@ -18,7 +18,7 @@ const (
 	PREC_PRIMARY
 )
 
-type parseFn func(c *Compiler) error
+type parseFn func(c *Compiler, canAssign bool) error
 
 type parseRule struct {
 	prefix     parseFn    // si el token EMPIEZA una expresión
