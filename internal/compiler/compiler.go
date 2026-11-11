@@ -176,6 +176,9 @@ func (c *Compiler) parsePrecedence(precedence Precedence) error {
 		}
 	}
 
+	if canAssign && c.cursor.Match(token.EQUAL) {
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "invalid assignment target")
+	}
 	return nil
 }
 
@@ -267,12 +270,12 @@ func (c *Compiler) literal(_ bool) error {
 	return nil
 }
 
-func (c *Compiler) namedVariable(name token.Token) error {
+func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
 	arg, err := c.identifierConstant(name)
 	if err != nil {
 		return err
 	}
-	if c.cursor.Match(token.EQUAL) {
+	if canAssign && c.cursor.Match(token.EQUAL) {
 		if err := c.expression(); err != nil {
 			return err
 		}
@@ -283,8 +286,8 @@ func (c *Compiler) namedVariable(name token.Token) error {
 	return nil
 }
 
-func (c *Compiler) variable(_ bool) error {
-	return c.namedVariable(c.cursor.Previous())
+func (c *Compiler) variable(canAssign bool) error {
+	return c.namedVariable(c.cursor.Previous(), canAssign)
 }
 
 // TO DO:

@@ -439,4 +439,36 @@ func TestCompileAssignment(t *testing.T) {
 
 		utils.AssertErrorMessage(t, err, "expected expression")
 	})
+
+	t.Run("Una variable dentro del valor asignado se lee", func(t *testing.T) {
+		chunk := compileSource(t, `saludo = "hola " + Lionel;`)
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_GET_GLOBAL), 2,
+			byte(c.OP_ADD),
+			byte(c.OP_SET_GLOBAL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[0], "saludo")
+		utils.AssertValue(t, chunk.Constants[2], "Lionel")
+	})
+
+	invalidTargets := []struct {
+		name   string
+		source string
+	}{
+		{"una variable dentro de un operador binario", "a * b = c + d;"},
+		{"una variable dentro de un operador unario", "-a = 1;"},
+		{"algo que no es una variable", "1 = 2;"},
+	}
+
+	for _, test := range invalidTargets {
+		t.Run("Error si se asigna a "+test.name, func(t *testing.T) {
+			err := compileSourceError(t, test.source)
+
+			utils.AssertErrorMessage(t, err, "invalid assignment target")
+		})
+	}
 }
