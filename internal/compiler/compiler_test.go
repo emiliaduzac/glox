@@ -393,3 +393,13 @@ func TestCompileVarDeclaration(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "';' after variable declaration")
 	})
 }
+
+func TestCompileVariableRead(t *testing.T) {
+	t.Run("Leer una variable se compila a OP_GET_GLOBAL con su nombre", func(t *testing.T) {
+		chunk := compileSource(t, "print a;")
+
+		assertBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+		utils.AssertValue(t, len(chunk.Constants), 1)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+	})
+}

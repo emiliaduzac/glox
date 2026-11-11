@@ -266,13 +266,23 @@ func (c *Compiler) literal() error {
 	return nil
 }
 
+func (c *Compiler) namedVariable(name token.Token) error {
+	arg, err := c.identifierConstant(name)
+	if err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_GET_GLOBAL), arg)
+	return nil
+}
+
+func (c *Compiler) variable() error {
+	return c.namedVariable(c.cursor.Previous())
+}
+
 // TO DO:
 func (c *Compiler) logicAnd() error {
 	return nil
 }
 func (c *Compiler) logicOr() error {
-	return nil
-}
-func (c *Compiler) variable() error {
 	return nil
 }
