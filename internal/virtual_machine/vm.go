@@ -153,6 +153,20 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			}
 			vm.push(value)
 
+		case c.OP_SET_GLOBAL:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			if _, ok := vm.globals[name]; !ok {
+				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined variable '%s'", name))
+			}
+			value, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			vm.globals[name] = value
+
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}

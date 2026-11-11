@@ -311,6 +311,38 @@ func TestOpGetGlobal(t *testing.T) {
 	})
 }
 
+func TestOpSetGlobal(t *testing.T) {
+	t.Run("Asignar cambia el valor de la variable y lo deja en el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		vm.globals["a"] = 1.0
+		name := chunk.AddConstant("a")
+		writeConstant(chunk, 2.0)
+		chunk.Write(byte(c.OP_SET_GLOBAL), line)
+		chunk.Write(byte(name), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, vm.globals["a"], 2.0)
+		utils.AssertValue(t, len(vm.stack), 1)
+		utils.AssertValue(t, vm.stack[0], 2.0)
+	})
+
+	t.Run("Error si la variable no está definida y no se crea", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		name := chunk.AddConstant("a")
+		writeConstant(chunk, 2.0)
+		chunk.Write(byte(c.OP_SET_GLOBAL), line)
+		chunk.Write(byte(name), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertErrorMessage(t, err, "undefined variable 'a'")
+		_, defined := vm.globals["a"]
+		utils.AssertValue(t, defined, false)
+	})
+}
+
 func TestOpNegate(t *testing.T) {
 	tests := []struct {
 		name     string
