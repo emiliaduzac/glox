@@ -270,6 +270,47 @@ func TestOpDefineGlobal(t *testing.T) {
 	})
 }
 
+func TestOpGetGlobal(t *testing.T) {
+	t.Run("Apila el valor de la variable", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		vm.globals["a"] = 1.0
+		name := chunk.AddConstant("a")
+		chunk.Write(byte(c.OP_GET_GLOBAL), line)
+		chunk.Write(byte(name), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(vm.stack), 1)
+		utils.AssertValue(t, vm.stack[0], 1.0)
+	})
+
+	t.Run("Una variable declarada sin valor se puede leer y vale nil", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		vm.globals["a"] = nil
+		name := chunk.AddConstant("a")
+		chunk.Write(byte(c.OP_GET_GLOBAL), line)
+		chunk.Write(byte(name), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(vm.stack), 1)
+		utils.AssertValue(t, vm.stack[0], nil)
+	})
+
+	t.Run("Error si la variable no está definida", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		name := chunk.AddConstant("a")
+		chunk.Write(byte(c.OP_GET_GLOBAL), line)
+		chunk.Write(byte(name), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertErrorMessage(t, err, "undefined variable 'a'")
+	})
+}
+
 func TestOpNegate(t *testing.T) {
 	tests := []struct {
 		name     string
