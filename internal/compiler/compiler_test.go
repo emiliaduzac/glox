@@ -403,3 +403,40 @@ func TestCompileVariableRead(t *testing.T) {
 		utils.AssertValue(t, chunk.Constants[0], "a")
 	})
 }
+
+func TestCompileAssignment(t *testing.T) {
+	t.Run("Asignar una variable se compila a OP_SET_GLOBAL con su nombre", func(t *testing.T) {
+		chunk := compileSource(t, "a = 1;")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_SET_GLOBAL), 0, byte(c.OP_POP), byte(c.OP_RETURN))
+		utils.AssertValue(t, len(chunk.Constants), 2)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+		utils.AssertValue(t, chunk.Constants[1], 1.0)
+	})
+
+	t.Run("Una asignación es una expresión y su valor se puede usar", func(t *testing.T) {
+		chunk := compileSource(t, "print a = 2;")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_SET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+	})
+
+	t.Run("La asignación asocia a derecha", func(t *testing.T) {
+		chunk := compileSource(t, "a = b = 1;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_SET_GLOBAL), 1,
+			byte(c.OP_SET_GLOBAL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+		utils.AssertValue(t, chunk.Constants[1], "b")
+	})
+
+	t.Run("Error si falta el valor a asignar", func(t *testing.T) {
+		err := compileSourceError(t, "a = ;")
+
+		utils.AssertErrorMessage(t, err, "expected expression")
+	})
+}

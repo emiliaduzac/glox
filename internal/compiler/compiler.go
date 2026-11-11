@@ -271,7 +271,14 @@ func (c *Compiler) namedVariable(name token.Token) error {
 	if err != nil {
 		return err
 	}
-	c.emit(byte(chunk.OP_GET_GLOBAL), arg)
+	if c.cursor.Match(token.EQUAL) {
+		if err := c.expression(); err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_SET_GLOBAL), arg)
+	} else {
+		c.emit(byte(chunk.OP_GET_GLOBAL), arg)
+	}
 	return nil
 }
 
