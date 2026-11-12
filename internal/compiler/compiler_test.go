@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -50,7 +51,7 @@ func compileErrors(t *testing.T, source string) []error {
 	return joined.Unwrap()
 }
 
-// assertBytes verifica que los bytes del chunk sean exactamente los esperados.
+// assertBytes verifica que los bytes del chunk sean exactamente los esperados
 func assertBytes(t *testing.T, chunk *c.Chunk, expected ...byte) {
 	t.Helper()
 	if !slices.Equal(chunk.Bytes, expected) {
@@ -363,8 +364,8 @@ func TestCompileErrorSynchronization(t *testing.T) {
 	})
 }
 
-func TestCompileVarDeclaration(t *testing.T) {
-	t.Run("Una variable declarada sin valor vale nil", func(t *testing.T) {
+func TestCompileGlobalVarDeclaration(t *testing.T) {
+	t.Run("Una variable global declarada sin valor vale nil", func(t *testing.T) {
 		chunk := compileSource(t, "var a;")
 
 		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_RETURN))
@@ -372,7 +373,7 @@ func TestCompileVarDeclaration(t *testing.T) {
 		utils.AssertValue(t, chunk.Constants[0], "a")
 	})
 
-	t.Run("Una variable declarada con un valor guarda ese valor", func(t *testing.T) {
+	t.Run("Una variable global declarada con un valor guarda ese valor", func(t *testing.T) {
 		chunk := compileSource(t, "var a = 1;")
 
 		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_RETURN))
@@ -381,7 +382,7 @@ func TestCompileVarDeclaration(t *testing.T) {
 		utils.AssertValue(t, chunk.Constants[1], 1.0)
 	})
 
-	t.Run("Error si falta el nombre de la variable", func(t *testing.T) {
+	t.Run("Error si falta el nombre de la variable global", func(t *testing.T) {
 		err := compileSourceError(t, "var 1;")
 
 		utils.AssertErrorMessage(t, err, "identifier after 'var'")
@@ -394,8 +395,8 @@ func TestCompileVarDeclaration(t *testing.T) {
 	})
 }
 
-func TestCompileVariableRead(t *testing.T) {
-	t.Run("Leer una variable se compila a OP_GET_GLOBAL con su nombre", func(t *testing.T) {
+func TestCompileGlobalVariableRead(t *testing.T) {
+	t.Run("Leer una variable global se compila a OP_GET_GLOBAL con su nombre", func(t *testing.T) {
 		chunk := compileSource(t, "print a;")
 
 		assertBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
@@ -404,8 +405,8 @@ func TestCompileVariableRead(t *testing.T) {
 	})
 }
 
-func TestCompileAssignment(t *testing.T) {
-	t.Run("Asignar una variable se compila a OP_SET_GLOBAL con su nombre", func(t *testing.T) {
+func TestCompileGlobalAssignment(t *testing.T) {
+	t.Run("Asignar una variable global se compila a OP_SET_GLOBAL con su nombre", func(t *testing.T) {
 		chunk := compileSource(t, "a = 1;")
 
 		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_SET_GLOBAL), 0, byte(c.OP_POP), byte(c.OP_RETURN))
@@ -488,5 +489,194 @@ func TestCompileBlock(t *testing.T) {
 		err := compileSourceError(t, "var a = 1; { print a; ")
 
 		utils.AssertErrorMessage(t, err, "'}' after block")
+	})
+}
+
+func TestCompileLocalVarDeclaration(t *testing.T) {
+	t.Run("Declarar una variable local no emite una instrucción especial", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a = 1; }")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_RETURN)) // el pop es por el cierre del scope
+		utils.AssertValue(t, len(chunk.Constants), 1)
+		utils.AssertValue(t, chunk.Constants[0], 1.0)
+	})
+
+	t.Run("Declarar una variable local sin valor es nil", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a; }")
+
+		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_POP), byte(c.OP_RETURN))
+		utils.AssertValue(t, len(chunk.Constants), 0)
+	})
+
+	t.Run("Error si falta el nombre de la variable local", func(t *testing.T) {
+		err := compileSourceError(t, "{ var 1; }")
+
+		utils.AssertErrorMessage(t, err, "identifier after 'var'")
+	})
+
+	t.Run("Error si falta el punto y coma", func(t *testing.T) {
+		err := compileSourceError(t, "{ var a }")
+
+		utils.AssertErrorMessage(t, err, "';' after variable declaration")
+	})
+
+	t.Run("Error si se redeclara la misma variable local", func(t *testing.T) {
+		err := compileSourceError(t, "{ var a = 1; var a = 2; }")
+
+		utils.AssertErrorMessage(t, err, "already a variable with this name in this scope")
+	})
+}
+
+func TestCompileLocalLimit(t *testing.T) {
+	localsSource := func(n int) string {
+		var sb strings.Builder
+		sb.WriteString("{ ")
+		for i := 0; i < n; i++ {
+			fmt.Fprintf(&sb, "var a%d; ", i)
+		}
+		sb.WriteString("}")
+		return sb.String()
+	}
+
+	t.Run("Un scope admite hasta 256 variables locales", func(t *testing.T) {
+		chunk := compileSource(t, localsSource(256))
+
+		utils.AssertValue(t, len(chunk.Constants), 0)
+	})
+
+	t.Run("Error si un scope tiene más de 256 variables locales", func(t *testing.T) {
+		err := compileSourceError(t, localsSource(257))
+
+		utils.AssertErrorMessage(t, err, "too many local variables in scope")
+	})
+}
+
+func TestCompileLocalVariableRead(t *testing.T) {
+	t.Run("Leer una variable local se compila a OP_GET_LOCAL con su indice, no con su nombre", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a = 1; print a; }")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_GET_LOCAL), 0, byte(c.OP_PRINT), byte(c.OP_POP), byte(c.OP_RETURN))
+		utils.AssertValue(t, len(chunk.Constants), 1)
+		utils.AssertValue(t, chunk.Constants[0], 1.0)
+	})
+
+	t.Run("Usa el indice que corresponde a cada variable", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a = 1; var b = 2; print b; print a; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0, // a: indice 0
+			byte(c.OP_CONSTANT), 1, // b: indice 1
+			byte(c.OP_GET_LOCAL), 1, // print b
+			byte(c.OP_PRINT),
+			byte(c.OP_GET_LOCAL), 0, // print a
+			byte(c.OP_PRINT),
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Una variable local de un bloque interno oculta a la de afuera (shadowing)", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a = 1; { var a = 2; print a; } print a; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0, // a externa, indice 0
+			byte(c.OP_CONSTANT), 1, // a interna, indice 1
+			byte(c.OP_GET_LOCAL), 1, // print a: lee la interna
+			byte(c.OP_PRINT),
+			byte(c.OP_POP),
+			byte(c.OP_GET_LOCAL), 0, // print a fuera del bloque interno: lee la externa
+			byte(c.OP_PRINT),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+}
+
+func TestCompileLocalAssignment(t *testing.T) {
+	t.Run("Asignar una variable local se compila a OP_SET_LOCAL con su indice", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a = 1; a = 2; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0, // el 1
+			byte(c.OP_CONSTANT), 1, // el 2
+			byte(c.OP_SET_LOCAL), 0, // a esta en la posicion 0 de locals
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, len(chunk.Constants), 2) // en las constantes van los valores, no el nombre
+	})
+
+	t.Run("Una asignación a una local es una expresión y su valor se puede usar", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a = 1; print a = 2; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_SET_LOCAL), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("La asignación entre locales asocia a derecha", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a; var b; a = b = 1; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_NIL),
+			byte(c.OP_NIL),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_SET_LOCAL), 1,
+			byte(c.OP_SET_LOCAL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Una local dentro del valor asignado se lee", func(t *testing.T) {
+		chunk := compileSource(t, "{ var a = 1; a = a + 1; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_ADD),
+			byte(c.OP_SET_LOCAL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+}
+
+func TestCompileLocalAndGlobalVariables(t *testing.T) {
+	t.Run("Distingue variables globales y locales", func(t *testing.T) {
+		chunk := compileSource(t, "var x = 1; { var y = 2; print x; print y; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_GET_GLOBAL), 3,
+			byte(c.OP_PRINT),
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Al terminar no quedan locales ni scopes abiertos", func(t *testing.T) {
+		tokens, _ := scanner.NewScanner("{ var a = 1; print 1 +; } print 2;").Scan()
+		compiler := NewCompiler(tokens)
+		_, err := compiler.Compile()
+
+		utils.AssertError(t, err)
+		utils.AssertValue(t, len(compiler.locals), 0)
+		utils.AssertValue(t, compiler.scopeDepth, 0)
 	})
 }

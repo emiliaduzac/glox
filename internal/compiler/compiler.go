@@ -342,19 +342,41 @@ func (c *Compiler) literal(_ bool) error {
 }
 
 func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
-	arg, err := c.identifierConstant(name)
-	if err != nil {
-		return err
+	var getOp, setOp chunk.OpCode
+	var arg byte
+
+	localIndex := c.resolveLocal(name)
+	if localIndex != -1 {
+		getOp, setOp = chunk.OP_GET_LOCAL, chunk.OP_SET_LOCAL
+		arg = byte(localIndex)
+	} else {
+		var err error
+		arg, err = c.identifierConstant(name)
+		if err != nil {
+			return err
+		}
+		getOp, setOp = chunk.OP_GET_GLOBAL, chunk.OP_SET_GLOBAL
 	}
+
 	if canAssign && c.cursor.Match(token.EQUAL) {
 		if err := c.expression(); err != nil {
 			return err
 		}
-		c.emit(byte(chunk.OP_SET_GLOBAL), arg)
+		c.emit(byte(setOp), arg)
 	} else {
-		c.emit(byte(chunk.OP_GET_GLOBAL), arg)
+		c.emit(byte(getOp), arg)
 	}
 	return nil
+}
+
+func (c *Compiler) resolveLocal(name token.Token) int {
+	for i := len(c.locals) - 1; i >= 0; i-- {
+		local := c.locals[i]
+		if name.Lexeme == local.Name.Lexeme {
+			return i
+		}
+	}
+	return -1
 }
 
 func (c *Compiler) variable(canAssign bool) error {
