@@ -95,8 +95,9 @@ Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de hab
 ## To Do List
 
 - [X] Chunk y VM
-- [ ] Compilador base
-- [ ] Expresiones, statements, variables globales y variables locales
+- [X] Compilador base, expresiones
+- [ ] statements, variables globales 
+- [X] bloques y variables locales
 - [ ] Control de flujo
 - [ ] Funciones y closures
 - [ ] Clases y herencia

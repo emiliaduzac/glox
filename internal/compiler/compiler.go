@@ -7,6 +7,11 @@ import (
 	"tp-lox/internal/token"
 )
 
+type Local struct {
+	Name  token.Token
+	Depth int
+}
+
 type Compiler struct {
 	cursor     *token.TokenCursor
 	chunk      *chunk.Chunk
@@ -93,6 +98,7 @@ func (c *Compiler) identifierConstant(name token.Token) (byte, error) {
 
 func (c *Compiler) defineVariable(global byte) {
 	if c.scopeDepth > 0 {
+		c.markInitialized()
 		return
 	}
 	c.emit(byte(chunk.OP_DEFINE_GLOBAL), global)
@@ -120,9 +126,13 @@ func (c *Compiler) addLocal(name token.Token) error {
 	if len(c.locals) == 256 {
 		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope")
 	}
-	local := Local{Name: name, Depth: c.scopeDepth}
+	local := Local{Name: name, Depth: -1} // no inicializada
 	c.locals = append(c.locals, local)
 	return nil
+}
+
+func (c *Compiler) markInitialized() {
+	c.locals[len(c.locals)-1].Depth = c.scopeDepth
 }
 
 func (c *Compiler) synchronize() {
@@ -345,7 +355,10 @@ func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
 	var getOp, setOp chunk.OpCode
 	var arg byte
 
-	localIndex := c.resolveLocal(name)
+	localIndex, err := c.resolveLocal(name)
+	if err != nil {
+		return err
+	}
 	if localIndex != -1 {
 		getOp, setOp = chunk.OP_GET_LOCAL, chunk.OP_SET_LOCAL
 		arg = byte(localIndex)
@@ -369,14 +382,17 @@ func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
 	return nil
 }
 
-func (c *Compiler) resolveLocal(name token.Token) int {
+func (c *Compiler) resolveLocal(name token.Token) (int, error) {
 	for i := len(c.locals) - 1; i >= 0; i-- {
 		local := c.locals[i]
 		if name.Lexeme == local.Name.Lexeme {
-			return i
+			if local.Depth == -1 {
+				return 0, errors.NewLoxError(c.cursor.GetPreviousLine(), "can't read local variable in its own initializer")
+			}
+			return i, nil
 		}
 	}
-	return -1
+	return -1, nil
 }
 
 func (c *Compiler) variable(canAssign bool) error {

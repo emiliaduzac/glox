@@ -591,6 +591,11 @@ func TestCompileLocalVariableRead(t *testing.T) {
 			byte(c.OP_RETURN),
 		)
 	})
+
+	t.Run("Error si se lee una variable local en su propio inicializador", func(t *testing.T) {
+		err := compileSourceError(t, `{ var a = "outer"; { var a = a; } }`)
+		utils.AssertErrorMessage(t, err, "can't read local variable in its own initializer")
+	})
 }
 
 func TestCompileLocalAssignment(t *testing.T) {
