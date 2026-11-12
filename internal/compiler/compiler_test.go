@@ -472,3 +472,21 @@ func TestCompileAssignment(t *testing.T) {
 		})
 	}
 }
+
+func TestCompileBlock(t *testing.T) {
+	t.Run("Los bloques se compilan correctamente", func(t *testing.T) {
+		chunk := compileSource(t, "var a = 1; { print a; }")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_GET_GLOBAL), 2, byte(c.OP_PRINT), byte(c.OP_RETURN))
+		utils.AssertValue(t, len(chunk.Constants), 3)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+		utils.AssertValue(t, chunk.Constants[1], 1.0)
+		utils.AssertValue(t, chunk.Constants[2], "a")
+	})
+
+	t.Run("Error si el bloque no se cierra", func(t *testing.T) {
+		err := compileSourceError(t, "var a = 1; { print a; ")
+
+		utils.AssertErrorMessage(t, err, "'}' after block")
+	})
+}

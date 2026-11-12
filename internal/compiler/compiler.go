@@ -8,15 +8,19 @@ import (
 )
 
 type Compiler struct {
-	cursor *token.TokenCursor
-	chunk  *chunk.Chunk
+	cursor     *token.TokenCursor
+	chunk      *chunk.Chunk
+	locals     []Local
+	scopeDepth int
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
 func NewCompiler(tokens []token.Token) *Compiler {
 	return &Compiler{
-		cursor: token.NewTokenCursor(tokens),
-		chunk:  chunk.NewChunk(),
+		cursor:     token.NewTokenCursor(tokens),
+		chunk:      chunk.NewChunk(),
+		locals:     []Local{},
+		scopeDepth: 0,
 	}
 }
 
@@ -101,8 +105,21 @@ func (c *Compiler) synchronize() {
 func (c *Compiler) statement() error {
 	if c.cursor.Match(token.PRINT) {
 		return c.printStatement()
+	} else if c.cursor.Match(token.LEFT_BRACE) {
+		c.beginScope()
+		err := c.block()
+		c.endScope() // siempre cerramos el scope, haya habido error o no
+		return err
 	}
 	return c.expressionStatement()
+}
+
+func (c *Compiler) beginScope() {
+	c.scopeDepth++
+}
+
+func (c *Compiler) endScope() {
+	c.scopeDepth--
 }
 
 func (c *Compiler) printStatement() error {
@@ -114,6 +131,19 @@ func (c *Compiler) printStatement() error {
 	}
 	c.emit(byte(chunk.OP_PRINT))
 	return nil
+}
+
+func (c *Compiler) block() error {
+	var errs []error
+	for !c.cursor.Check(token.RIGHT_BRACE) && !c.cursor.Check(token.EOF) {
+		if err := c.declaration(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if err := c.cursor.Consume(token.RIGHT_BRACE, "'}' after block"); err != nil {
+		errs = append(errs, err)
+	}
+	return stderrors.Join(errs...)
 }
 
 func (c *Compiler) expressionStatement() error {
