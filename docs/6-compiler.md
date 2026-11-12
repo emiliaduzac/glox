@@ -38,22 +38,23 @@ Un truco que aplica el libro es no generar instrucciones nuevas para `!=`, `>=` 
 
 #### Literales
 
-Los números y los strings se compilan de la misma forma, se guarda el valor en el pool de constantes del chunk y se crea un OP_CONSTANT con su índice. Es por esto mismo que en la tabla los números y strings apuntan a la misma funcion value que agarra el valor que el scanner dejó en el token y lo deja como constante.
-Un detalle de diferencia con el libro acá es que para los strings el compilador tiene que sacar las comillas pero para nuestra implementación eso no es necesario porque ya lo hace a eso el scanner. Y otra cosa interesante es que en el libro necesita copiar los caracteres al heap para que el mismo string sea dueño de su memoria, pero nosotros en glox no hacemos eso porque en go los strings son inmutables asi que se pueden compartir sin copiarlos. 
+Los números y los strings se compilan de la misma forma, se guarda el valor en el pool de constantes del chunk y se crea un `OP_CONSTANT` con su índice. Es por esto mismo que en la tabla los números y strings apuntan a la misma funcion `value()` que agarra el valor que el scanner dejó en el token y lo deja como constante.
+Un detalle de diferencia con el libro es que para los strings el compilador tiene que sacar las comillas, pero para nuestra implementación eso no es necesario porque eso ya lo hace el scanner. Y otra cosa interesante es que en el libro necesita copiar los caracteres al heap para que el mismo string sea dueño de su memoria, pero nosotros en glox no hacemos eso porque en Go los strings son inmutables asi que se pueden compartir sin copiarlos.
 
 #### Asociatividad
 
-A diferencia de la precedencia, la asociatividad no está en la tabla, sino que sale de cómo cada función compila sus operandos.
-En el caso de los binarios, `binary()` compila su operando **derecho** llamando a `parsePrecedence` con la precedencia del operador más uno. Así, el operando derecho no puede quedarse con otro operador del mismo nivel, y este queda para la expresión de afuera.
+Como vimos, cada operador tiene en la tabla una función que se ejecuta cuando el compilador lo encuentra. Las que nos interesan para la asociatividad son las de los operadores: `binary()` para los binarios, `unary()` para los unarios y `variable()`, que maneja la asignación cuando después de un nombre encuentra un `=`.
 
-Paso a paso para el ejemplo `1 - 2 - 3`:
+Cuando se llama a una de esas funciones, lo que está a la izquierda del operador ya se compiló (o no existe, en el caso de los unarios). Queda compilar lo que viene después del operador y emitir la instrucción del operador. Para eso, cada función llama a `parsePrecedence` con una precedencia mínima, que definirá la asociatividad. Si aparece otro operador del mismo nivel (con la misma precedencia), puede pasar una de dos cosas:
 
-1. `parsePrecedence(PREC_ASSIGNMENT)` acepta cualquier operador. Compila el `1`.
-2. Encuentra el primer `-` (`PREC_TERM`). Como es mayor o igual a `PREC_ASSIGNMENT`, lo toma y llama a `binary()`.
-3. `binary()` compila el lado derecho con `parsePrecedence(PREC_FACTOR)` (suma 1 a la precedencia actual, que era `PREC_TERM`), que solo acepta operadores de `PREC_FACTOR` o mayor. Compila el `2`.
-4. Encuentra el segundo `-` (`PREC_TERM`). Como es menor a `PREC_FACTOR`, corta. Se emite la resta: `1 - 2`.
-5. De vuelta en el primer nivel, encuentra el segundo `-`. Como es mayor o igual a `PREC_ASSIGNMENT`, lo toma y llama a `binary()`.
-6. `binary()` compila el `3` y se emite la segunda resta: `(1 - 2) - 3`.
+- Si la función pide una precedencia **mayor** que la del operador actual, un operador que tenga el mismo nivel no alcanzaría el mínimo, así que no entra a la expresión: queda para la de afuera. La asociatividad es **a izquierda**.
+- Si pide la **misma o una menor**, el siguiente operador sí alcanza el mínimo, así que entra y se resuelve primero. La asociatividad es **a derecha**.
+
+| Función | Precedencia que pide | Asociatividad | Ejemplo |
+| --- | --- | --- | --- |
+| `binary()` | La del operador + 1 | A izquierda | `1 - 2 - 3` → `(1 - 2) - 3` |
+| `unary()` | `PREC_UNARY`, la de su operador | A derecha | `- -1` → `-(-1)` |
+| `variable()` | `PREC_ASSIGNMENT`, la más baja | A derecha | `a = b = 1` → `a = (b = 1)` |
 
 ### Tests
 

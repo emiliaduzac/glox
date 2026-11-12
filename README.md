@@ -28,7 +28,7 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Parser](docs/2-parser.md)
 - [Interpreter](docs/3-interpreter.md)
 - [Resolver](docs/4-resolver.md)
-- [Bytecode](docs/5-bytecode.md)
+- [Bytecode & Virtual Machine](docs/5-bytecode_and_vm.md)
 - [Compiler](docs/6-compiler.md)
 - [Benchmarks](docs/z-benchmarks.md)
 
