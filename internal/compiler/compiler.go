@@ -78,6 +78,12 @@ func (c *Compiler) parseVariable(expected string) (byte, error) {
 	if err := c.cursor.Consume(token.IDENTIFIER, expected); err != nil {
 		return 0, err
 	}
+	if err := c.declareVariable(); err != nil {
+		return 0, err
+	}
+	if c.scopeDepth > 0 {
+		return 0, nil
+	}
 	return c.identifierConstant(c.cursor.Previous())
 }
 
@@ -86,7 +92,37 @@ func (c *Compiler) identifierConstant(name token.Token) (byte, error) {
 }
 
 func (c *Compiler) defineVariable(global byte) {
+	if c.scopeDepth > 0 {
+		return
+	}
 	c.emit(byte(chunk.OP_DEFINE_GLOBAL), global)
+}
+
+func (c *Compiler) declareVariable() error {
+	if c.scopeDepth == 0 {
+		return nil
+	}
+
+	name := c.cursor.Previous()
+	for i := len(c.locals) - 1; i >= 0; i-- {
+		local := c.locals[i]
+		if local.Depth != -1 && local.Depth < c.scopeDepth {
+			break
+		}
+		if name.Lexeme == local.Name.Lexeme {
+			return errors.NewLoxError(c.cursor.GetPreviousLine(), "already a variable with this name in this scope")
+		}
+	}
+	return c.addLocal(name)
+}
+
+func (c *Compiler) addLocal(name token.Token) error {
+	if len(c.locals) == 256 {
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope")
+	}
+	local := Local{Name: name, Depth: c.scopeDepth}
+	c.locals = append(c.locals, local)
+	return nil
 }
 
 func (c *Compiler) synchronize() {
@@ -120,6 +156,11 @@ func (c *Compiler) beginScope() {
 
 func (c *Compiler) endScope() {
 	c.scopeDepth--
+
+	for len(c.locals) > 0 && c.locals[len(c.locals)-1].Depth > c.scopeDepth {
+		c.emit(byte(chunk.OP_POP))
+		c.locals = c.locals[:len(c.locals)-1]
+	}
 }
 
 func (c *Compiler) printStatement() error {
