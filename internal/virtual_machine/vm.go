@@ -69,6 +69,7 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 				return err
 			}
 			vm.push(-num)
+
 		// Aritméticos
 		case c.OP_ADD:
 			if err := vm.add(); err != nil {
@@ -131,6 +132,7 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 				return err
 			}
 
+		// Variables globales
 		case c.OP_DEFINE_GLOBAL:
 			name, err := vm.readString()
 			if err != nil {
@@ -141,7 +143,6 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 				return err
 			}
 			vm.globals[name] = value
-
 		case c.OP_GET_GLOBAL:
 			name, err := vm.readString()
 			if err != nil {
@@ -152,7 +153,6 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined variable '%s'", name))
 			}
 			vm.push(value)
-
 		case c.OP_SET_GLOBAL:
 			name, err := vm.readString()
 			if err != nil {
@@ -166,6 +166,24 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 				return err
 			}
 			vm.globals[name] = value
+
+		// Variables locales
+		case c.OP_GET_LOCAL:
+			slot, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			vm.push(vm.stack[slot])
+		case c.OP_SET_LOCAL:
+			slot, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			value, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			vm.stack[slot] = value
 
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
