@@ -9,21 +9,19 @@ import (
 )
 
 type Parser struct {
-	tokens  []token.Token
-	current int
+	cursor *token.TokenCursor
 }
 
 // NewParser crea un nuevo parser, a partir de una lista de tokens generados por el scanner.
 func NewParser(tokens []token.Token) *Parser {
 	return &Parser{
-		tokens:  tokens,
-		current: 0,
+		cursor: token.NewTokenCursor(tokens),
 	}
 }
 
 func (p *Parser) Parse() ([]statements.Stmt, error) {
 	stmts := []statements.Stmt{}
-	for !p.isAtEnd() {
+	for !p.cursor.IsAtEnd() {
 		stmt, err := p.declaration()
 		if err != nil {
 			return nil, err
@@ -34,10 +32,10 @@ func (p *Parser) Parse() ([]statements.Stmt, error) {
 }
 
 func (p *Parser) declaration() (statements.Stmt, error) {
-	if p.isInTokenTypes(token.FUN) {
+	if p.cursor.Match(token.FUN) {
 		return p.function("function")
 	}
-	if p.isInTokenTypes(token.VAR) {
+	if p.cursor.Match(token.VAR) {
 		stmt, err := p.varDeclaration()
 		if err != nil {
 			return nil, err
@@ -52,26 +50,26 @@ func (p *Parser) declaration() (statements.Stmt, error) {
 }
 
 func (p *Parser) statement() (statements.Stmt, error) {
-	if p.isInTokenTypes(token.PRINT) {
+	if p.cursor.Match(token.PRINT) {
 		return p.printStatement()
 	}
-	if p.isInTokenTypes(token.LEFT_BRACE) {
+	if p.cursor.Match(token.LEFT_BRACE) {
 		stmts, err := p.block()
 		if err != nil {
 			return nil, err
 		}
 		return statements.NewBlockStmt(stmts), nil
 	}
-	if p.isInTokenTypes(token.IF) {
+	if p.cursor.Match(token.IF) {
 		return p.ifStatement()
 	}
-	if p.isInTokenTypes(token.WHILE) {
+	if p.cursor.Match(token.WHILE) {
 		return p.whileStatement()
 	}
-	if p.isInTokenTypes(token.FOR) {
+	if p.cursor.Match(token.FOR) {
 		return p.forStatement()
 	}
-	if p.isInTokenTypes(token.RETURN) {
+	if p.cursor.Match(token.RETURN) {
 		return p.returnStatement()
 	}
 
@@ -97,7 +95,7 @@ func (p *Parser) expressionStatement() (statements.Stmt, error) {
 func (p *Parser) block() ([]statements.Stmt, error) {
 	var statements []statements.Stmt
 
-	for !p.isTokenType(token.RIGHT_BRACE) && !p.isAtEnd() {
+	for !p.cursor.Check(token.RIGHT_BRACE) && !p.cursor.IsAtEnd() {
 		decl, err := p.declaration()
 		if err != nil {
 			return nil, err
@@ -105,22 +103,22 @@ func (p *Parser) block() ([]statements.Stmt, error) {
 		statements = append(statements, decl)
 	}
 
-	if !p.isInTokenTypes(token.RIGHT_BRACE) {
-		return nil, p.expectedError("'}' after block")
+	if err := p.cursor.Consume(token.RIGHT_BRACE, "'}' after block"); err != nil {
+		return nil, err
 	}
 
 	return statements, nil
 }
 
 func (p *Parser) varDeclaration() (statements.Stmt, error) {
-	if !p.isInTokenTypes(token.IDENTIFIER) {
-		return nil, p.expectedError("identifier after 'var'")
+	if err := p.cursor.Consume(token.IDENTIFIER, "identifier after 'var'"); err != nil {
+		return nil, err
 	}
 
-	varName := p.getPrevious()
+	varName := p.cursor.Previous()
 
 	var initializer expression.Expr
-	if p.isInTokenTypes(token.EQUAL) {
+	if p.cursor.Match(token.EQUAL) {
 		var err error
 		initializer, err = p.expression()
 		if err != nil {
@@ -130,23 +128,23 @@ func (p *Parser) varDeclaration() (statements.Stmt, error) {
 		initializer = nil
 	}
 
-	if !p.isInTokenTypes(token.SEMICOLON) {
-		return nil, p.expectedError("';' after variable declaration")
+	if err := p.cursor.Consume(token.SEMICOLON, "';' after variable declaration"); err != nil {
+		return nil, err
 	}
 
 	return statements.NewVarStmt(varName, initializer), nil
 }
 
 func (p *Parser) ifStatement() (statements.Stmt, error) {
-	if !p.isInTokenTypes(token.LEFT_PAREN) {
-		return nil, p.expectedError("'(' after 'if'")
+	if err := p.cursor.Consume(token.LEFT_PAREN, "'(' after 'if'"); err != nil {
+		return nil, err
 	}
 	condition, err := p.expression()
 	if err != nil {
 		return nil, err
 	}
-	if !p.isInTokenTypes(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after if condition")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after if condition"); err != nil {
+		return nil, err
 	}
 
 	thenBranch, err := p.statement()
@@ -155,7 +153,7 @@ func (p *Parser) ifStatement() (statements.Stmt, error) {
 	}
 
 	var elseBranch statements.Stmt
-	if p.isInTokenTypes(token.ELSE) {
+	if p.cursor.Match(token.ELSE) {
 		elseBranch, err = p.statement()
 		if err != nil {
 			return nil, err
@@ -166,15 +164,15 @@ func (p *Parser) ifStatement() (statements.Stmt, error) {
 }
 
 func (p *Parser) whileStatement() (statements.Stmt, error) {
-	if !p.isInTokenTypes(token.LEFT_PAREN) {
-		return nil, p.expectedError("'(' after 'while'")
+	if err := p.cursor.Consume(token.LEFT_PAREN, "'(' after 'while'"); err != nil {
+		return nil, err
 	}
 	condition, err := p.expression()
 	if err != nil {
 		return nil, err
 	}
-	if !p.isInTokenTypes(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after while condition")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after while condition"); err != nil {
+		return nil, err
 	}
 
 	body, err := p.statement()
@@ -186,8 +184,8 @@ func (p *Parser) whileStatement() (statements.Stmt, error) {
 }
 
 func (p *Parser) forStatement() (statements.Stmt, error) {
-	if !p.isInTokenTypes(token.LEFT_PAREN) {
-		return nil, p.expectedError("'(' after 'for'")
+	if err := p.cursor.Consume(token.LEFT_PAREN, "'(' after 'for'"); err != nil {
+		return nil, err
 	}
 
 	// obtenemos las partes del for: inicializador, condición e incremento
@@ -235,16 +233,16 @@ func (p *Parser) getStatement() (expression.Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !p.isInTokenTypes(token.SEMICOLON) {
-		return nil, p.expectedError("';' after statement")
+	if err := p.cursor.Consume(token.SEMICOLON, "';' after statement"); err != nil {
+		return nil, err
 	}
 	return expr, nil
 }
 
 func (p *Parser) returnStatement() (statements.Stmt, error) {
-	keyword := p.getPrevious()
+	keyword := p.cursor.Previous()
 	var value expression.Expr
-	if !p.isTokenType(token.SEMICOLON) {
+	if !p.cursor.Check(token.SEMICOLON) {
 		var err error
 		value, err = p.expression()
 		if err != nil {
@@ -252,8 +250,8 @@ func (p *Parser) returnStatement() (statements.Stmt, error) {
 		}
 	}
 
-	if !p.isInTokenTypes(token.SEMICOLON) {
-		return nil, p.expectedError("';' after return value")
+	if err := p.cursor.Consume(token.SEMICOLON, "';' after return value"); err != nil {
+		return nil, err
 	}
 
 	return statements.NewReturnStmt(keyword, value), nil
@@ -272,8 +270,8 @@ func (p *Parser) assignment() (expression.Expr, error) {
 		return nil, err
 	}
 
-	if p.isInTokenTypes(token.EQUAL) {
-		equals := p.getPrevious()
+	if p.cursor.Match(token.EQUAL) {
+		equals := p.cursor.Previous()
 
 		value, err := p.assignment()
 		if err != nil {
@@ -296,8 +294,8 @@ func (p *Parser) or() (expression.Expr, error) {
 		return nil, err
 	}
 
-	for p.isInTokenTypes(token.OR) {
-		operator := p.getPrevious()
+	for p.cursor.Match(token.OR) {
+		operator := p.cursor.Previous()
 		right, err := p.and()
 		if err != nil {
 			return nil, err
@@ -314,8 +312,8 @@ func (p *Parser) and() (expression.Expr, error) {
 		return nil, err
 	}
 
-	for p.isInTokenTypes(token.AND) {
-		operator := p.getPrevious()
+	for p.cursor.Match(token.AND) {
+		operator := p.cursor.Previous()
 		right, err := p.equality()
 		if err != nil {
 			return nil, err
@@ -332,8 +330,8 @@ func (p *Parser) equality() (expression.Expr, error) {
 		return nil, err
 	}
 
-	for p.isInTokenTypes(token.BANG_EQUAL, token.EQUAL_EQUAL) {
-		operator := p.getPrevious()
+	for p.cursor.Match(token.BANG_EQUAL, token.EQUAL_EQUAL) {
+		operator := p.cursor.Previous()
 		right, err := p.comparison()
 		if err != nil {
 			return nil, err
@@ -350,8 +348,8 @@ func (p *Parser) comparison() (expression.Expr, error) {
 		return nil, err
 	}
 
-	for p.isInTokenTypes(token.GREATER, token.GREATER_EQUAL, token.LESS, token.LESS_EQUAL) {
-		operator := p.getPrevious()
+	for p.cursor.Match(token.GREATER, token.GREATER_EQUAL, token.LESS, token.LESS_EQUAL) {
+		operator := p.cursor.Previous()
 		right, err := p.term()
 		if err != nil {
 			return nil, err
@@ -368,8 +366,8 @@ func (p *Parser) term() (expression.Expr, error) {
 		return nil, err
 	}
 
-	for p.isInTokenTypes(token.MINUS, token.PLUS) {
-		operator := p.getPrevious()
+	for p.cursor.Match(token.MINUS, token.PLUS) {
+		operator := p.cursor.Previous()
 		right, err := p.factor()
 		if err != nil {
 			return nil, err
@@ -386,8 +384,8 @@ func (p *Parser) factor() (expression.Expr, error) {
 		return nil, err
 	}
 
-	for p.isInTokenTypes(token.SLASH, token.STAR, token.PERCENT) {
-		operator := p.getPrevious()
+	for p.cursor.Match(token.SLASH, token.STAR, token.PERCENT) {
+		operator := p.cursor.Previous()
 		right, err := p.unary()
 		if err != nil {
 			return nil, err
@@ -399,8 +397,8 @@ func (p *Parser) factor() (expression.Expr, error) {
 }
 
 func (p *Parser) unary() (expression.Expr, error) {
-	if p.isInTokenTypes(token.BANG, token.MINUS) {
-		operator := p.getPrevious()
+	if p.cursor.Match(token.BANG, token.MINUS) {
+		operator := p.cursor.Previous()
 		right, err := p.unary()
 		if err != nil {
 			return nil, err
@@ -418,7 +416,7 @@ func (p *Parser) call() (expression.Expr, error) {
 	}
 
 	for {
-		if p.isInTokenTypes(token.LEFT_PAREN) {
+		if p.cursor.Match(token.LEFT_PAREN) {
 			expr, err = p.finishCall(expr)
 			if err != nil {
 				return nil, err
@@ -434,96 +432,96 @@ func (p *Parser) call() (expression.Expr, error) {
 func (p *Parser) finishCall(callee expression.Expr) (expression.Expr, error) {
 	var arguments []expression.Expr
 
-	if !p.isTokenType(token.RIGHT_PAREN) {
+	if !p.cursor.Check(token.RIGHT_PAREN) {
 		for {
 			if len(arguments) >= 255 {
-				return nil, p.expectedError("cannot have more than 255 arguments")
+				return nil, p.cursor.ExpectedError("cannot have more than 255 arguments")
 			}
 			arg, err := p.expression()
 			if err != nil {
 				return nil, err
 			}
 			arguments = append(arguments, arg)
-			if !p.isInTokenTypes(token.COMMA) {
+			if !p.cursor.Match(token.COMMA) {
 				break
 			}
 		}
 	}
 
-	if !p.isInTokenTypes(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after arguments")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after arguments"); err != nil {
+		return nil, err
 	}
 
-	paren := p.getPrevious()
+	paren := p.cursor.Previous()
 	return expression.NewCall(callee, paren, arguments), nil
 }
 
 func (p *Parser) primary() (expression.Expr, error) {
-	if p.isInTokenTypes(token.FALSE) {
+	if p.cursor.Match(token.FALSE) {
 		return expression.NewLiteral(false), nil
 	}
-	if p.isInTokenTypes(token.TRUE) {
+	if p.cursor.Match(token.TRUE) {
 		return expression.NewLiteral(true), nil
 	}
-	if p.isInTokenTypes(token.NIL) {
+	if p.cursor.Match(token.NIL) {
 		return expression.NewLiteral(nil), nil
 	}
 
-	if p.isInTokenTypes(token.NUMBER, token.STRING) {
-		return expression.NewLiteral(p.getPrevious().Literal), nil
+	if p.cursor.Match(token.NUMBER, token.STRING) {
+		return expression.NewLiteral(p.cursor.Previous().Literal), nil
 	}
 
-	if p.isInTokenTypes(token.LEFT_PAREN) {
+	if p.cursor.Match(token.LEFT_PAREN) {
 		expr, err := p.expression()
 		if err != nil {
 			return nil, err
 		}
-		if !p.isInTokenTypes(token.RIGHT_PAREN) {
-			return nil, errors.NewLoxError(p.getLine(), "expected ')' after expression")
+		if !p.cursor.Match(token.RIGHT_PAREN) {
+			return nil, errors.NewLoxError(p.cursor.GetLine(), "expected ')' after expression")
 		}
 		return expression.NewGrouping(expr), nil
 	}
 
-	if p.isInTokenTypes(token.IDENTIFIER) {
-		return expression.NewVariable(p.getPrevious()), nil
+	if p.cursor.Match(token.IDENTIFIER) {
+		return expression.NewVariable(p.cursor.Previous()), nil
 	}
 
-	return nil, p.expectedError("expression")
+	return nil, p.cursor.ExpectedError("expression")
 }
 
 func (p *Parser) function(kind string) (statements.Stmt, error) {
-	if !p.isInTokenTypes(token.IDENTIFIER) {
-		return nil, p.expectedError(fmt.Sprintf("expect %s name", kind))
+	if err := p.cursor.Consume(token.IDENTIFIER, fmt.Sprintf("expect %s name", kind)); err != nil {
+		return nil, err
 	}
 
-	name := p.getPrevious()
+	name := p.cursor.Previous()
 
-	if !p.isInTokenTypes(token.LEFT_PAREN) {
-		return nil, p.expectedError(fmt.Sprintf("'(' after %s name", kind))
+	if err := p.cursor.Consume(token.LEFT_PAREN, fmt.Sprintf("'(' after %s name", kind)); err != nil {
+		return nil, err
 	}
 
 	var parameters []token.Token
-	if !p.isTokenType(token.RIGHT_PAREN) {
+	if !p.cursor.Check(token.RIGHT_PAREN) {
 		for {
 			if len(parameters) >= 255 {
-				return nil, p.expectedError("cannot have more than 255 parameters")
+				return nil, p.cursor.ExpectedError("cannot have more than 255 parameters")
 			}
-			if !p.isInTokenTypes(token.IDENTIFIER) {
-				return nil, p.expectedError("expect parameter name")
+			if err := p.cursor.Consume(token.IDENTIFIER, "expect parameter name"); err != nil {
+				return nil, err
 			}
-			parameters = append(parameters, p.getPrevious())
-			if !p.isInTokenTypes(token.COMMA) {
+			parameters = append(parameters, p.cursor.Previous())
+			if !p.cursor.Match(token.COMMA) {
 				break
 			}
 		}
 	}
 
-	if !p.isInTokenTypes(token.RIGHT_PAREN) {
-		return nil, p.expectedError("')' after parameters")
+	if err := p.cursor.Consume(token.RIGHT_PAREN, "')' after parameters"); err != nil {
+		return nil, err
 	}
 
-	if !p.isInTokenTypes(token.LEFT_BRACE) {
-		return nil, p.expectedError(fmt.Sprintf("'{' before %s body", kind))
+	if err := p.cursor.Consume(token.LEFT_BRACE, fmt.Sprintf("'{' before %s body", kind)); err != nil {
+		return nil, err
 	}
 
 	body, err := p.block()

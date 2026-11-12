@@ -2,6 +2,7 @@ package virtualmachine
 
 import (
 	"fmt"
+	"math"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/utils"
@@ -21,7 +22,13 @@ func NewVirtualMachine(chunk *c.Chunk) *VirtualMachine {
 	}
 }
 
-func (vm *VirtualMachine) Run() error {
+func (vm *VirtualMachine) Run() (err error) {
+	defer func() {
+		if err != nil {
+			vm.resetStack()
+		}
+	}()
+
 	for vm.ip < len(vm.chunk.Bytes) {
 		b, err := vm.readByte()
 		if err != nil {
@@ -32,7 +39,7 @@ func (vm *VirtualMachine) Run() error {
 		switch op {
 		case c.OP_RETURN:
 			if len(vm.stack) > 0 {
-				return errors.NewLoxError(vm.currentLine(), "Inconsistent Stack Height: should be empty at exit")
+				return errors.NewLoxError(vm.currentLine(), "inconsistent Stack Height: should be empty at exit")
 			}
 			return nil
 
@@ -56,7 +63,7 @@ func (vm *VirtualMachine) Run() error {
 				return err
 			}
 			vm.push(-num)
-
+		// Aritméticos
 		case c.OP_ADD:
 			if err := vm.add(); err != nil {
 				return err
@@ -73,6 +80,21 @@ func (vm *VirtualMachine) Run() error {
 			if err := vm.binaryOp(func(left, right float64) any { return left / right }); err != nil {
 				return err
 			}
+		case c.OP_MODULO:
+			if err := vm.binaryOp(func(left, right float64) any { return math.Mod(left, right) }); err != nil {
+				return err
+			}
+
+		// Comparación
+		case c.OP_EQUAL:
+			left, right, err := vm.peekOperands()
+			if err != nil {
+				return err
+			}
+			if err := vm.popTwo(); err != nil {
+				return err
+			}
+			vm.push(utils.IsEqual(left, right))
 		case c.OP_GREATER:
 			if err := vm.binaryOp(func(left, right float64) any { return left > right }); err != nil {
 				return err
@@ -82,11 +104,23 @@ func (vm *VirtualMachine) Run() error {
 				return err
 			}
 
+		case c.OP_NOT:
+			value, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			vm.push(!utils.IsTruthy(value))
+
 		default:
-			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("UNKOWN %b", op))
+			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
 	}
 	return nil
+}
+
+// resetStack descarta todos los valores del stack
+func (vm *VirtualMachine) resetStack() {
+	vm.stack = vm.stack[:0]
 }
 
 // readByte devuelve el byte al que apunta el instruction pointer y lo avanza al siguiente
@@ -128,64 +162,94 @@ func (vm *VirtualMachine) pop() (any, error) {
 }
 
 // peek devuelve el valor a distance posiciones del tope del stack, sin sacarlo
-// func (vm *VirtualMachine) peek(distance int) any {
-// 	if len(vm.stack) <= distance {
-// 		return nil
-// 	}
-// 	return vm.stack[len(vm.stack)-1-distance]
-// }
-
-// popNumberOperand saca el tope del stack y verifica que sea un número
-func (vm *VirtualMachine) popNumberOperand() (float64, error) {
-	operand, err := vm.pop()
-	if err != nil {
-		return 0, err
+func (vm *VirtualMachine) peek(distance int) (any, error) {
+	if len(vm.stack) <= distance {
+		return nil, errors.NewLoxError(vm.currentLine(), "stack underflow")
 	}
-	return utils.CheckNumberOperand(vm.currentLine(), operand)
+	return vm.stack[len(vm.stack)-1-distance], nil
 }
 
-// popNumberOperands saca dos números del stack y los devuelve en orden (izquierdo, derecho)
-func (vm *VirtualMachine) popNumberOperands() (float64, float64, error) {
-	left, right, err := vm.popOperands()
-	if err != nil {
-		return 0, 0, err
-	}
-	return utils.CheckNumberOperands(vm.currentLine(), left, right)
-}
-
-// popOperands saca los dos operandos del stack y los devuelve en orden (izquierdo, derecho)
-func (vm *VirtualMachine) popOperands() (any, any, error) {
-	right, err := vm.pop()
+// peekOperands devuelve los dos operandos del tope, sin sacarlos y en orden (izquierdo, derecho)
+func (vm *VirtualMachine) peekOperands() (any, any, error) {
+	right, err := vm.peek(0)
 	if err != nil {
 		return nil, nil, err
 	}
-	left, err := vm.pop()
+	left, err := vm.peek(1)
 	if err != nil {
 		return nil, nil, err
 	}
 	return left, right, nil
 }
 
+// popNumberOperand verifica que el tope del stack sea un número. Si lo es, lo saca
+func (vm *VirtualMachine) popNumberOperand() (float64, error) {
+	operand, err := vm.peek(0)
+	if err != nil {
+		return 0, err
+	}
+	num, err := utils.CheckNumberOperand(vm.currentLine(), operand)
+	if err != nil {
+		return 0, err
+	}
+	if _, err := vm.pop(); err != nil {
+		return 0, err
+	}
+	return num, nil
+}
+
+// popNumberOperands verifica que los dos operandos sean números. Si lo son, los saca
+func (vm *VirtualMachine) popNumberOperands() (float64, float64, error) {
+	left, right, err := vm.peekOperands()
+	if err != nil {
+		return 0, 0, err
+	}
+	l, r, err := utils.CheckNumberOperands(vm.currentLine(), left, right)
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := vm.popTwo(); err != nil {
+		return 0, 0, err
+	}
+	return l, r, nil
+}
+
+// popTwo saca los dos operandos del tope del stack
+func (vm *VirtualMachine) popTwo() error {
+	if _, err := vm.pop(); err != nil {
+		return err
+	}
+	_, err := vm.pop()
+	return err
+}
+
 // add suma dos números o concatena dos strings y deja el resultado en el stack
 func (vm *VirtualMachine) add() error {
-	left, right, err := vm.popOperands()
+	left, right, err := vm.peekOperands()
 	if err != nil {
 		return err
 	}
 
+	var result any
 	switch l := left.(type) {
 	case float64:
 		if r, ok := right.(float64); ok {
-			vm.push(l + r)
-			return nil
+			result = l + r
 		}
 	case string:
 		if r, ok := right.(string); ok {
-			vm.push(l + r)
-			return nil
+			result = l + r
 		}
 	}
-	return errors.NewLoxError(vm.currentLine(), "operands must be two numbers or two strings")
+	if result == nil {
+		return errors.NewLoxError(vm.currentLine(), "operands must be two numbers or two strings")
+	}
+
+	if err := vm.popTwo(); err != nil {
+		return err
+	}
+	vm.push(result)
+	return nil
 }
 
 // binaryOp saca dos números del stack, les aplica op y deja el resultado en el stack

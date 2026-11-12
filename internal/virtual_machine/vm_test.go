@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"math"
 	"testing"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/utils"
@@ -38,7 +39,7 @@ func TestOpReturn(t *testing.T) {
 
 		err := vm.Run()
 
-		utils.AssertErrorMessage(t, err, "Inconsistent Stack Height")
+		utils.AssertErrorMessage(t, err, "inconsistent Stack Height")
 	})
 
 	t.Run("Corta la ejecución", func(t *testing.T) {
@@ -287,6 +288,7 @@ func TestOpAdd(t *testing.T) {
 		right any
 	}{
 		{"número y string", 1.0, "a"},
+		{"string y número", "a", 1.0},
 		{"número y otro", 1.0, nil},
 	}
 
@@ -534,6 +536,106 @@ func TestOpDivide(t *testing.T) {
 	})
 }
 
+func TestOpModulo(t *testing.T) {
+	tests := []struct {
+		name     string
+		left     float64
+		right    float64
+		expected float64
+	}{
+		{"positivos", 10.0, 3.0, 1.0},
+		{"módulo exacto", 10.0, 5.0, 0.0},
+		{"cero módulo positivo", 0.0, 5.0, 0.0},
+		{"decimales", 5.5, 2.0, 1.5},
+		{"dividendo negativo", -10.0, 3.0, -1.0},
+		{"divisor negativo", 10.0, -3.0, 1.0},
+		{"ambos negativos", -10.0, -3.0, -1.0},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.left)
+			writeConstant(chunk, test.right)
+			chunk.Write(byte(c.OP_MODULO), line)
+
+			err := vm.Run()
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, len(vm.stack), 1)
+			utils.AssertValue(t, vm.stack[0], test.expected)
+		})
+	}
+
+	nanTests := []struct {
+		name  string
+		left  float64
+		right float64
+	}{
+		{"módulo cero", 10.0, 0.0},
+		{"cero módulo cero", 0.0, 0.0},
+	}
+
+	for _, test := range nanTests {
+		t.Run("Da NaN en "+test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.left)
+			writeConstant(chunk, test.right)
+			chunk.Write(byte(c.OP_MODULO), line)
+
+			err := vm.Run()
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, len(vm.stack), 1)
+			result, ok := vm.stack[0].(float64)
+			if !ok || !math.IsNaN(result) {
+				t.Errorf("expected NaN, got %v", vm.stack[0])
+			}
+		})
+	}
+
+	incompatibleTests := []struct {
+		name  string
+		left  any
+		right any
+	}{
+		{"número y string", 1.0, "a"},
+		{"número y otro", 1.0, nil},
+	}
+
+	for _, test := range incompatibleTests {
+		t.Run("Error si se hace módulo de "+test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.left)
+			writeConstant(chunk, test.right)
+			chunk.Write(byte(c.OP_MODULO), line)
+
+			err := vm.Run()
+
+			utils.AssertErrorMessage(t, err, "operands must be numbers")
+		})
+	}
+
+	t.Run("Error si el stack tiene un solo elemento", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_MODULO), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+
+	t.Run("Error si el stack está vacío", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_MODULO), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+}
+
 func TestOpGreater(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -604,6 +706,114 @@ func TestOpGreater(t *testing.T) {
 	})
 }
 
+func TestOpNot(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    any
+		expected bool
+	}{
+		{"nil", nil, true},
+		{"false", false, true},
+		{"true", true, false},
+		{"número", 1.0, false},
+		{"cero", 0.0, false},
+		{"string", "a", false},
+		{"string vacío", "", false},
+	}
+
+	for _, test := range tests {
+		t.Run("Not de "+test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.value)
+			chunk.Write(byte(c.OP_NOT), line)
+
+			err := vm.Run()
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, len(vm.stack), 1)
+			utils.AssertValue(t, vm.stack[0], test.expected)
+		})
+	}
+
+	t.Run("Error si el stack está vacío", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_NOT), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+}
+
+func TestOpEqual(t *testing.T) {
+	tests := []struct {
+		name     string
+		left     any
+		right    any
+		expected bool
+	}{
+		{"números iguales", 1.0, 1.0, true},
+		{"números distintos", 1.0, 2.0, false},
+		{"strings iguales", "a", "a", true},
+		{"strings distintos", "a", "b", false},
+		{"booleanos iguales", true, true, true},
+		{"booleanos distintos", true, false, false},
+		{"nil con nil", nil, nil, true},
+		{"número y string", 1.0, "1", false},
+		{"nil y false", nil, false, false},
+		{"número y booleano", 1.0, true, false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.left)
+			writeConstant(chunk, test.right)
+			chunk.Write(byte(c.OP_EQUAL), line)
+
+			err := vm.Run()
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, len(vm.stack), 1)
+			utils.AssertValue(t, vm.stack[0], test.expected)
+		})
+	}
+
+	t.Run("Error si el stack tiene un solo elemento", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_EQUAL), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+
+	t.Run("Error si el stack está vacío", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_EQUAL), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+
+	t.Run("Un string armado en runtime es igual a un literal con el mismo contenido", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, "st")
+		writeConstant(chunk, "ri")
+		chunk.Write(byte(c.OP_ADD), line)
+		writeConstant(chunk, "stri")
+		chunk.Write(byte(c.OP_EQUAL), line)
+
+		err := vm.Run()
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(vm.stack), 1)
+		utils.AssertValue(t, vm.stack[0], true)
+	})
+}
+
 func TestOpLess(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -671,5 +881,42 @@ func TestOpLess(t *testing.T) {
 		err := vm.Run()
 
 		utils.AssertErrorMessage(t, err, "stack underflow")
+	})
+}
+
+func TestRuntimeErrorResetsStack(t *testing.T) {
+	t.Run("Un error en un operador unario vacía el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_FALSE), line)
+		chunk.Write(byte(c.OP_NEGATE), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "operand must be a number")
+		utils.AssertValue(t, len(vm.stack), 0)
+	})
+
+	t.Run("Un error en un operador binario vacía el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, "a")
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_ADD), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "operands must be two numbers or two strings")
+		utils.AssertValue(t, len(vm.stack), 0)
+	})
+
+	t.Run("También se descartan los valores que había debajo de la operación que falla", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 10.0)
+		chunk.Write(byte(c.OP_TRUE), line)
+		chunk.Write(byte(c.OP_NEGATE), line)
+
+		err := vm.Run()
+
+		utils.AssertErrorMessage(t, err, "operand must be a number")
+		utils.AssertValue(t, len(vm.stack), 0)
 	})
 }
