@@ -1214,6 +1214,9 @@ const (
 	printSize    = 1
 	constantSize = 2 // OP_CONSTANT + indice
 	jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
+	loopSize     = 3 // OP_LOOP + 2 bytes de offset
+	localSize    = 2 // OP_GET_LOCAL / OP_SET_LOCAL + índice
+	binarySize   = 1 // OP_GREATER / OP_SUBTRACT
 
 	// offsets de los saltos para un then o un else de la forma `print n;`
 	skipThen = popSize + constantSize + printSize + jumpSize
@@ -1360,4 +1363,71 @@ func TestOr(t *testing.T) {
 			utils.AssertValue(t, out.String(), test.expected)
 		})
 	}
+}
+
+func TestOpLoop(t *testing.T) {
+	t.Run("Vuelve a la condición y repite el cuerpo hasta que sea falsa", func(t *testing.T) {
+		// { var i = 2; while (i > 0) { print i; i = i - 1; } }
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		conditionSize := localSize + constantSize + binarySize                                          // i > 0
+		bodySize := localSize + printSize + localSize + constantSize + binarySize + localSize + popSize // print i; i = i - 1;
+		skipBody := popSize + bodySize + loopSize
+		backToCondition := conditionSize + jumpSize + skipBody
+
+		writeConstant(chunk, 2.0)
+		// condición: inicio del ciclo
+		chunk.Write(byte(c.OP_GET_LOCAL), line)
+		chunk.Write(0, line)
+		writeConstant(chunk, 0.0)
+		chunk.Write(byte(c.OP_GREATER), line)
+		writeJump(chunk, c.OP_JUMP_IF_FALSE, skipBody)
+		chunk.Write(byte(c.OP_POP), line)
+		// cuerpo: print i;
+		chunk.Write(byte(c.OP_GET_LOCAL), line)
+		chunk.Write(0, line)
+		chunk.Write(byte(c.OP_PRINT), line)
+		// cuerpo: i = i - 1;
+		chunk.Write(byte(c.OP_GET_LOCAL), line)
+		chunk.Write(0, line)
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_SUBTRACT), line)
+		chunk.Write(byte(c.OP_SET_LOCAL), line)
+		chunk.Write(0, line)
+		chunk.Write(byte(c.OP_POP), line)
+		writeJump(chunk, c.OP_LOOP, backToCondition) // vuelve a la condición
+		// salida
+		chunk.Write(byte(c.OP_POP), line) // saca la condición
+		chunk.Write(byte(c.OP_POP), line) // fin del bloque: saca i
+		chunk.Write(byte(c.OP_RETURN), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "2\n1\n")
+	})
+
+	t.Run("Con la condición falsa desde el inicio no entra al cuerpo", func(t *testing.T) {
+		// while (false) print 1;
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		skipBody := popSize + constantSize + printSize + loopSize
+		backToCondition := literalSize + jumpSize + skipBody
+
+		chunk.Write(byte(c.OP_FALSE), line)
+		writeJump(chunk, c.OP_JUMP_IF_FALSE, skipBody)
+		chunk.Write(byte(c.OP_POP), line)
+		writeConstant(chunk, 1.0)
+		chunk.Write(byte(c.OP_PRINT), line)
+		writeJump(chunk, c.OP_LOOP, backToCondition)
+		chunk.Write(byte(c.OP_POP), line)
+		chunk.Write(byte(c.OP_RETURN), line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "")
+	})
 }
