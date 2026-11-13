@@ -23,6 +23,16 @@ func writeConstant(chunk *c.Chunk, value any) {
 	chunk.Write(byte(index), line)
 }
 
+func writeJump(chunk *c.Chunk, op c.OpCode, offset int) {
+	chunk.Write(byte(op), line)
+	chunk.Write(byte(offset>>8), line)
+	chunk.Write(byte(offset), line)
+}
+
+func writeOp(op c.OpCode) func(chunk *c.Chunk) {
+	return func(chunk *c.Chunk) { chunk.Write(byte(op), line) }
+}
+
 func TestOpReturn(t *testing.T) {
 	t.Run("Stack vacío no da error", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
@@ -1196,4 +1206,47 @@ func TestOpSetLocal(t *testing.T) {
 		utils.AssertValue(t, vm.stack[variableIndex], newValue)
 		utils.AssertValue(t, vm.stack[len(vm.stack)-1], newValue)
 	})
+}
+
+func TestOpJumpIfFalse(t *testing.T) {
+	const (
+		popSize      = 1
+		printSize    = 1
+		constantSize = 2 // OP_CONSTANT + indice
+		jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
+	)
+	skipThen := popSize + constantSize + printSize + jumpSize
+
+	tests := []struct {
+		name      string
+		condition func(chunk *c.Chunk)
+		expected  string
+	}{
+		{"Con false salta el cuerpo", writeOp(c.OP_FALSE), ""},
+		{"Con nil salta el cuerpo", writeOp(c.OP_NIL), ""},
+		{"Con true ejecuta el cuerpo", writeOp(c.OP_TRUE), "1\n"},
+		{"Con 0 ejecuta el cuerpo (es truthy)", func(chunk *c.Chunk) { writeConstant(chunk, 0.0) }, "1\n"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// if (<condición>) print 1;
+			vm, chunk := setUpVM(t)
+			var out bytes.Buffer
+			vm.out = &out
+			test.condition(chunk)
+			writeJump(chunk, c.OP_JUMP_IF_FALSE, skipThen)
+			chunk.Write(byte(c.OP_POP), line)
+			writeConstant(chunk, 1.0)
+			chunk.Write(byte(c.OP_PRINT), line)
+			writeJump(chunk, c.OP_JUMP, popSize)
+			chunk.Write(byte(c.OP_POP), line)
+			chunk.Write(byte(c.OP_RETURN), line)
+
+			err := vm.Run(chunk)
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, out.String(), test.expected)
+		})
+	}
 }

@@ -686,6 +686,67 @@ func TestCompileLocalAndGlobalVariables(t *testing.T) {
 	})
 }
 
-func TestCompileIf(t *testing.T) {
+func TestCompileIfWithoutElse(t *testing.T) {
+	const (
+		literalSize  = 1 // OP_TRUE - OP_FALSE - OP_NIL
+		popSize      = 1
+		printSize    = 1
+		constantSize = 2 // OP_CONSTANT + indice
+		jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
+	)
 
+	t.Run("If sin else", func(t *testing.T) {
+		compiled := compileSource(t, "if (true) print 1;")
+		skipThen := popSize + constantSize + printSize + jumpSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen),
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(popSize),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("If anidado sin else: el salto externo incluye al interno completo", func(t *testing.T) {
+		chunk := compileSource(t, "if (true) if (false) print 1;")
+		skipInnerThen := popSize + constantSize + printSize + jumpSize
+		innerIfSize := literalSize + jumpSize + skipInnerThen + popSize
+		skipOuterThen := popSize + innerIfSize + jumpSize
+
+		assertBytes(t, chunk,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipOuterThen),
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipInnerThen),
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(popSize),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(popSize),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el paréntesis de apertura", func(t *testing.T) {
+		err := compileSourceError(t, "if true) print 1;")
+		utils.AssertErrorMessage(t, err, "'(' after if")
+	})
+
+	t.Run("Error si falta el paréntesis de cierre", func(t *testing.T) {
+		err := compileSourceError(t, "if (true print 1;")
+		utils.AssertErrorMessage(t, err, "')' after condition")
+	})
+
+	t.Run("Error si falta el cuerpo del if", func(t *testing.T) {
+		err := compileSourceError(t, "if (true)")
+		utils.AssertError(t, err)
+		utils.AssertErrorMessage(t, err, "expected expression")
+	})
 }
