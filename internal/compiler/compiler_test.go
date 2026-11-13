@@ -851,3 +851,30 @@ func TestCompileAnd(t *testing.T) {
 		utils.AssertError(t, err)
 	})
 }
+
+func TestCompileOr(t *testing.T) {
+	t.Run("Or se compila como dos saltos: si el izquierdo es verdadero, saltea el derecho", func(t *testing.T) {
+		compiled := compileSource(t, "true or false;")
+		skipRight := popSize + literalSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(jumpSize),
+			byte(c.OP_JUMP), 0, byte(skipRight),
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el operando derecho", func(t *testing.T) {
+		err := compileSourceError(t, "true or;")
+		utils.AssertError(t, err)
+	})
+
+	t.Run("Error si falta el operando izquierdo", func(t *testing.T) {
+		err := compileSourceError(t, "and or;")
+		utils.AssertError(t, err)
+	})
+}

@@ -1325,3 +1325,39 @@ func TestAnd(t *testing.T) {
 		})
 	}
 }
+
+func TestOr(t *testing.T) {
+	skipRight := popSize + literalSize
+	tests := []struct {
+		name     string
+		left     c.OpCode
+		right    c.OpCode
+		expected string
+	}{
+		{"true or true es true", c.OP_TRUE, c.OP_TRUE, "true\n"},
+		{"true or false es true", c.OP_TRUE, c.OP_FALSE, "true\n"},
+		{"false or true es true", c.OP_FALSE, c.OP_TRUE, "true\n"},
+		{"false or false es false", c.OP_FALSE, c.OP_FALSE, "false\n"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// print <left> or <right>;
+			vm, chunk := setUpVM(t)
+			var out bytes.Buffer
+			vm.out = &out
+			chunk.Write(byte(test.left), line)
+			writeJump(chunk, c.OP_JUMP_IF_FALSE, jumpSize)
+			writeJump(chunk, c.OP_JUMP, skipRight)
+			chunk.Write(byte(c.OP_POP), line)
+			chunk.Write(byte(test.right), line)
+			chunk.Write(byte(c.OP_PRINT), line)
+			chunk.Write(byte(c.OP_RETURN), line)
+
+			err := vm.Run(chunk)
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, out.String(), test.expected)
+		})
+	}
+}

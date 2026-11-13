@@ -461,7 +461,20 @@ func (c *Compiler) logicAnd(_ bool) error {
 	return nil
 }
 
-// TO DO:
 func (c *Compiler) logicOr(_ bool) error {
+	elseJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	endJump := c.emitJump(chunk.OP_JUMP)
+
+	if err := c.patchJump(elseJump); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
+
+	if err := c.parsePrecedence(PREC_OR); err != nil {
+		return err
+	}
+	if err := c.patchJump(endJump); err != nil {
+		return err
+	}
 	return nil
 }
