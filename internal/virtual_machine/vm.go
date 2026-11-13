@@ -185,6 +185,7 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			}
 			vm.stack[slot] = value
 
+		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
 			offset, err := vm.readShort()
 			if err != nil {
@@ -197,6 +198,12 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			if !utils.IsTruthy(value) {
 				vm.ip += offset
 			}
+		case c.OP_JUMP:
+			offset, err := vm.readShort()
+			if err != nil {
+				return err
+			}
+			vm.ip += offset
 
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))

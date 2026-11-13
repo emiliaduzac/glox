@@ -211,10 +211,24 @@ func (c *Compiler) ifStatement() error {
 		return err
 	}
 	thenJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	c.emit(byte(chunk.OP_POP))
 	if err := c.statement(); err != nil {
 		return err
 	}
-	c.patchJump(thenJump)
+	elseJump := c.emitJump(chunk.OP_JUMP)
+	if err := c.patchJump(thenJump); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
+
+	if c.cursor.Match(token.ELSE) {
+		if err := c.statement(); err != nil {
+			return err
+		}
+	}
+	if err := c.patchJump(elseJump); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -257,7 +271,7 @@ func (c *Compiler) emitJump(instruction chunk.OpCode) int {
 func (c *Compiler) patchJump(offset int) error {
 	jump := len(c.chunk.Bytes) - offset - 2
 	if jump > math.MaxUint16 {
-		errors.NewLoxError(c.cursor.GetPreviousLine(), "too much code to jump over")
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too much code to jump over")
 	}
 	c.chunk.Bytes[offset] = byte(jump >> 8)
 	c.chunk.Bytes[offset+1] = byte(jump)

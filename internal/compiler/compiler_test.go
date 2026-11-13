@@ -685,3 +685,7 @@ func TestCompileLocalAndGlobalVariables(t *testing.T) {
 		utils.AssertValue(t, compiler.scopeDepth, 0)
 	})
 }
+
+func TestCompileIf(t *testing.T) {
+
+}
