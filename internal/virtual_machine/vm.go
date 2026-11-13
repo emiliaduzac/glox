@@ -2,27 +2,33 @@ package virtualmachine
 
 import (
 	"fmt"
+	"io"
 	"math"
+	"os"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/utils"
 )
 
 type VirtualMachine struct {
-	ip    int
-	stack []any
-	chunk *c.Chunk
+	ip      int
+	stack   []any
+	chunk   *c.Chunk
+	out     io.Writer
+	globals map[string]any
 }
 
-func NewVirtualMachine(chunk *c.Chunk) *VirtualMachine {
+func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{
-		ip:    0,
-		stack: []any{},
-		chunk: chunk,
+		stack:   []any{},
+		out:     os.Stdout,
+		globals: map[string]any{},
 	}
 }
 
-func (vm *VirtualMachine) Run() (err error) {
+func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
+	vm.chunk = chunk
+	vm.ip = 0
 	defer func() {
 		if err != nil {
 			vm.resetStack()
@@ -63,6 +69,7 @@ func (vm *VirtualMachine) Run() (err error) {
 				return err
 			}
 			vm.push(-num)
+
 		// Aritméticos
 		case c.OP_ADD:
 			if err := vm.add(); err != nil {
@@ -111,6 +118,73 @@ func (vm *VirtualMachine) Run() (err error) {
 			}
 			vm.push(!utils.IsTruthy(value))
 
+		case c.OP_PRINT:
+			value, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintln(vm.out, utils.Stringify(value)); err != nil {
+				return err
+			}
+
+		case c.OP_POP:
+			if _, err := vm.pop(); err != nil {
+				return err
+			}
+
+		// Variables globales
+		case c.OP_DEFINE_GLOBAL:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			value, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			vm.globals[name] = value
+		case c.OP_GET_GLOBAL:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			value, ok := vm.globals[name]
+			if !ok {
+				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined variable '%s'", name))
+			}
+			vm.push(value)
+		case c.OP_SET_GLOBAL:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			if _, ok := vm.globals[name]; !ok {
+				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined variable '%s'", name))
+			}
+			value, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			vm.globals[name] = value
+
+		// Variables locales
+		case c.OP_GET_LOCAL:
+			slot, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			vm.push(vm.stack[slot])
+		case c.OP_SET_LOCAL:
+			slot, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			value, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			vm.stack[slot] = value
+
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
@@ -143,6 +217,18 @@ func (vm *VirtualMachine) readConstant() (any, error) {
 		return nil, errors.NewLoxError(vm.currentLine(), "constant index out of range")
 	}
 	return vm.chunk.Constants[index], nil
+}
+
+func (vm *VirtualMachine) readString() (string, error) {
+	constant, err := vm.readConstant()
+	if err != nil {
+		return "", err
+	}
+	name, ok := constant.(string)
+	if !ok {
+		return "", errors.NewLoxError(vm.currentLine(), "constant is not a string")
+	}
+	return name, nil
 }
 
 // push agrega un elemento al tope del stack

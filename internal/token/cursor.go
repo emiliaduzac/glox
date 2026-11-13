@@ -8,8 +8,9 @@ import (
 // TokenCursor recorre una lista de tokens, manteniendo la posición actual.
 // Lo comparten el parser y el compiler para no repetir la lógica de avanzar y consultar tokens.
 type TokenCursor struct {
-	tokens  []Token
-	current int
+	tokens   []Token
+	current  int
+	previous Token
 }
 
 // NewTokenCursor crea un cursor posicionado en el primer token de la lista.
@@ -29,7 +30,7 @@ func (c *TokenCursor) Current() Token {
 
 // Previous devuelve el último token consumido.
 func (c *TokenCursor) Previous() Token {
-	return c.tokens[c.current-1]
+	return c.previous
 }
 
 // GetLine devuelve la línea del token actual.
@@ -54,10 +55,11 @@ func (c *TokenCursor) GetPreviousLine() int {
 
 // Advance consume el token actual y devuelve el token consumido. No avanza más allá del EOF.
 func (c *TokenCursor) Advance() Token {
+	c.previous = c.Current()
 	if !c.IsAtEnd() {
 		c.current++
 	}
-	return c.Previous()
+	return c.previous
 }
 
 // Check indica si el token actual es del tipo pasado, sin consumirlo.

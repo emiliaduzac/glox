@@ -28,7 +28,7 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Parser](docs/2-parser.md)
 - [Interpreter](docs/3-interpreter.md)
 - [Resolver](docs/4-resolver.md)
-- [Bytecode](docs/5-bytecode.md)
+- [Bytecode & Virtual Machine](docs/5-bytecode_and_vm.md)
 - [Compiler](docs/6-compiler.md)
 - [Benchmarks](docs/z-benchmarks.md)
 
@@ -48,10 +48,16 @@ go run ./cmd <archivo.lox>
 go run ./cmd
 ```
 
-Si se quiere especificar el modo (como `--scanning` o `--parsing`):
+Si se quiere especificar el modo (como `--scanning`, `--parsing`, etc):
 
 ```bash
 go run ./cmd --<mode>
+```
+
+Por deafult se ejecuta el tree-walk de la primera parte. Para usar el compilador a bytecode y la VM se agrega la flag `--vm`:
+
+```bash
+go run ./cmd --vm <archivo.lox>
 ```
 
 Para ver todos los modos:
@@ -95,8 +101,9 @@ Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de hab
 ## To Do List
 
 - [X] Chunk y VM
-- [ ] Compilador base
-- [ ] Expresiones, statements, variables globales y variables locales
+- [X] Compilador base, expresiones
+- [X] statements, variables globales 
+- [X] bloques y variables locales
 - [ ] Control de flujo
 - [ ] Funciones y closures
 - [ ] Clases y herencia

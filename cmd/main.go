@@ -6,24 +6,27 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"tp-lox/internal/compiler"
 	"tp-lox/internal/interpreter"
 	"tp-lox/internal/parser"
 	"tp-lox/internal/resolver"
 	"tp-lox/internal/scanner"
 	"tp-lox/internal/statements"
+	"tp-lox/internal/token"
+	virtualmachine "tp-lox/internal/virtual_machine"
 )
 
 type Lox struct {
 	mode        int
 	interpreter *interpreter.Interpreter
-	// vm   *vm.VirtualMachine
+	vm          *virtualmachine.VirtualMachine
 }
 
 func newLox(mode int) *Lox {
 	return &Lox{
 		mode:        mode,
 		interpreter: interpreter.NewInterpreter(),
-		// vm:   vm.NewVirtualMachine(),
+		vm:          virtualmachine.NewVirtualMachine(),
 	}
 }
 
@@ -31,7 +34,7 @@ func (l *Lox) start() {
 	args := flag.Args()
 
 	if len(args) > 1 {
-		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing|--resolve] [script]")
+		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing|--resolve|--vm] [script]")
 		os.Exit(EX_USAGE)
 	} else if len(args) == 1 {
 		l.runFile(args[0])
@@ -84,6 +87,10 @@ func (l *Lox) run(source string) error {
 		return nil
 	}
 
+	if l.mode == VMMode {
+		return l.runVM(tokens)
+	}
+
 	parser := parser.NewParser(tokens)
 	stmts, err := parser.Parse()
 	if err != nil {
@@ -118,10 +125,24 @@ func (l *Lox) run(source string) error {
 	return nil
 }
 
+func (l *Lox) runVM(tokens []token.Token) error {
+	chunk, err := compiler.NewCompiler(tokens).Compile()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return err
+	}
+	if err := l.vm.Run(chunk); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return err
+	}
+	return nil
+}
+
 func main() {
 	scanningFlag := flag.Bool("scanning", false, "corre solo el scanner, muestra los tokens")
 	parsingFlag := flag.Bool("parsing", false, "corre el scanner y el parser, muestra el AST")
 	resolveFlag := flag.Bool("resolve", false, "corre el scanner, el parser y el resolver, muestra las distancias resueltas de las variables locales")
+	vmFlag := flag.Bool("vm", false, "corre el scanner, el compilador y la VM")
 	flag.Parse()
 
 	var mode int
@@ -132,6 +153,8 @@ func main() {
 		mode = ParsingMode
 	case *resolveFlag:
 		mode = ResolveMode
+	case *vmFlag:
+		mode = VMMode
 	default:
 		mode = FullMode
 	}
