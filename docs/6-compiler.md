@@ -65,6 +65,34 @@ Al finalizar el bloque, resta uno a la profundidad y elimina de su stack falso l
 
 Un detalle más sobre las variables locales es que puede haber como máximo 256 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255.
 
+### Control de flujo
+
+#### If - Else
+
+En el tree-walk interpreter, un `if` de Lox se ejecutaba directamente con un if de Go. En el bytecode compiler, en cambio, lo implementamos como lo haría una CPU: con saltos.
+
+Hasta ahora todas las instrucciones venían siendo secuenciales, pero para los `if-else`, vamos a querer que saltee instrucciones según la rama en la que cae. Es decir: si la condición del `if` es verdadera, seguimos secuencial, pero salteamos toda la parte del `else` (si la hay). Lo mismo si la condición no se cumple: queremos saltear el cuerpo del `if`.
+
+Para eso, tenemos dos nuevas instrucciones:
+
+- `OP_JUMP`: salta la cantidad de bytes que indica su operando. Lo usamos luego del cuerpo del `if`, para que se saltee toda la parte del `else` y su cuerpo.
+- `OP_JUMP_IF_FALSE`: mira el tope del stack, donde quedó la condición, y solo si es falsa salta la cantidad de bytes que indica su operando. Lo usamos si la condición del `if` no se cumple y no queremos ejecutar su cuerpo.
+
+En ambos casos, cuando el compilador emite el salto, todavía no sabe cuántos bytes tiene que saltear, ya que, como mencionamos, vamos leyendo secuencialmente. Al emitir el `OP_JUMP_IF_FALSE` todavía no compiló el cuerpo del `if`, así que no sabe cuánto ocupa. Lo mismo pasa con el `OP_JUMP` y el cuerpo del `else`. Para resolverlo se usa el truco de **backpatching**: ponemos un placeholder de dos bytes (para abarcar cuerpos posiblemente grandes) y una vez compilado el cuerpo, volvemos y escribimos el valor real.
+
+Por último, se debe dejar el stack limpio, como cualquier statement. Cuando hay un `if`, la condición puede ser verdadera o falsa, pero en ambos casos queda en el tope del stack. Además, el compilador no sabe como se evalúa la condición, entonces tenemos que cubrir ambos casos. El orden quedaría:
+
+```
+<condición>
+OP_JUMP_IF_FALSE <hasta el POP del else, antes de ejecutar el cuerpo del else>
+OP_POP // solo se va a ejecutar si la condición dio verdadera
+<cuerpo del if>
+OP_JUMP <hasta después del else>
+OP_POP // a partir de acá, solo si la condición dio falsa, aunque no haya cuerpo de else
+<cuerpo del else (opcional)>
+<lo que sigue>
+```
+
 ### Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
