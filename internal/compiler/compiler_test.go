@@ -874,7 +874,7 @@ func TestCompileOr(t *testing.T) {
 	})
 
 	t.Run("Error si falta el operando izquierdo", func(t *testing.T) {
-		err := compileSourceError(t, "and or;")
+		err := compileSourceError(t, "or ture;")
 		utils.AssertError(t, err)
 	})
 }

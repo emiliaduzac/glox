@@ -30,7 +30,7 @@ Acá es que también debemos manejar "a mano" el caso `default` y estar atentos 
 
 4. Sobre el operador módulo (`%`): Al manejarlo Go solo lo aplica a enteros, por lo que usamos `math.Mod` para preservar los flotantes y no caer en panics. 
 
-5. **Operadores lógicos**: a diferencia de otros lenguajes, evaluar estos operadores no se resuelve a un booleano, sino que devuelven el valor del operando que "decidió" el resultado. Es decir: el de la izquierda si hubo cortocircuito (explicados en [parser.md](parser.md)), el de la derecha si no. 
+5. **Operadores lógicos**: a diferencia de otros lenguajes, evaluar estos operadores no se resuelve a un booleano, sino que devuelven el valor del operando que "decidió" el resultado. Es decir: el de la izquierda si hubo cortocircuito (explicados en [parser.md](2-parser.md)), el de la derecha si no. 
 
 ### Funciones y llamadas
 
