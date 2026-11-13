@@ -154,6 +154,8 @@ func (c *Compiler) statement() error {
 		return c.printStatement()
 	} else if c.cursor.Match(token.IF) {
 		return c.ifStatement()
+	} else if c.cursor.Match(token.WHILE) {
+		return c.whileStatement()
 	} else if c.cursor.Match(token.LEFT_BRACE) {
 		c.beginScope()
 		err := c.block()
@@ -232,6 +234,33 @@ func (c *Compiler) ifStatement() error {
 	return nil
 }
 
+func (c *Compiler) whileStatement() error {
+	loopStart := len(c.chunk.Bytes)
+	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after 'while'"); err != nil {
+		return err
+	}
+	if err := c.expression(); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after condition"); err != nil {
+		return err
+	}
+
+	exitJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	c.emit(byte(chunk.OP_POP))
+	if err := c.statement(); err != nil {
+		return err
+	}
+	if err := c.emitLoop(loopStart); err != nil {
+		return err
+	}
+	if err := c.patchJump(exitJump); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
+	return nil
+}
+
 func (c *Compiler) expressionStatement() error {
 	if err := c.expression(); err != nil {
 		return err
@@ -266,6 +295,18 @@ func (c *Compiler) emitConstant(value any) error {
 func (c *Compiler) emitJump(instruction chunk.OpCode) int {
 	c.emit(byte(instruction), 0xff, 0xff)
 	return len(c.chunk.Bytes) - 2
+}
+
+func (c *Compiler) emitLoop(loopStart int) error {
+	c.emit(byte(chunk.OP_LOOP))
+
+	offset := len(c.chunk.Bytes) - loopStart + 2
+	if offset > math.MaxUint16 {
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "loop body too large")
+	}
+
+	c.emit(byte(offset>>8), byte(offset))
+	return nil
 }
 
 func (c *Compiler) patchJump(offset int) error {
