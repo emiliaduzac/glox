@@ -1,4 +1,4 @@
-## Bytecode
+##  Bytecode y Virtual Machine
 
 En nuestra versión anterior, teníamos un **tree walking interpreter**, pero vimos que esto hacía que no fuera veloz. Para mejorar nuestro lenguaje, implementaremos un **bytecode compiler**.
 

@@ -83,7 +83,7 @@ func (c *Compiler) parseVariable(expected string) (byte, error) {
 	if err := c.cursor.Consume(token.IDENTIFIER, expected); err != nil {
 		return 0, err
 	}
-	if err := c.declareVariable(); err != nil {
+	if err := c.declareLocalVariable(); err != nil {
 		return 0, err
 	}
 	if c.scopeDepth > 0 {
@@ -104,7 +104,7 @@ func (c *Compiler) defineVariable(global byte) {
 	c.emit(byte(chunk.OP_DEFINE_GLOBAL), global)
 }
 
-func (c *Compiler) declareVariable() error {
+func (c *Compiler) declareLocalVariable() error {
 	if c.scopeDepth == 0 {
 		return nil
 	}

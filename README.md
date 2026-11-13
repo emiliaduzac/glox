@@ -48,7 +48,7 @@ go run ./cmd <archivo.lox>
 go run ./cmd
 ```
 
-Si se quiere especificar el modo (como `--scanning` o `--parsing`):
+Si se quiere especificar el modo (como `--scanning`, `--parsing`, etc):
 
 ```bash
 go run ./cmd --<mode>
