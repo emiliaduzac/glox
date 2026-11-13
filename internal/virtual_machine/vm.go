@@ -185,6 +185,19 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			}
 			vm.stack[slot] = value
 
+		case c.OP_JUMP_IF_FALSE:
+			offset, err := vm.readShort()
+			if err != nil {
+				return err
+			}
+			value, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			if !utils.IsTruthy(value) {
+				vm.ip += offset
+			}
+
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
@@ -229,6 +242,18 @@ func (vm *VirtualMachine) readString() (string, error) {
 		return "", errors.NewLoxError(vm.currentLine(), "constant is not a string")
 	}
 	return name, nil
+}
+
+func (vm *VirtualMachine) readShort() (int, error) {
+	high, err := vm.readByte()
+	if err != nil {
+		return 0, err
+	}
+	low, err := vm.readByte()
+	if err != nil {
+		return 0, err
+	}
+	return int(high)<<8 | int(low), nil
 }
 
 // push agrega un elemento al tope del stack

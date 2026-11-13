@@ -2,6 +2,7 @@ package compiler
 
 import (
 	stderrors "errors"
+	"math"
 	"tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/token"
@@ -123,7 +124,7 @@ func (c *Compiler) declareLocalVariable() error {
 }
 
 func (c *Compiler) addLocal(name token.Token) error {
-	if len(c.locals) == 256 {
+	if len(c.locals) == math.MaxUint8+1 {
 		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope")
 	}
 	local := Local{Name: name, Depth: -1} // no inicializada
@@ -151,6 +152,8 @@ func (c *Compiler) synchronize() {
 func (c *Compiler) statement() error {
 	if c.cursor.Match(token.PRINT) {
 		return c.printStatement()
+	} else if c.cursor.Match(token.IF) {
+		return c.ifStatement()
 	} else if c.cursor.Match(token.LEFT_BRACE) {
 		c.beginScope()
 		err := c.block()
@@ -197,6 +200,24 @@ func (c *Compiler) block() error {
 	return stderrors.Join(errs...)
 }
 
+func (c *Compiler) ifStatement() error {
+	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after if"); err != nil {
+		return err
+	}
+	if err := c.expression(); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after condition"); err != nil {
+		return err
+	}
+	thenJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	if err := c.statement(); err != nil {
+		return err
+	}
+	c.patchJump(thenJump)
+	return nil
+}
+
 func (c *Compiler) expressionStatement() error {
 	if err := c.expression(); err != nil {
 		return err
@@ -228,9 +249,24 @@ func (c *Compiler) emitConstant(value any) error {
 	return nil
 }
 
+func (c *Compiler) emitJump(instruction chunk.OpCode) int {
+	c.emit(byte(instruction), 0xff, 0xff)
+	return len(c.chunk.Bytes) - 2
+}
+
+func (c *Compiler) patchJump(offset int) error {
+	jump := len(c.chunk.Bytes) - offset - 2
+	if jump > math.MaxUint16 {
+		errors.NewLoxError(c.cursor.GetPreviousLine(), "too much code to jump over")
+	}
+	c.chunk.Bytes[offset] = byte(jump >> 8)
+	c.chunk.Bytes[offset+1] = byte(jump)
+	return nil
+}
+
 func (c *Compiler) makeConstant(value any) (byte, error) {
 	index := c.chunk.AddConstant(value)
-	if index > 255 {
+	if index > math.MaxUint8 {
 		return 0, errors.NewLoxError(c.cursor.GetPreviousLine(), "too many constants in one chunk")
 	}
 	return byte(index), nil
