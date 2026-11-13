@@ -7,16 +7,25 @@ import (
 	"tp-lox/internal/token"
 )
 
+type Local struct {
+	Name  token.Token
+	Depth int
+}
+
 type Compiler struct {
-	cursor *token.TokenCursor
-	chunk  *chunk.Chunk
+	cursor     *token.TokenCursor
+	chunk      *chunk.Chunk
+	locals     []Local
+	scopeDepth int
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
 func NewCompiler(tokens []token.Token) *Compiler {
 	return &Compiler{
-		cursor: token.NewTokenCursor(tokens),
-		chunk:  chunk.NewChunk(),
+		cursor:     token.NewTokenCursor(tokens),
+		chunk:      chunk.NewChunk(),
+		locals:     []Local{},
+		scopeDepth: 0,
 	}
 }
 
@@ -74,6 +83,12 @@ func (c *Compiler) parseVariable(expected string) (byte, error) {
 	if err := c.cursor.Consume(token.IDENTIFIER, expected); err != nil {
 		return 0, err
 	}
+	if err := c.declareLocalVariable(); err != nil {
+		return 0, err
+	}
+	if c.scopeDepth > 0 {
+		return 0, nil
+	}
 	return c.identifierConstant(c.cursor.Previous())
 }
 
@@ -82,7 +97,42 @@ func (c *Compiler) identifierConstant(name token.Token) (byte, error) {
 }
 
 func (c *Compiler) defineVariable(global byte) {
+	if c.scopeDepth > 0 {
+		c.markInitialized()
+		return
+	}
 	c.emit(byte(chunk.OP_DEFINE_GLOBAL), global)
+}
+
+func (c *Compiler) declareLocalVariable() error {
+	if c.scopeDepth == 0 {
+		return nil
+	}
+
+	name := c.cursor.Previous()
+	for i := len(c.locals) - 1; i >= 0; i-- {
+		local := c.locals[i]
+		if local.Depth != -1 && local.Depth < c.scopeDepth {
+			break
+		}
+		if name.Lexeme == local.Name.Lexeme {
+			return errors.NewLoxError(c.cursor.GetPreviousLine(), "already a variable with this name in this scope")
+		}
+	}
+	return c.addLocal(name)
+}
+
+func (c *Compiler) addLocal(name token.Token) error {
+	if len(c.locals) == 256 {
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope")
+	}
+	local := Local{Name: name, Depth: -1} // no inicializada
+	c.locals = append(c.locals, local)
+	return nil
+}
+
+func (c *Compiler) markInitialized() {
+	c.locals[len(c.locals)-1].Depth = c.scopeDepth
 }
 
 func (c *Compiler) synchronize() {
@@ -101,8 +151,26 @@ func (c *Compiler) synchronize() {
 func (c *Compiler) statement() error {
 	if c.cursor.Match(token.PRINT) {
 		return c.printStatement()
+	} else if c.cursor.Match(token.LEFT_BRACE) {
+		c.beginScope()
+		err := c.block()
+		c.endScope() // siempre cerramos el scope, haya habido error o no
+		return err
 	}
 	return c.expressionStatement()
+}
+
+func (c *Compiler) beginScope() {
+	c.scopeDepth++
+}
+
+func (c *Compiler) endScope() {
+	c.scopeDepth--
+
+	for len(c.locals) > 0 && c.locals[len(c.locals)-1].Depth > c.scopeDepth {
+		c.emit(byte(chunk.OP_POP))
+		c.locals = c.locals[:len(c.locals)-1]
+	}
 }
 
 func (c *Compiler) printStatement() error {
@@ -114,6 +182,19 @@ func (c *Compiler) printStatement() error {
 	}
 	c.emit(byte(chunk.OP_PRINT))
 	return nil
+}
+
+func (c *Compiler) block() error {
+	var errs []error
+	for !c.cursor.Check(token.RIGHT_BRACE) && !c.cursor.Check(token.EOF) {
+		if err := c.declaration(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if err := c.cursor.Consume(token.RIGHT_BRACE, "'}' after block"); err != nil {
+		errs = append(errs, err)
+	}
+	return stderrors.Join(errs...)
 }
 
 func (c *Compiler) expressionStatement() error {
@@ -271,19 +352,47 @@ func (c *Compiler) literal(_ bool) error {
 }
 
 func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
-	arg, err := c.identifierConstant(name)
+	var getOp, setOp chunk.OpCode
+	var arg byte
+
+	localIndex, err := c.resolveLocal(name)
 	if err != nil {
 		return err
 	}
+	if localIndex != -1 {
+		getOp, setOp = chunk.OP_GET_LOCAL, chunk.OP_SET_LOCAL
+		arg = byte(localIndex)
+	} else {
+		var err error
+		arg, err = c.identifierConstant(name)
+		if err != nil {
+			return err
+		}
+		getOp, setOp = chunk.OP_GET_GLOBAL, chunk.OP_SET_GLOBAL
+	}
+
 	if canAssign && c.cursor.Match(token.EQUAL) {
 		if err := c.expression(); err != nil {
 			return err
 		}
-		c.emit(byte(chunk.OP_SET_GLOBAL), arg)
+		c.emit(byte(setOp), arg)
 	} else {
-		c.emit(byte(chunk.OP_GET_GLOBAL), arg)
+		c.emit(byte(getOp), arg)
 	}
 	return nil
+}
+
+func (c *Compiler) resolveLocal(name token.Token) (int, error) {
+	for i := len(c.locals) - 1; i >= 0; i-- {
+		local := c.locals[i]
+		if name.Lexeme == local.Name.Lexeme {
+			if local.Depth == -1 {
+				return 0, errors.NewLoxError(c.cursor.GetPreviousLine(), "can't read local variable in its own initializer")
+			}
+			return i, nil
+		}
+	}
+	return -1, nil
 }
 
 func (c *Compiler) variable(canAssign bool) error {

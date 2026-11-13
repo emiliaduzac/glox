@@ -1149,3 +1149,51 @@ func TestRunChunks(t *testing.T) {
 		utils.AssertValue(t, out.String(), "1\n")
 	})
 }
+
+func TestOpGetLocal(t *testing.T) {
+	t.Run("Copia el valor sin sacarlo de su lugar", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 10.0)
+		chunk.Write(byte(c.OP_GET_LOCAL), line)
+		chunk.Write(0, line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, vm.stack[0], 10.0)
+		utils.AssertValue(t, vm.stack[1], 10.0)
+	})
+
+	t.Run("Copia al tope el valor del índice indicado, no el ultimo", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, 10.0)
+		writeConstant(chunk, 20.0)
+		chunk.Write(byte(c.OP_GET_LOCAL), line)
+		chunk.Write(0, line) // el 10, en indice 0
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(vm.stack), 3)
+		utils.AssertValue(t, vm.stack[2], 10.0)
+	})
+}
+
+func TestOpSetLocal(t *testing.T) {
+	t.Run("Asignar cambia el valor de la variable y lo deja en el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		const variableIndex = 0
+		initialValue, newValue := 1.0, 2.0
+
+		writeConstant(chunk, initialValue)
+		writeConstant(chunk, newValue)
+		chunk.Write(byte(c.OP_SET_LOCAL), line)
+		chunk.Write(variableIndex, line)
+
+		err := vm.Run(chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, vm.stack[variableIndex], newValue)
+		utils.AssertValue(t, vm.stack[len(vm.stack)-1], newValue)
+	})
+}
