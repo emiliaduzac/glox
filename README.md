@@ -54,6 +54,12 @@ Si se quiere especificar el modo (como `--scanning`, `--parsing`, etc):
 go run ./cmd --<mode>
 ```
 
+Por deafult se ejecuta el tree-walk de la primera parte. Para usar el compilador a bytecode y la VM se agrega la flag `--vm`:
+
+```bash
+go run ./cmd --vm <archivo.lox>
+```
+
 Para ver todos los modos:
 
 ```bash
@@ -96,7 +102,7 @@ Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de hab
 
 - [X] Chunk y VM
 - [X] Compilador base, expresiones
-- [ ] statements, variables globales 
+- [X] statements, variables globales 
 - [X] bloques y variables locales
 - [ ] Control de flujo
 - [ ] Funciones y closures
