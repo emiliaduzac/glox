@@ -17,6 +17,8 @@ type Compiler struct {
 	chunk      *chunk.Chunk
 	locals     []Local
 	scopeDepth int
+	errs       []error
+	panicMode  bool
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
@@ -30,14 +32,11 @@ func NewCompiler(tokens []token.Token) *Compiler {
 }
 
 func (c *Compiler) Compile() (*chunk.Chunk, error) {
-	var errs []error
 	for !c.cursor.Match(token.EOF) {
-		if err := c.declaration(); err != nil {
-			errs = append(errs, err)
-		}
+		c.declaration()
 	}
-	if len(errs) > 0 {
-		return nil, stderrors.Join(errs...)
+	if len(c.errs) > 0 {
+		return nil, stderrors.Join(c.errs...)
 	}
 	c.emitReturn()
 	return c.chunk, nil
@@ -47,7 +46,7 @@ func (c *Compiler) expression() error {
 	return c.parsePrecedence(PREC_ASSIGNMENT)
 }
 
-func (c *Compiler) declaration() error {
+func (c *Compiler) declaration() {
 	var err error
 	if c.cursor.Match(token.VAR) {
 		err = c.varDeclaration()
@@ -55,9 +54,19 @@ func (c *Compiler) declaration() error {
 		err = c.statement()
 	}
 	if err != nil {
+		c.report(err)
+	}
+	if c.panicMode {
 		c.synchronize()
 	}
-	return err
+}
+
+func (c *Compiler) report(err error) {
+	if c.panicMode {
+		return
+	}
+	c.panicMode = true
+	c.errs = append(c.errs, err)
 }
 
 func (c *Compiler) varDeclaration() error {
@@ -83,9 +92,7 @@ func (c *Compiler) parseVariable(expected string) (byte, error) {
 	if err := c.cursor.Consume(token.IDENTIFIER, expected); err != nil {
 		return 0, err
 	}
-	if err := c.declareLocalVariable(); err != nil {
-		return 0, err
-	}
+	c.declareLocalVariable()
 	if c.scopeDepth > 0 {
 		return 0, nil
 	}
@@ -104,9 +111,9 @@ func (c *Compiler) defineVariable(global byte) {
 	c.emit(byte(chunk.OP_DEFINE_GLOBAL), global)
 }
 
-func (c *Compiler) declareLocalVariable() error {
+func (c *Compiler) declareLocalVariable() {
 	if c.scopeDepth == 0 {
-		return nil
+		return
 	}
 
 	name := c.cursor.Previous()
@@ -116,19 +123,19 @@ func (c *Compiler) declareLocalVariable() error {
 			break
 		}
 		if name.Lexeme == local.Name.Lexeme {
-			return errors.NewLoxError(c.cursor.GetPreviousLine(), "already a variable with this name in this scope")
+			c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "already a variable with this name in this scope"))
 		}
 	}
-	return c.addLocal(name)
+	c.addLocal(name)
 }
 
-func (c *Compiler) addLocal(name token.Token) error {
+func (c *Compiler) addLocal(name token.Token) {
 	if len(c.locals) == 256 {
-		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope")
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope"))
+		return
 	}
 	local := Local{Name: name, Depth: -1} // no inicializada
 	c.locals = append(c.locals, local)
-	return nil
 }
 
 func (c *Compiler) markInitialized() {
@@ -136,6 +143,7 @@ func (c *Compiler) markInitialized() {
 }
 
 func (c *Compiler) synchronize() {
+	c.panicMode = false
 	for !c.cursor.IsAtEnd() {
 		if c.cursor.GetPreviousType() == token.SEMICOLON {
 			return
@@ -185,16 +193,10 @@ func (c *Compiler) printStatement() error {
 }
 
 func (c *Compiler) block() error {
-	var errs []error
 	for !c.cursor.Check(token.RIGHT_BRACE) && !c.cursor.Check(token.EOF) {
-		if err := c.declaration(); err != nil {
-			errs = append(errs, err)
-		}
+		c.declaration()
 	}
-	if err := c.cursor.Consume(token.RIGHT_BRACE, "'}' after block"); err != nil {
-		errs = append(errs, err)
-	}
-	return stderrors.Join(errs...)
+	return c.cursor.Consume(token.RIGHT_BRACE, "'}' after block")
 }
 
 func (c *Compiler) expressionStatement() error {
@@ -355,10 +357,7 @@ func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
 	var getOp, setOp chunk.OpCode
 	var arg byte
 
-	localIndex, err := c.resolveLocal(name)
-	if err != nil {
-		return err
-	}
+	localIndex := c.resolveLocal(name)
 	if localIndex != -1 {
 		getOp, setOp = chunk.OP_GET_LOCAL, chunk.OP_SET_LOCAL
 		arg = byte(localIndex)
@@ -382,17 +381,17 @@ func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
 	return nil
 }
 
-func (c *Compiler) resolveLocal(name token.Token) (int, error) {
+func (c *Compiler) resolveLocal(name token.Token) int {
 	for i := len(c.locals) - 1; i >= 0; i-- {
 		local := c.locals[i]
 		if name.Lexeme == local.Name.Lexeme {
 			if local.Depth == -1 {
-				return 0, errors.NewLoxError(c.cursor.GetPreviousLine(), "can't read local variable in its own initializer")
+				c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't read local variable in its own initializer"))
 			}
-			return i, nil
+			return i
 		}
 	}
-	return -1, nil
+	return -1
 }
 
 func (c *Compiler) variable(canAssign bool) error {

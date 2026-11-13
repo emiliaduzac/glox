@@ -362,6 +362,35 @@ func TestCompileErrorSynchronization(t *testing.T) {
 		utils.AssertError(t, err)
 		utils.AssertValue(t, chunk == nil, true)
 	})
+
+	t.Run("Un error dentro de un bloque anidado se muestra una sola vez", func(t *testing.T) {
+		errs := compileErrors(t, `{ var a = "x"; { var a = a; } }`)
+
+		utils.AssertValue(t, len(errs), 1)
+		utils.AssertErrorMessage(t, errs[0], "can't read local variable in its own initializer")
+	})
+
+	t.Run("Un error dentro de un bloque no oculta los errores de lo que sigue", func(t *testing.T) {
+		errs := compileErrors(t, "{ print 1 +; }\na = ;")
+
+		utils.AssertValue(t, len(errs), 2)
+		utils.AssertErrorMessage(t, errs[0], "[line 1] Error: expected expression")
+		utils.AssertErrorMessage(t, errs[1], "[line 2] Error: expected expression")
+	})
+
+	t.Run("Mientras hay un error sin sincronizar no se reportan otros del mismo statement", func(t *testing.T) {
+		errs := compileErrors(t, "{ var a = a + ; }")
+
+		utils.AssertValue(t, len(errs), 1)
+		utils.AssertErrorMessage(t, errs[0], "can't read local variable in its own initializer")
+	})
+
+	t.Run("Leer una variable local en su propio inicializador no genera errores falsos más adelante", func(t *testing.T) {
+		errs := compileErrors(t, "{ var a = a; }\n{ var a = 1; }")
+
+		utils.AssertValue(t, len(errs), 1)
+		utils.AssertErrorMessage(t, errs[0], "can't read local variable in its own initializer")
+	})
 }
 
 func TestCompileGlobalVarDeclaration(t *testing.T) {
