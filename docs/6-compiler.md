@@ -107,6 +107,14 @@ Algo interesante, igual que en la implementación anterior, es que el resultado 
 Para los ciclos necesitamos saltar hacia **atrás**, para volver a ejecutar una parte del código. Para eso agregamos una nueva instrucción: `OP_LOOP`. Funciona igual que `OP_JUMP` pero resta en vez de sumar. A diferencia de los otros saltos, no necesita backpatching: cuando se emite, ya sabemos a dónde tiene que volver: el inicio del ciclo, que ya fue compilado.
 
 - **while**: apenas nos encontramos con un `while`, guardamos la posición actual del chunk, que es donde va a empezar la condición. Luego compilamos la condición y emitimos un `OP_JUMP_IF_FALSE`, que actúa igual que en el `if`: si la condición es falsa, saltea todo el cuerpo. Le sigue un `OP_POP` para eliminar la condición del stack, que solo se ejecuta si la condición fue verdadera (sino, se hubiese salteado). Luego se compila el cuerpo y el `OP_LOOP` que vuelve a la posición que habíamos guardado, para evaluar la condición otra vez. Recién ahí terminan las instrucciones del ciclo y podemos completar el `OP_JUMP_IF_FALSE`, que salta hasta un último `OP_POP`, que se ejecuta una vez que la condición es falsa.
+- **for**: este tipo de ciclo tiene 3 partes y todas son opcionales. Todo el `for` está dentro de un scope propio, así que una variable declarada en el inicializador es local al ciclo.
+  En primer lugar, el _inicializador_, que puede ser la declaración de una variable o una expresión, y **se debe ejecutar una única vez**. Recién después de eso marcamos el inicio del ciclo, guardando la posición actual del chunk.
+  A eso le sigue la _condición_, que, igual que en el `while`, emite un `OP_JUMP_IF_FALSE` para salir del ciclo cuando no se cumple. Si no hay condición, no hay salto y el ciclo sería infinito.
+  Finalmente, el _incremento_, que a pesar de estar escrito antes del cuerpo, debe ejecutarse **después** de cada iteración. Como el compilador lo emite en el orden en que lo lee, el incremento queda en el bytecode entre la condición y el cuerpo, y lo resolvemos con saltos para que la VM los recorra en este orden:
+  - Después de la condición, un `OP_JUMP` saltea el incremento y va directo al cuerpo.
+  - Al final del cuerpo, un `OP_LOOP` vuelve al incremento.
+  - Al final del incremento, otro `OP_LOOP` vuelve a la condición.
+  Si no hay incremento, el cuerpo vuelve directamente a la condición, como en el `while`. Por último, se completa el salto de salida de la condición.
 
 ### Tests
 

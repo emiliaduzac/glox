@@ -174,11 +174,12 @@ func (c *Compiler) statement() error {
 		return c.ifStatement()
 	} else if c.cursor.Match(token.WHILE) {
 		return c.whileStatement()
+	} else if c.cursor.Match(token.FOR) {
+		return c.forStatement()
 	} else if c.cursor.Match(token.LEFT_BRACE) {
 		c.beginScope()
-		err := c.block()
-		c.endScope() // siempre cerramos el scope, haya habido error o no
-		return err
+		defer c.endScope()
+		return c.block()
 	}
 	return c.expressionStatement()
 }
@@ -271,6 +272,91 @@ func (c *Compiler) whileStatement() error {
 	}
 	c.emit(byte(chunk.OP_POP))
 	return nil
+}
+
+func (c *Compiler) forStatement() error {
+	c.beginScope()
+	defer c.endScope()
+
+	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after 'for'"); err != nil {
+		return err
+	}
+	if err := c.forInitializer(); err != nil {
+		return err
+	}
+
+	loopStart := len(c.chunk.Bytes)
+	exitJump, err := c.forCondition()
+	if err != nil {
+		return err
+	}
+	loopStart, err = c.forIncrement(loopStart)
+	if err != nil {
+		return err
+	}
+
+	if err := c.statement(); err != nil {
+		return err
+	}
+	if err := c.emitLoop(loopStart); err != nil {
+		return err
+	}
+
+	if exitJump != -1 {
+		if err := c.patchJump(exitJump); err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_POP))
+	}
+	return nil
+}
+
+func (c *Compiler) forInitializer() error {
+	if c.cursor.Match(token.SEMICOLON) {
+		return nil // sin inicializador
+	}
+	if c.cursor.Match(token.VAR) {
+		return c.varDeclaration()
+	}
+	return c.expressionStatement()
+}
+
+func (c *Compiler) forCondition() (int, error) {
+	if c.cursor.Match(token.SEMICOLON) {
+		return -1, nil // sin condición
+	}
+	if err := c.expression(); err != nil {
+		return -1, err
+	}
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after loop condition"); err != nil {
+		return -1, err
+	}
+	exitJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	c.emit(byte(chunk.OP_POP))
+	return exitJump, nil
+}
+
+func (c *Compiler) forIncrement(loopStart int) (int, error) {
+	if c.cursor.Match(token.RIGHT_PAREN) {
+		return loopStart, nil // sin incremento
+	}
+
+	bodyJump := c.emitJump(chunk.OP_JUMP)
+	incrementStart := len(c.chunk.Bytes)
+	if err := c.expression(); err != nil {
+		return loopStart, err
+	}
+	c.emit(byte(chunk.OP_POP))
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after for clauses"); err != nil {
+		return loopStart, err
+	}
+	if err := c.emitLoop(loopStart); err != nil {
+		return loopStart, err
+	}
+	if err := c.patchJump(bodyJump); err != nil {
+		return loopStart, err
+	}
+	return incrementStart, nil
 }
 
 func (c *Compiler) expressionStatement() error {

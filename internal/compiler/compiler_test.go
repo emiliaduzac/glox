@@ -758,6 +758,8 @@ const (
 	printSize    = 1
 	constantSize = 2 // OP_CONSTANT + indice
 	jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
+	loopSize     = 3 // OP_LOOP + 2 bytes de offset
+	getLocalSize = 2 // OP_GET_LOCAL + índice
 
 	// offsets de los saltos para un then o un else de la forma `print n;`
 	skipThen = popSize + constantSize + printSize + jumpSize // el then y el JUMP que saltea el else
@@ -942,5 +944,119 @@ func TestCompileOr(t *testing.T) {
 	t.Run("Error si falta el operando izquierdo", func(t *testing.T) {
 		err := compileSourceError(t, "or ture;")
 		utils.AssertError(t, err)
+	})
+}
+
+func TestCompileWhile(t *testing.T) {
+	t.Run("While: el cuerpo vuelve a la condición", func(t *testing.T) {
+		compiled := compileSource(t, "while (false) print 1;")
+		skipBody := popSize + constantSize + printSize + loopSize // el POP, el cuerpo y el LOOP
+		backToCondition := literalSize + jumpSize + skipBody      // todo, desde la condición hasta el final del LOOP
+
+		assertBytes(t, compiled,
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody), // si es falsa, sale del ciclo
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToCondition), // vuelve a evaluar la condición
+			byte(c.OP_POP), // salida: saca la condición
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el paréntesis de apertura", func(t *testing.T) {
+		err := compileSourceError(t, "while true) print 1;")
+		utils.AssertErrorMessage(t, err, "'(' after 'while'")
+	})
+
+	t.Run("Error si falta el paréntesis de cierre", func(t *testing.T) {
+		err := compileSourceError(t, "while (true print 1;")
+		utils.AssertErrorMessage(t, err, "')' after condition")
+	})
+}
+
+func TestCompileFor(t *testing.T) {
+	t.Run("Sin nada: ciclo infinito, sin salto de salida", func(t *testing.T) {
+		compiled := compileSource(t, "for (;;) print 1;")
+		backToStart := constantSize + printSize + loopSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToStart),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Solo con condición: igual que un while", func(t *testing.T) {
+		compiled := compileSource(t, "for (; false;) print 1;")
+		skipBody := popSize + constantSize + printSize + loopSize
+		backToCondition := literalSize + jumpSize + skipBody
+
+		assertBytes(t, compiled,
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody),
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToCondition),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Con inicializador: la variable es local al for", func(t *testing.T) {
+		compiled := compileSource(t, "for (var i = 0;;) print i;")
+		backToStart := getLocalSize + printSize + loopSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_CONSTANT), 0, // var i = 0: se ejecuta una sola vez, antes del ciclo
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToStart),
+			byte(c.OP_POP), // endScope: saca i
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Con incremento: el cuerpo vuelve al incremento y el incremento a la condición", func(t *testing.T) {
+		compiled := compileSource(t, "for (; false; 2) print 1;")
+		incrementSize := constantSize + popSize
+		bodySize := constantSize + printSize
+		skipToExit := popSize + jumpSize + incrementSize + loopSize + bodySize + loopSize
+		skipIncrement := incrementSize + loopSize
+		backToCondition := literalSize + jumpSize + popSize + jumpSize + incrementSize + loopSize
+		backToIncrement := incrementSize + loopSize + bodySize + loopSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_FALSE),                              // condición: inicio del ciclo
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipToExit), // si es falsa, sale del ciclo
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(skipIncrement), // saltea el incremento y va al cuerpo
+			byte(c.OP_CONSTANT), 0, // incremento
+			byte(c.OP_POP),
+			byte(c.OP_LOOP), 0, byte(backToCondition), // después del incremento, vuelve a la condición
+			byte(c.OP_CONSTANT), 1, // cuerpo
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToIncrement), // después del cuerpo, vuelve al incremento
+			byte(c.OP_POP), // salida: saca la condición
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el paréntesis de apertura", func(t *testing.T) {
+		err := compileSourceError(t, "for ;;) print 1;")
+		utils.AssertErrorMessage(t, err, "'(' after 'for'")
+	})
+
+	t.Run("Error si falta el ';' después de la condición", func(t *testing.T) {
+		err := compileSourceError(t, "for (; true) print 1;")
+		utils.AssertErrorMessage(t, err, "';' after loop condition")
+	})
+
+	t.Run("Error si falta el paréntesis de cierre", func(t *testing.T) {
+		err := compileSourceError(t, "for (;; 2 print 1;")
+		utils.AssertErrorMessage(t, err, "')' after for clauses")
 	})
 }
