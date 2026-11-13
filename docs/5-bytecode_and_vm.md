@@ -46,6 +46,8 @@ Con el control de flujo, la VM deja de ejecutar siempre la instrucción siguient
 
 La cantidad de bytes a saltear viene en el operando, que ocupa dos bytes, así que la VM los lee con `readShort()` y los vuelve a juntar en un solo número. Para la VM esto no implica mucha más lógica que saber a dónde mover el instruction pointer, lo más interesante ocurre en el [compilador](6-compiler.md).
 
+El caso de los ciclos es parecido, pero al revés: el `OP_LOOP` resta un offset en vez de sumarlo, para volver al inicio del ciclo.
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.

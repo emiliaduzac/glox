@@ -102,6 +102,12 @@ Para los operadores lógicos tampoco vamos a crear nuevas instrucciones: vamos a
 
 Algo interesante, igual que en la implementación anterior, es que el resultado no es necesariamente un booleano, sino uno de los dos operandos tal cual. Cuál de los dos depende de si el primero es *truthy* (en Lox, todo menos `false` y `nil`). Por ejemplo, `"hola" or "chau"` da `"hola"`, porque `"hola"` es *truthy*.
 
+#### Iteraciones
+
+Para los ciclos necesitamos saltar hacia **atrás**, para volver a ejecutar una parte del código. Para eso agregamos una nueva instrucción: `OP_LOOP`. Funciona igual que `OP_JUMP` pero resta en vez de sumar. A diferencia de los otros saltos, no necesita backpatching: cuando se emite, ya sabemos a dónde tiene que volver: el inicio del ciclo, que ya fue compilado.
+
+- **while**: apenas nos encontramos con un `while`, guardamos la posición actual del chunk, que es donde va a empezar la condición. Luego compilamos la condición y emitimos un `OP_JUMP_IF_FALSE`, que actúa igual que en el `if`: si la condición es falsa, saltea todo el cuerpo. Le sigue un `OP_POP` para eliminar la condición del stack, que solo se ejecuta si la condición fue verdadera (sino, se hubiese salteado). Luego se compila el cuerpo y el `OP_LOOP` que vuelve a la posición que habíamos guardado, para evaluar la condición otra vez. Recién ahí terminan las instrucciones del ciclo y podemos completar el `OP_JUMP_IF_FALSE`, que salta hasta un último `OP_POP`, que se ejecuta una vez que la condición es falsa.
+
 ### Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:

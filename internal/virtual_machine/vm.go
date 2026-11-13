@@ -205,6 +205,13 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			}
 			vm.ip += offset
 
+		case c.OP_LOOP:
+			offset, err := vm.readShort()
+			if err != nil {
+				return err
+			}
+			vm.ip -= offset
+
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
