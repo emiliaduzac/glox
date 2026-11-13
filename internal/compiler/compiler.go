@@ -449,10 +449,19 @@ func (c *Compiler) variable(canAssign bool) error {
 	return c.namedVariable(c.cursor.Previous(), canAssign)
 }
 
-// TO DO:
 func (c *Compiler) logicAnd(_ bool) error {
+	endJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	c.emit(byte(chunk.OP_POP))
+	if err := c.parsePrecedence(PREC_AND); err != nil {
+		return err
+	}
+	if err := c.patchJump(endJump); err != nil {
+		return err
+	}
 	return nil
 }
+
+// TO DO:
 func (c *Compiler) logicOr(_ bool) error {
 	return nil
 }

@@ -693,7 +693,7 @@ const (
 	constantSize = 2 // OP_CONSTANT + indice
 	jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
 
-	// offsets de los saltos para un `then` o `else` de la forma `print n;`
+	// offsets de los saltos para un then o un else de la forma `print n;`
 	skipThen = popSize + constantSize + printSize + jumpSize // el then y el JUMP que saltea el else
 	skipElse = popSize + constantSize + printSize            // el POP de la condición y el else
 )
@@ -823,5 +823,31 @@ func TestCompileIfWithElse(t *testing.T) {
 	t.Run("Error si falta el cuerpo del else", func(t *testing.T) {
 		err := compileSourceError(t, "if (true) print 1; else")
 		utils.AssertErrorMessage(t, err, "expected expression")
+	})
+}
+
+func TestCompileAnd(t *testing.T) {
+	t.Run("And se compila como un salto sobre el operando derecho", func(t *testing.T) {
+		compiled := compileSource(t, "true and false;")
+		skipRight := popSize + literalSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipRight),
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el operando derecho", func(t *testing.T) {
+		err := compileSourceError(t, "true and;")
+		utils.AssertError(t, err)
+	})
+
+	t.Run("Error si falta el operando izquierdo", func(t *testing.T) {
+		err := compileSourceError(t, "and true;")
+		utils.AssertError(t, err)
 	})
 }
