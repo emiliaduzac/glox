@@ -492,6 +492,7 @@ func TestCompileGlobalAssignment(t *testing.T) {
 		{"una variable dentro de un operador binario", "a * b = c + d;"},
 		{"una variable dentro de un operador unario", "-a = 1;"},
 		{"algo que no es una variable", "1 = 2;"},
+		{"una variable entre paréntesis", "(a) = 5;"},
 	}
 
 	for _, test := range invalidTargets {
