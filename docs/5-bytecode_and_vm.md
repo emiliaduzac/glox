@@ -1,4 +1,4 @@
-##  Bytecode y Virtual Machine
+## Bytecode y Virtual Machine
 
 En nuestra versión anterior, teníamos un **tree walking interpreter**, pero vimos que esto hacía que no fuera veloz. Para mejorar nuestro lenguaje, implementaremos un **bytecode compiler**.
 
@@ -27,7 +27,7 @@ La VM simula el comportamiento de una CPU, y será la encargada de ejecutar nues
 - **instruction pointer**: indica la siguiente instrucción a ejecutar. Como es una secuencia lineal, simplemente va avanzando.
 - **stack**: guarda los valores con los que trabaja la VM. Inicialmente eran los valores temporales que producen las instrucciones en runtime, como el resultado de `1 + 2`. Esos valores son usados por instrucciones que trabajan siempre sobre el tope del stack (por ejemplo `OP_ADD` o `OP_PRINT`). Luego, incorporamos las variables locales, cuyos valores también viven en el stack. A diferencia de los anteriores, no se acceden desde el tope, sino por su índice (con `OP_GET_LOCAL` y `OP_SET_LOCAL`). El compilador conoce ese índice porque lleva la cuenta de en qué posición queda cada variable, y lo emite como operando de esas instrucciones.
 
-Igual que como hacía el intérprete, la VM recorre en un ciclo las instrucciones y las va ejecutando.
+Al igual que el intérprete, la VM es la que ejecuta el programa. La diferencia está en cómo lo recorre: el intérprete recorría el árbol de forma recursiva, mientras que la VM ejecuta las instrucciones en un único ciclo, ya que son un array lineal.
 
 Si la vm detecta un error de runtime, como puede ser que se recibe un tipo incorrecto, entonces corta y devuelve el error con la linea. Pero como la vm mira con peek antes de sacar del stack, si falla queda basura en el stack. Entonces es por este motivo que cuando el run de la vm falla, invocamos a `resetStack()` utilizando el defer propio de Go.
 
