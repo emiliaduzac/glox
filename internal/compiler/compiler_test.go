@@ -278,6 +278,43 @@ func TestCompileErrors(t *testing.T) {
 	}
 }
 
+func TestCompileVariableNameConstants(t *testing.T) {
+	t.Run("Usar la misma variable varias veces guarda su nombre una sola vez", func(t *testing.T) {
+		chunk := compileSource(t, "print a; print a;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, len(chunk.Constants), 1)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+	})
+
+	t.Run("Variables distintas guardan cada una su nombre", func(t *testing.T) {
+		chunk := compileSource(t, "print a; print b;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_GET_GLOBAL), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, len(chunk.Constants), 2)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+		utils.AssertValue(t, chunk.Constants[1], "b")
+	})
+
+	t.Run("Un programa que usa muchas veces la misma variable no llena las constantes", func(t *testing.T) {
+		chunk := compileSource(t, "var a = 0;\n"+strings.Repeat("a = a + 1;\n", 130))
+
+		utils.AssertValue(t, len(chunk.Constants), 132)
+	})
+}
+
 func TestCompileConstantLimit(t *testing.T) {
 	t.Run("Un chunk admite hasta 256 constantes", func(t *testing.T) {
 		chunk := compileExpr(t, strings.Repeat("1 + ", 255)+"1")
@@ -508,11 +545,10 @@ func TestCompileBlock(t *testing.T) {
 	t.Run("Los bloques se compilan correctamente", func(t *testing.T) {
 		chunk := compileSource(t, "var a = 1; { print a; }")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_GET_GLOBAL), 2, byte(c.OP_PRINT), byte(c.OP_RETURN))
-		utils.AssertValue(t, len(chunk.Constants), 3)
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+		utils.AssertValue(t, len(chunk.Constants), 2)
 		utils.AssertValue(t, chunk.Constants[0], "a")
 		utils.AssertValue(t, chunk.Constants[1], 1.0)
-		utils.AssertValue(t, chunk.Constants[2], "a")
 	})
 
 	t.Run("Error si el bloque no se cierra", func(t *testing.T) {
@@ -696,7 +732,7 @@ func TestCompileLocalAndGlobalVariables(t *testing.T) {
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_DEFINE_GLOBAL), 0,
 			byte(c.OP_CONSTANT), 2,
-			byte(c.OP_GET_GLOBAL), 3,
+			byte(c.OP_GET_GLOBAL), 0,
 			byte(c.OP_PRINT),
 			byte(c.OP_GET_LOCAL), 0,
 			byte(c.OP_PRINT),

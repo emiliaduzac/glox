@@ -13,21 +13,23 @@ type Local struct {
 }
 
 type Compiler struct {
-	cursor     *token.TokenCursor
-	chunk      *chunk.Chunk
-	locals     []Local
-	scopeDepth int
-	errs       []error
-	panicMode  bool
+	cursor      *token.TokenCursor
+	chunk       *chunk.Chunk
+	locals      []Local
+	scopeDepth  int
+	errs        []error
+	panicMode   bool
+	identifiers map[string]byte
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
 func NewCompiler(tokens []token.Token) *Compiler {
 	return &Compiler{
-		cursor:     token.NewTokenCursor(tokens),
-		chunk:      chunk.NewChunk(),
-		locals:     []Local{},
-		scopeDepth: 0,
+		cursor:      token.NewTokenCursor(tokens),
+		chunk:       chunk.NewChunk(),
+		locals:      []Local{},
+		scopeDepth:  0,
+		identifiers: map[string]byte{},
 	}
 }
 
@@ -100,7 +102,15 @@ func (c *Compiler) parseVariable(expected string) (byte, error) {
 }
 
 func (c *Compiler) identifierConstant(name token.Token) (byte, error) {
-	return c.makeConstant(name.Lexeme)
+	if index, ok := c.identifiers[name.Lexeme]; ok {
+		return index, nil
+	}
+	index, err := c.makeConstant(name.Lexeme)
+	if err != nil {
+		return 0, err
+	}
+	c.identifiers[name.Lexeme] = index
+	return index, nil
 }
 
 func (c *Compiler) defineVariable(global byte) {
