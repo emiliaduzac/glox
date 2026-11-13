@@ -1208,15 +1208,18 @@ func TestOpSetLocal(t *testing.T) {
 	})
 }
 
-func TestOpJumpIfFalse(t *testing.T) {
-	const (
-		popSize      = 1
-		printSize    = 1
-		constantSize = 2 // OP_CONSTANT + indice
-		jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
-	)
-	skipThen := popSize + constantSize + printSize + jumpSize
+const (
+	popSize      = 1
+	printSize    = 1
+	constantSize = 2 // OP_CONSTANT + indice
+	jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
 
+	// offsets de los saltos para un then o un else de la forma `print n;`
+	skipThen = popSize + constantSize + printSize + jumpSize
+	skipElse = popSize + constantSize + printSize
+)
+
+func TestOpJumpIfFalse(t *testing.T) {
 	tests := []struct {
 		name      string
 		condition func(chunk *c.Chunk)
@@ -1241,6 +1244,41 @@ func TestOpJumpIfFalse(t *testing.T) {
 			chunk.Write(byte(c.OP_PRINT), line)
 			writeJump(chunk, c.OP_JUMP, popSize)
 			chunk.Write(byte(c.OP_POP), line)
+			chunk.Write(byte(c.OP_RETURN), line)
+
+			err := vm.Run(chunk)
+
+			utils.AssertNoError(t, err)
+			utils.AssertValue(t, out.String(), test.expected)
+		})
+	}
+}
+
+func TestOpJump(t *testing.T) {
+	tests := []struct {
+		name      string
+		condition c.OpCode
+		expected  string
+	}{
+		{"Con true ejecuta el then y saltea el else", c.OP_TRUE, "1\n"},
+		{"Con false saltea el then y ejecuta el else", c.OP_FALSE, "2\n"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// if (<condición>) print 1; else print 2;
+			vm, chunk := setUpVM(t)
+			var out bytes.Buffer
+			vm.out = &out
+			chunk.Write(byte(test.condition), line)
+			writeJump(chunk, c.OP_JUMP_IF_FALSE, skipThen)
+			chunk.Write(byte(c.OP_POP), line)
+			writeConstant(chunk, 1.0)
+			chunk.Write(byte(c.OP_PRINT), line)
+			writeJump(chunk, c.OP_JUMP, skipElse)
+			chunk.Write(byte(c.OP_POP), line)
+			writeConstant(chunk, 2.0)
+			chunk.Write(byte(c.OP_PRINT), line)
 			chunk.Write(byte(c.OP_RETURN), line)
 
 			err := vm.Run(chunk)

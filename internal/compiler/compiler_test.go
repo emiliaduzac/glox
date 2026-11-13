@@ -686,18 +686,21 @@ func TestCompileLocalAndGlobalVariables(t *testing.T) {
 	})
 }
 
-func TestCompileIfWithoutElse(t *testing.T) {
-	const (
-		literalSize  = 1 // OP_TRUE - OP_FALSE - OP_NIL
-		popSize      = 1
-		printSize    = 1
-		constantSize = 2 // OP_CONSTANT + indice
-		jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
-	)
+const (
+	literalSize  = 1 // OP_TRUE - OP_FALSE - OP_NIL
+	popSize      = 1
+	printSize    = 1
+	constantSize = 2 // OP_CONSTANT + indice
+	jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
 
+	// offsets de los saltos para un `then` o `else` de la forma `print n;`
+	skipThen = popSize + constantSize + printSize + jumpSize // el then y el JUMP que saltea el else
+	skipElse = popSize + constantSize + printSize            // el POP de la condición y el else
+)
+
+func TestCompileIfWithoutElse(t *testing.T) {
 	t.Run("If sin else", func(t *testing.T) {
 		compiled := compileSource(t, "if (true) print 1;")
-		skipThen := popSize + constantSize + printSize + jumpSize
 
 		assertBytes(t, compiled,
 			byte(c.OP_TRUE),
@@ -713,8 +716,7 @@ func TestCompileIfWithoutElse(t *testing.T) {
 
 	t.Run("If anidado sin else: el salto externo incluye al interno completo", func(t *testing.T) {
 		chunk := compileSource(t, "if (true) if (false) print 1;")
-		skipInnerThen := popSize + constantSize + printSize + jumpSize
-		innerIfSize := literalSize + jumpSize + skipInnerThen + popSize
+		innerIfSize := literalSize + jumpSize + skipThen + popSize
 		skipOuterThen := popSize + innerIfSize + jumpSize
 
 		assertBytes(t, chunk,
@@ -722,7 +724,7 @@ func TestCompileIfWithoutElse(t *testing.T) {
 			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipOuterThen),
 			byte(c.OP_POP),
 			byte(c.OP_FALSE),
-			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipInnerThen),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen),
 			byte(c.OP_POP),
 			byte(c.OP_CONSTANT), 0,
 			byte(c.OP_PRINT),
@@ -747,6 +749,79 @@ func TestCompileIfWithoutElse(t *testing.T) {
 	t.Run("Error si falta el cuerpo del if", func(t *testing.T) {
 		err := compileSourceError(t, "if (true)")
 		utils.AssertError(t, err)
+		utils.AssertErrorMessage(t, err, "expected expression")
+	})
+}
+
+func TestCompileIfWithElse(t *testing.T) {
+	t.Run("If con else", func(t *testing.T) {
+		compiled := compileSource(t, "if (true) print 1; else print 2;")
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen), // si es falso, va al else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(skipElse), // si se ejecutó el then, saltea el else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Else anidado pertenece al if más cercano", func(t *testing.T) {
+		compiled := compileSource(t, "if (true) if (false) print 1; else print 2;")
+		innerIfSize := literalSize + jumpSize + skipThen + skipElse
+		skipOuterThen := popSize + innerIfSize + jumpSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipOuterThen), // externo: saltea todo el if interno
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen), // interno: va a su else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(skipElse), // interno: saltea su else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(popSize), // externo: no tiene else, solo saltea su POP
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Else if encadenado: el else contiene a otro if", func(t *testing.T) {
+		compiled := compileSource(t, "if (true) print 1; else if (false) print 2;")
+		// el else del if externo contiene al if interno completo (sin else)
+		innerIfSize := literalSize + jumpSize + skipThen + popSize
+		skipElseIf := popSize + innerIfSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen), // externo: si es falso, va al else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(skipElseIf), // externo: saltea el else, que es el if interno
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen), // interno: saltea su then
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(popSize), // interno: saltea su POP
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el cuerpo del else", func(t *testing.T) {
+		err := compileSourceError(t, "if (true) print 1; else")
 		utils.AssertErrorMessage(t, err, "expected expression")
 	})
 }
