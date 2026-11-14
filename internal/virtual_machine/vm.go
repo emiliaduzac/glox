@@ -10,6 +10,11 @@ import (
 	"tp-lox/internal/utils"
 )
 
+const (
+	framesMax = 64
+	stackMax  = framesMax * (math.MaxUint8 + 1)
+)
+
 type callFrame struct {
 	function *c.Function
 	ip       int
@@ -25,7 +30,8 @@ type VirtualMachine struct {
 
 func NewVirtualMachine() *VirtualMachine {
 	return &VirtualMachine{
-		stack:   []any{},
+		frames:  make([]callFrame, 0, framesMax),
+		stack:   make([]any, 0, stackMax),
 		out:     os.Stdout,
 		globals: map[string]any{},
 	}
