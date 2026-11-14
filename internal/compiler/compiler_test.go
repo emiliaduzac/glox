@@ -1241,3 +1241,198 @@ func TestCompileContinue(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "';' after continue")
 	})
 }
+
+func TestCompileBreak(t *testing.T) {
+	t.Run("En un while, salta después del POP de salida", func(t *testing.T) {
+		compiled := compileSource(t, "while (true) break;")
+		skipBody := popSize + jumpSize + loopSize
+		backToCondition := literalSize + jumpSize + skipBody
+		breakToEnd := loopSize + popSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(breakToEnd), // break
+			byte(c.OP_LOOP), 0, byte(backToCondition),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("En un for, salta después del POP de salida", func(t *testing.T) {
+		compiled := compileSource(t, "for (; true; 2) break;")
+		incrementSize := constantSize + popSize
+		skipToExit := popSize + jumpSize + incrementSize + loopSize + jumpSize + loopSize
+		skipIncrement := incrementSize + loopSize
+		backToCondition := literalSize + jumpSize + popSize + jumpSize + incrementSize + loopSize
+		breakToEnd := loopSize + popSize
+		backToIncrement := incrementSize + loopSize + jumpSize + loopSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipToExit),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(skipIncrement),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_POP),
+			byte(c.OP_LOOP), 0, byte(backToCondition),
+			byte(c.OP_JUMP), 0, byte(breakToEnd), // break: no pasa por el incremento
+			byte(c.OP_LOOP), 0, byte(backToIncrement),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("En un for sin condición, salta después del último LOOP", func(t *testing.T) {
+		compiled := compileSource(t, "for (;;) break;")
+		breakToEnd := loopSize
+		backToStart := jumpSize + loopSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_JUMP), 0, byte(breakToEnd), // break
+			byte(c.OP_LOOP), 0, byte(backToStart),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Saca del stack las locales del ciclo antes de saltar", func(t *testing.T) {
+		compiled := compileSource(t, "while (true) { var a = 1; break; }")
+		skipBody := popSize + constantSize + popSize + jumpSize + popSize + loopSize
+		backToCondition := literalSize + jumpSize + skipBody
+		breakToEnd := popSize + loopSize + popSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody),
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_POP),                       // break: saca a
+			byte(c.OP_JUMP), 0, byte(breakToEnd), // break: salta
+			byte(c.OP_POP),
+			byte(c.OP_LOOP), 0, byte(backToCondition),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("No saca las locales de afuera del ciclo", func(t *testing.T) {
+		compiled := compileSource(t, "{ var a = 1; while (true) break; }")
+		skipBody := popSize + jumpSize + loopSize
+		backToCondition := literalSize + jumpSize + skipBody
+		breakToEnd := loopSize + popSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(breakToEnd), // break: sin POP de a
+			byte(c.OP_LOOP), 0, byte(backToCondition),
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("No saca la variable del inicializador del for", func(t *testing.T) {
+		compiled := compileSource(t, "for (var i = 0; true;) break;")
+		skipBody := popSize + jumpSize + loopSize
+		backToCondition := literalSize + jumpSize + skipBody
+		breakToEnd := loopSize + popSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(breakToEnd), // break: sin POP de i
+			byte(c.OP_LOOP), 0, byte(backToCondition),
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("En ciclos anidados, sale solo del más interno", func(t *testing.T) {
+		compiled := compileSource(t, "while (true) while (false) break;")
+		skipInnerBody := popSize + jumpSize + loopSize
+		backToInner := literalSize + jumpSize + skipInnerBody
+		breakToInnerEnd := loopSize + popSize
+		innerLoopSize := literalSize + jumpSize + skipInnerBody + popSize
+		skipOuterBody := popSize + innerLoopSize + loopSize
+		backToOuter := literalSize + jumpSize + skipOuterBody
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipOuterBody),
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipInnerBody),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(breakToInnerEnd), // break: cae en el LOOP del de afuera
+			byte(c.OP_LOOP), 0, byte(backToInner),
+			byte(c.OP_POP),
+			byte(c.OP_LOOP), 0, byte(backToOuter),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Varios break en el mismo ciclo saltan al mismo lugar", func(t *testing.T) {
+		compiled := compileSource(t, "while (true) { if (true) break; break; }")
+		ifSkipThen := popSize + jumpSize + jumpSize
+		ifSize := literalSize + jumpSize + ifSkipThen + popSize
+		skipBody := popSize + ifSize + jumpSize + loopSize
+		backToCondition := literalSize + jumpSize + skipBody
+		firstBreakToEnd := jumpSize + popSize + jumpSize + loopSize + popSize
+		secondBreakToEnd := loopSize + popSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody),
+			byte(c.OP_POP),
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(ifSkipThen),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(firstBreakToEnd), // primer break
+			byte(c.OP_JUMP), 0, byte(popSize),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(secondBreakToEnd), // segundo break
+			byte(c.OP_LOOP), 0, byte(backToCondition),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Las locales siguen disponibles para el resto del cuerpo", func(t *testing.T) {
+		compiled := compileSource(t, "while (true) { var a = 1; if (a) break; print a; }")
+
+		if slices.Contains(compiled.Bytes, byte(c.OP_GET_GLOBAL)) {
+			t.Errorf("expected a to be compiled as a local, got bytes %v", compiled.Bytes)
+		}
+	})
+
+	t.Run("Error si está fuera de un ciclo", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"suelto", "break;"},
+			{"dentro de un if", "if (true) break;"},
+			{"después de que terminó el ciclo", "while (false) {} break;"},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+				utils.AssertErrorMessage(t, err, "found 'break' outside a loop")
+			})
+		}
+	})
+
+	t.Run("Error si falta el ';'", func(t *testing.T) {
+		err := compileSourceError(t, "while (true) break")
+		utils.AssertErrorMessage(t, err, "';' after break")
+	})
+}

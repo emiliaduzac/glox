@@ -354,11 +354,18 @@ func TestInvalidCharacters(t *testing.T) {
 	}
 }
 
-func TestContinue(t *testing.T) {
+func TestContinueAndBreak(t *testing.T) {
 	t.Run("continue es una palabra reservada", func(t *testing.T) {
 		tokens := setUpScanner(t, "continue")
 
 		assertToken(t, tokens[0], token.CONTINUE, "continue", nil)
+		assertEndsWithEOF(t, tokens)
+	})
+
+	t.Run("break es una palabra reservada", func(t *testing.T) {
+		tokens := setUpScanner(t, "break")
+
+		assertToken(t, tokens[0], token.BREAK, "break", nil)
 		assertEndsWithEOF(t, tokens)
 	})
 }
