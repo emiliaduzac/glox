@@ -90,13 +90,19 @@ go test -v ./...
 
 ## Tests de la cátedra
 
-Para ejecutar los tests de la cátedra:
+Para ejecutar los tests de la cátedra en el modo **tree walking interpreter**:
 
 ```bash
 python3 real-tests/script.py "go run ./cmd"
 ```
 
-Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
+Para la segunda implementación: **bytecode compiler**:
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm"
+```
+
+En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
 
 ## To Do List
 
