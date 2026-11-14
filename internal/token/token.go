@@ -49,26 +49,29 @@ const (
 	VAR
 	WHILE
 
+	CONTNIUE
+
 	EOF
 )
 
 var TokenKeyWords = map[string]TokenType{
-	"and":    AND,
-	"class":  CLASS,
-	"else":   ELSE,
-	"false":  FALSE,
-	"fun":    FUN,
-	"for":    FOR,
-	"if":     IF,
-	"nil":    NIL,
-	"or":     OR,
-	"print":  PRINT,
-	"return": RETURN,
-	"super":  SUPER,
-	"this":   THIS,
-	"true":   TRUE,
-	"var":    VAR,
-	"while":  WHILE,
+	"and":      AND,
+	"class":    CLASS,
+	"else":     ELSE,
+	"false":    FALSE,
+	"fun":      FUN,
+	"for":      FOR,
+	"if":       IF,
+	"nil":      NIL,
+	"or":       OR,
+	"print":    PRINT,
+	"return":   RETURN,
+	"super":    SUPER,
+	"this":     THIS,
+	"true":     TRUE,
+	"var":      VAR,
+	"while":    WHILE,
+	"continue": CONTNIUE,
 }
 
 func (t TokenType) String() string {
@@ -79,7 +82,7 @@ func (t TokenType) String() string {
 		"GREATER", "GREATER_EQUAL", "LESS", "LESS_EQUAL",
 		"IDENTIFIER", "STRING", "NUMBER",
 		"AND", "CLASS", "ELSE", "FALSE", "FUN", "FOR", "IF", "NIL", "OR",
-		"PRINT", "RETURN", "SUPER", "THIS", "TRUE", "VAR", "WHILE",
+		"PRINT", "RETURN", "SUPER", "THIS", "TRUE", "VAR", "WHILE", "CONTINUE",
 		"EOF",
 	}
 	if int(t) < 0 || int(t) >= len(names) {

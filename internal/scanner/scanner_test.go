@@ -353,3 +353,12 @@ func TestInvalidCharacters(t *testing.T) {
 		})
 	}
 }
+
+func TestContinue(t *testing.T) {
+	t.Run("continue es una palabra reservada", func(t *testing.T) {
+		tokens := setUpScanner(t, "continue")
+
+		assertToken(t, tokens[0], token.CONTNIUE, "continue", nil)
+		assertEndsWithEOF(t, tokens)
+	})
+}
