@@ -18,13 +18,15 @@ import (
 
 type Lox struct {
 	mode        int
+	debug       bool
 	interpreter *interpreter.Interpreter
 	vm          *virtualmachine.VirtualMachine
 }
 
-func newLox(mode int) *Lox {
+func newLox(mode int, debug bool) *Lox {
 	return &Lox{
 		mode:        mode,
+		debug:       debug,
 		interpreter: interpreter.NewInterpreter(),
 		vm:          virtualmachine.NewVirtualMachine(),
 	}
@@ -34,7 +36,7 @@ func (l *Lox) start() {
 	args := flag.Args()
 
 	if len(args) > 1 {
-		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing|--resolve|--vm] [script]")
+		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing|--resolve|--vm [--debug]] [script]")
 		os.Exit(EX_USAGE)
 	} else if len(args) == 1 {
 		l.runFile(args[0])
@@ -131,6 +133,9 @@ func (l *Lox) runVM(tokens []token.Token) error {
 		fmt.Fprintln(os.Stderr, err)
 		return err
 	}
+	if l.debug {
+		function.Chunk.Disassemble(function.String())
+	}
 	if err := l.vm.Run(&function.Chunk); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return err
@@ -143,6 +148,7 @@ func main() {
 	parsingFlag := flag.Bool("parsing", false, "corre el scanner y el parser, muestra el AST")
 	resolveFlag := flag.Bool("resolve", false, "corre el scanner, el parser y el resolver, muestra las distancias resueltas de las variables locales")
 	vmFlag := flag.Bool("vm", false, "corre el scanner, el compilador y la VM")
+	debugFlag := flag.Bool("debug", false, "con --vm, muestra el bytecode compilado antes de ejecutarlo")
 	flag.Parse()
 
 	var mode int
@@ -159,6 +165,6 @@ func main() {
 		mode = FullMode
 	}
 
-	lox := newLox(mode)
+	lox := newLox(mode, *debugFlag)
 	lox.start()
 }

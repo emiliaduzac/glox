@@ -100,7 +100,8 @@ func (c *Chunk) AddConstant(value any) int {
 	return len(c.Constants) - 1
 }
 
-func (c *Chunk) Disassemble() {
+func (c *Chunk) Disassemble(name string) {
+	fmt.Printf("== %s ==\n", name)
 	fmt.Println("== RAW BYTES ==")
 	var parts []string
 	for _, b := range c.Bytes {
