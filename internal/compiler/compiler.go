@@ -13,6 +13,12 @@ type Local struct {
 	Depth int
 }
 
+type Loop struct {
+	loopStart  int
+	scopeDepth int
+	breakJumps []int
+}
+
 type Compiler struct {
 	cursor      *token.TokenCursor
 	chunk       *chunk.Chunk
@@ -21,6 +27,7 @@ type Compiler struct {
 	errs        []error
 	panicMode   bool
 	identifiers map[string]byte
+	loops       []Loop
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
@@ -180,6 +187,10 @@ func (c *Compiler) statement() error {
 		c.beginScope()
 		defer c.endScope()
 		return c.block()
+	} else if c.cursor.Match(token.CONTINUE) {
+		return c.continueStatement()
+	} else if c.cursor.Match(token.BREAK) {
+		return c.breakStatement()
 	}
 	return c.expressionStatement()
 }
@@ -195,6 +206,18 @@ func (c *Compiler) endScope() {
 		c.emit(byte(chunk.OP_POP))
 		c.locals = c.locals[:len(c.locals)-1]
 	}
+}
+
+func (c *Compiler) beginLoop(loopStart int) {
+	c.loops = append(c.loops, Loop{loopStart: loopStart, scopeDepth: c.scopeDepth})
+}
+
+func (c *Compiler) endLoop() {
+	c.loops = c.loops[:len(c.loops)-1]
+}
+
+func (c *Compiler) getCurrentLoop() *Loop {
+	return &c.loops[len(c.loops)-1]
 }
 
 func (c *Compiler) printStatement() error {
@@ -249,6 +272,9 @@ func (c *Compiler) ifStatement() error {
 
 func (c *Compiler) whileStatement() error {
 	loopStart := len(c.chunk.Bytes)
+	c.beginLoop(loopStart)
+	defer c.endLoop()
+
 	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after 'while'"); err != nil {
 		return err
 	}
@@ -271,7 +297,8 @@ func (c *Compiler) whileStatement() error {
 		return err
 	}
 	c.emit(byte(chunk.OP_POP))
-	return nil
+
+	return c.patchBreakJumps()
 }
 
 func (c *Compiler) forStatement() error {
@@ -294,6 +321,8 @@ func (c *Compiler) forStatement() error {
 	if err != nil {
 		return err
 	}
+	c.beginLoop(loopStart)
+	defer c.endLoop()
 
 	if err := c.statement(); err != nil {
 		return err
@@ -308,7 +337,8 @@ func (c *Compiler) forStatement() error {
 		}
 		c.emit(byte(chunk.OP_POP))
 	}
-	return nil
+
+	return c.patchBreakJumps()
 }
 
 func (c *Compiler) forInitializer() error {
@@ -357,6 +387,36 @@ func (c *Compiler) forIncrement(loopStart int) (int, error) {
 		return loopStart, err
 	}
 	return incrementStart, nil
+}
+
+func (c *Compiler) continueStatement() error {
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after continue"); err != nil {
+		return err
+	}
+	if len(c.loops) == 0 {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "found 'continue' outside a loop"))
+		return nil
+	}
+
+	currentLoop := c.getCurrentLoop()
+	c.popLoopLocals(currentLoop)
+	return c.emitLoop(currentLoop.loopStart)
+}
+
+func (c *Compiler) breakStatement() error {
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after break"); err != nil {
+		return err
+	}
+	if len(c.loops) == 0 {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "found 'break' outside a loop"))
+		return nil
+	}
+
+	currentLoop := c.getCurrentLoop()
+	c.popLoopLocals(currentLoop)
+	breakJump := c.emitJump(chunk.OP_JUMP)
+	currentLoop.breakJumps = append(currentLoop.breakJumps, breakJump)
+	return nil
 }
 
 func (c *Compiler) expressionStatement() error {
@@ -415,6 +475,21 @@ func (c *Compiler) patchJump(offset int) error {
 	c.chunk.Bytes[offset] = byte(jump >> 8)
 	c.chunk.Bytes[offset+1] = byte(jump)
 	return nil
+}
+
+func (c *Compiler) patchBreakJumps() error {
+	for _, breakJump := range c.getCurrentLoop().breakJumps {
+		if err := c.patchJump(breakJump); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Compiler) popLoopLocals(currentLoop *Loop) {
+	for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > currentLoop.scopeDepth; i-- {
+		c.emit(byte(chunk.OP_POP))
+	}
 }
 
 func (c *Compiler) makeConstant(value any) (byte, error) {

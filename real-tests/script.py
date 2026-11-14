@@ -9,6 +9,13 @@ currentdir = os.path.dirname(os.path.abspath(__file__))
 total_failed = 0
 tests = list(filter(lambda f: f.endswith(".lox"), sorted(os.listdir(currentdir))))
 
+if len(sys.argv) > 2:
+    wanted = sys.argv[2] if sys.argv[2].endswith(".lox") else sys.argv[2] + ".lox"
+    if wanted not in tests:
+        print(f"No existe el archivo {wanted} en {currentdir}")
+        sys.exit(2)
+    tests = [wanted]
+
 for lox_file in tests:
     result = subprocess.run(
         [*LOX_BINARY, os.path.join(currentdir, lox_file)],
