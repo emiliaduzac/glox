@@ -60,6 +60,12 @@ Por default se ejecuta el tree-walk de la primera parte. Para usar el compilador
 go run ./cmd --vm <archivo.lox>
 ```
 
+Combinaciones de flags permitidas:
+
+- Ninguna flag: tree-walk.
+- Una sola entre `--scanning`, `--parsing` o `--resolve`. No se pueden combinar entre sí ni con `--vm` o `--debug`.
+- `--vm`, solo o seguido de `--debug`. `--debug` no se puede usar sin `--vm`.
+
 Para ver todos los modos:
 
 ```bash
