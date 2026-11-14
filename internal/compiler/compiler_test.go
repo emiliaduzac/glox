@@ -245,6 +245,37 @@ func TestCompileFunctionParameters(t *testing.T) {
 	})
 }
 
+func TestCompileFunctionName(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		index    int
+		expected string
+	}{
+		{"función global", "fun suma() {}", 1, "suma"},
+		{"función local de un bloque", "{ fun resta() {} }", 0, "resta"},
+		{"función con parámetros", "fun multiplicar(a, b) {}", 1, "multiplicar"},
+	}
+	for _, test := range tests {
+		t.Run("La función se llama como el identificador de su declaración: "+test.name, func(t *testing.T) {
+			chunk := compileSource(t, test.source)
+
+			function := chunk.Constants[test.index].(*c.Function)
+			utils.AssertValue(t, function.Name, test.expected)
+			utils.AssertValue(t, utils.Stringify(function), "<fn "+test.expected+">")
+		})
+	}
+
+	t.Run("Cada función anidada tiene su propio nombre", func(t *testing.T) {
+		chunk := compileSource(t, "fun outer() { fun inner() {} }")
+
+		outer := chunk.Constants[1].(*c.Function)
+		inner := outer.Chunk.Constants[0].(*c.Function)
+		utils.AssertValue(t, outer.Name, "outer")
+		utils.AssertValue(t, inner.Name, "inner")
+	})
+}
+
 func TestCompileEnclosingFunction(t *testing.T) {
 	t.Run("Al terminar una función anidada el compilador sigue escribiendo en la de afuera", func(t *testing.T) {
 		chunk := compileSource(t, "fun a() { fun b() {} print 1; }")

@@ -234,6 +234,9 @@ func TestOpLiterals(t *testing.T) {
 }
 
 func TestOpPrint(t *testing.T) {
+	namedFunction := c.NewFunction()
+	namedFunction.Name = "f"
+
 	tests := []struct {
 		name     string
 		value    any
@@ -243,6 +246,7 @@ func TestOpPrint(t *testing.T) {
 		{"string", "hola", "hola\n"},
 		{"booleano", true, "true\n"},
 		{"nil", nil, "nil\n"},
+		{"función", namedFunction, "<fn f>\n"},
 	}
 
 	for _, test := range tests {

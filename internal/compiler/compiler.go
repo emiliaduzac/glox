@@ -43,10 +43,14 @@ func NewCompiler(tokens []token.Token) *Compiler {
 }
 
 func newFunctionCompiler(state *parserState, enclosing *Compiler, funcType FunctionType) *Compiler {
+	function := chunk.NewFunction()
+	if funcType != TYPE_SCRIPT {
+		function.Name = state.cursor.GetPreviousLexeme()
+	}
 	return &Compiler{
 		parserState: state,
 		enclosing:   enclosing,
-		function:    chunk.NewFunction(),
+		function:    function,
 		funcType:    funcType,
 		locals:      []Local{{Depth: 0}},
 		identifiers: map[string]byte{},
