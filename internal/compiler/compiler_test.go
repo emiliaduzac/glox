@@ -79,6 +79,99 @@ func TestCompileScript(t *testing.T) {
 	})
 }
 
+func TestCompileFunctionDeclaration(t *testing.T) {
+	t.Run("Una función global se guarda como constante y se define como variable global", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() {}")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_RETURN))
+		utils.AssertValue(t, chunk.Constants[0], "f")
+		function := chunk.Constants[1].(*c.Function)
+		utils.AssertValue(t, function.Arity, 0)
+		assertBytes(t, &function.Chunk, byte(c.OP_RETURN))
+	})
+
+	t.Run("El cuerpo se compila en el chunk de la función y no en el del script", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() { print 1; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+		utils.AssertValue(t, len(function.Chunk.Constants), 1)
+		utils.AssertValue(t, function.Chunk.Constants[0], 1.0)
+		utils.AssertValue(t, len(chunk.Constants), 2)
+	})
+
+	t.Run("Dentro de un bloque la función es una variable local", func(t *testing.T) {
+		chunk := compileSource(t, "{ fun f() {} }")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_RETURN))
+		_, isFunction := chunk.Constants[0].(*c.Function)
+		utils.AssertValue(t, isFunction, true)
+	})
+
+	t.Run("Una función declarada dentro de otra queda en el chunk de la de afuera", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() { fun b() {} }")
+
+		outer := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &outer.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_RETURN))
+		_, isFunction := outer.Chunk.Constants[0].(*c.Function)
+		utils.AssertValue(t, isFunction, true)
+	})
+
+	t.Run("Las variables del cuerpo son locales de la función y no se sacan con OP_POP al terminar", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() { var x = 1; print x; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_GET_LOCAL), 1, byte(c.OP_PRINT), byte(c.OP_RETURN))
+	})
+
+	t.Run("Cada función tiene su propia tabla de constantes", func(t *testing.T) {
+		chunk := compileSource(t, "var a; fun f() { print a; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_NIL),
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_DEFINE_GLOBAL), 1,
+			byte(c.OP_RETURN),
+		)
+		function := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+		utils.AssertValue(t, function.Chunk.Constants[0], "a")
+	})
+
+	t.Run("Errores de sintaxis en la declaración", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			source   string
+			expected string
+		}{
+			{"falta el nombre", "fun () {}", "function name"},
+			{"falta el paréntesis que abre", "fun f {}", "'(' after function name"},
+			{"falta el paréntesis que cierra", "fun f( {}", "')' after parameters"},
+			{"falta la llave que abre", "fun f() print 1;", "'{' before function body"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, test.expected)
+			})
+		}
+	})
+
+	t.Run("Un error dentro del cuerpo se suma a los demás y el compilador sigue", func(t *testing.T) {
+		errs := compileErrors(t, "fun f() { print 1 +; } print 2 +;")
+
+		utils.AssertValue(t, len(errs), 2)
+	})
+
+	t.Run("Una función no puede ser el cuerpo de un if sin bloque", func(t *testing.T) {
+		err := compileSourceError(t, "if (true) fun f() {}")
+
+		utils.AssertError(t, err)
+	})
+}
+
 func TestCompileLiterals(t *testing.T) {
 	tests := []struct {
 		name   string

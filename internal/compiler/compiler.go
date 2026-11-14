@@ -20,25 +20,33 @@ const (
 	TYPE_SCRIPT
 )
 
+type parserState struct {
+	cursor    *token.TokenCursor
+	errs      []error
+	panicMode bool
+}
+
 type Compiler struct {
-	cursor      *token.TokenCursor
+	*parserState
 	function    *chunk.Function
 	funcType    FunctionType
 	locals      []Local
 	scopeDepth  int
-	errs        []error
-	panicMode   bool
 	identifiers map[string]byte
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
 func NewCompiler(tokens []token.Token) *Compiler {
+	state := &parserState{cursor: token.NewTokenCursor(tokens)}
+	return newFunctionCompiler(state, TYPE_SCRIPT)
+}
+
+func newFunctionCompiler(state *parserState, funcType FunctionType) *Compiler {
 	return &Compiler{
-		cursor:      token.NewTokenCursor(tokens),
+		parserState: state,
 		function:    chunk.NewFunction(),
-		funcType:    TYPE_SCRIPT,
+		funcType:    funcType,
 		locals:      []Local{{Depth: 0}},
-		scopeDepth:  0,
 		identifiers: map[string]byte{},
 	}
 }
@@ -69,7 +77,9 @@ func (c *Compiler) expression() error {
 
 func (c *Compiler) declaration() {
 	var err error
-	if c.cursor.Match(token.VAR) {
+	if c.cursor.Match(token.FUN) {
+		err = c.funDeclaration()
+	} else if c.cursor.Match(token.VAR) {
 		err = c.varDeclaration()
 	} else {
 		err = c.statement()
@@ -168,6 +178,9 @@ func (c *Compiler) addLocal(name token.Token) {
 }
 
 func (c *Compiler) markInitialized() {
+	if c.scopeDepth == 0 {
+		return
+	}
 	c.locals[len(c.locals)-1].Depth = c.scopeDepth
 }
 
@@ -224,6 +237,39 @@ func (c *Compiler) printStatement() error {
 	}
 	c.emit(byte(chunk.OP_PRINT))
 	return nil
+}
+
+func (c *Compiler) funDeclaration() error {
+	global, err := c.parseVariable("function name")
+	if err != nil {
+		return err
+	}
+	c.markInitialized()
+	if err := c.compileFunction(TYPE_FUNCTION); err != nil {
+		return err
+	}
+	c.defineVariable(global)
+	return nil
+}
+
+func (c *Compiler) compileFunction(funcType FunctionType) error {
+	fc := newFunctionCompiler(c.parserState, funcType)
+	fc.beginScope()
+
+	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after function name"); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after parameters"); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.LEFT_BRACE, "'{' before function body"); err != nil {
+		return err
+	}
+	if err := fc.block(); err != nil {
+		return err
+	}
+
+	return c.emitConstant(fc.endCompiler())
 }
 
 func (c *Compiler) block() error {
