@@ -10,10 +10,15 @@ import (
 	"tp-lox/internal/utils"
 )
 
+type callFrame struct {
+	function *c.Function
+	ip       int
+	slots    int
+}
+
 type VirtualMachine struct {
-	ip      int
+	frames  []callFrame
 	stack   []any
-	chunk   *c.Chunk
 	out     io.Writer
 	globals map[string]any
 }
@@ -26,16 +31,17 @@ func NewVirtualMachine() *VirtualMachine {
 	}
 }
 
-func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
-	vm.chunk = chunk
-	vm.ip = 0
+func (vm *VirtualMachine) Run(function *c.Function) (err error) {
+	vm.push(function)
+	vm.frames = append(vm.frames, callFrame{function: function})
 	defer func() {
 		if err != nil {
 			vm.resetStack()
 		}
 	}()
 
-	for vm.ip < len(vm.chunk.Bytes) {
+	frame := vm.currentFrame()
+	for frame.ip < len(frame.function.Chunk.Bytes) {
 		b, err := vm.readByte()
 		if err != nil {
 			return err
@@ -44,9 +50,11 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 
 		switch op {
 		case c.OP_RETURN:
-			if len(vm.stack) > 0 {
+			if len(vm.stack) > frame.slots+1 {
 				return errors.NewLoxError(vm.currentLine(), "inconsistent Stack Height: should be empty at exit")
 			}
+			vm.stack = vm.stack[:frame.slots]
+			vm.frames = vm.frames[:len(vm.frames)-1]
 			return nil
 
 		case c.OP_CONSTANT:
@@ -173,7 +181,7 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			if err != nil {
 				return err
 			}
-			vm.push(vm.stack[slot])
+			vm.push(vm.stack[frame.slots+int(slot)])
 		case c.OP_SET_LOCAL:
 			slot, err := vm.readByte()
 			if err != nil {
@@ -183,7 +191,7 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			if err != nil {
 				return err
 			}
-			vm.stack[slot] = value
+			vm.stack[frame.slots+int(slot)] = value
 
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
@@ -196,21 +204,21 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 				return err
 			}
 			if !utils.IsTruthy(value) {
-				vm.ip += offset
+				frame.ip += offset
 			}
 		case c.OP_JUMP:
 			offset, err := vm.readShort()
 			if err != nil {
 				return err
 			}
-			vm.ip += offset
+			frame.ip += offset
 
 		case c.OP_LOOP:
 			offset, err := vm.readShort()
 			if err != nil {
 				return err
 			}
-			vm.ip -= offset
+			frame.ip -= offset
 
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
@@ -222,15 +230,25 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 // resetStack descarta todos los valores del stack
 func (vm *VirtualMachine) resetStack() {
 	vm.stack = vm.stack[:0]
+	vm.frames = vm.frames[:0]
+}
+
+func (vm *VirtualMachine) stackBase() int {
+	return vm.currentFrame().slots + 1
+}
+
+func (vm *VirtualMachine) currentFrame() *callFrame {
+	return &vm.frames[len(vm.frames)-1]
 }
 
 // readByte devuelve el byte al que apunta el instruction pointer y lo avanza al siguiente
 func (vm *VirtualMachine) readByte() (byte, error) {
-	if vm.ip >= len(vm.chunk.Bytes) {
+	frame := vm.currentFrame()
+	if frame.ip >= len(frame.function.Chunk.Bytes) {
 		return 0, errors.NewLoxError(vm.currentLine(), "unexpected end of bytecode")
 	}
-	b := vm.chunk.Bytes[vm.ip]
-	vm.ip++
+	b := frame.function.Chunk.Bytes[frame.ip]
+	frame.ip++
 	return b, nil
 }
 
@@ -240,10 +258,11 @@ func (vm *VirtualMachine) readConstant() (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if int(index) >= len(vm.chunk.Constants) {
+	constants := vm.currentFrame().function.Chunk.Constants
+	if int(index) >= len(constants) {
 		return nil, errors.NewLoxError(vm.currentLine(), "constant index out of range")
 	}
-	return vm.chunk.Constants[index], nil
+	return constants[index], nil
 }
 
 func (vm *VirtualMachine) readString() (string, error) {
@@ -277,7 +296,7 @@ func (vm *VirtualMachine) push(value any) {
 
 // pop saca el elemento del tope del stack y lo devuelve
 func (vm *VirtualMachine) pop() (any, error) {
-	if len(vm.stack) == 0 {
+	if len(vm.stack) <= vm.stackBase() {
 		return nil, errors.NewLoxError(vm.currentLine(), "stack underflow")
 	}
 
@@ -288,7 +307,7 @@ func (vm *VirtualMachine) pop() (any, error) {
 
 // peek devuelve el valor a distance posiciones del tope del stack, sin sacarlo
 func (vm *VirtualMachine) peek(distance int) (any, error) {
-	if len(vm.stack) <= distance {
+	if len(vm.stack)-vm.stackBase() <= distance {
 		return nil, errors.NewLoxError(vm.currentLine(), "stack underflow")
 	}
 	return vm.stack[len(vm.stack)-1-distance], nil
@@ -388,5 +407,6 @@ func (vm *VirtualMachine) binaryOp(op func(left, right float64) any) error {
 }
 
 func (vm *VirtualMachine) currentLine() int {
-	return vm.chunk.Lines[vm.ip-1]
+	frame := vm.currentFrame()
+	return frame.function.Chunk.Lines[frame.ip-1]
 }
