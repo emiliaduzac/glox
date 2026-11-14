@@ -284,6 +284,81 @@ func TestOpCall(t *testing.T) {
 	})
 }
 
+func TestNativeCall(t *testing.T) {
+	subtract := &native{arity: 2, fn: func(args []any) any {
+		return args[0].(float64) - args[1].(float64)
+	}}
+	callSubtract := func(chunk *c.Chunk) {
+		writeConstant(chunk, subtract)
+		writeConstant(chunk, 33.0)
+		writeConstant(chunk, 3.0)
+		writeCall(chunk, 2)
+	}
+
+	t.Run("Una función nativa recibe los argumentos en orden y devuelve su resultado", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		callSubtract(chunk)
+		chunk.Write(byte(c.OP_PRINT), line)
+		chunk.Write(byte(c.OP_NIL), line)
+		chunk.Write(byte(c.OP_RETURN), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "30\n")
+	})
+
+	t.Run("Después de llamar a una función nativa queda solo su resultado en el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		callSubtract(chunk)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], 30.0)
+	})
+
+	t.Run("Error si se llama a una función nativa con menos argumentos de los esperados", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, subtract)
+		writeConstant(chunk, 33.0)
+		writeCall(chunk, 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "expected 2 arguments but got 1")
+	})
+
+	t.Run("Error si se llama a una función nativa con más argumentos de los esperados", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, subtract)
+		writeConstant(chunk, 33.0)
+		writeConstant(chunk, 3.0)
+		writeConstant(chunk, 1.0)
+		writeCall(chunk, 3)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "expected 2 arguments but got 3")
+	})
+
+	t.Run("Una función nativa se imprime como <native fn>", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		writeConstant(chunk, subtract)
+		chunk.Write(byte(c.OP_PRINT), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "<native fn>\n")
+	})
+}
+
 func TestReturn(t *testing.T) {
 	returning := func(value any) *c.Function {
 		function := c.NewFunction()

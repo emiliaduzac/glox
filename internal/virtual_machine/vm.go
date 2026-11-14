@@ -263,6 +263,8 @@ func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 	switch function := callee.(type) {
 	case *c.Function:
 		return vm.call(function, argCount)
+	case *native:
+		return vm.callNative(function, argCount)
 	default:
 		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
 	}
@@ -276,6 +278,17 @@ func (vm *VirtualMachine) call(function *c.Function, argCount int) error {
 		return errors.NewLoxError(vm.currentLine(), "stack overflow")
 	}
 	vm.frames = append(vm.frames, callFrame{function: function, slots: len(vm.stack) - argCount - 1})
+	return nil
+}
+
+func (vm *VirtualMachine) callNative(function *native, argCount int) error {
+	if argCount != function.arity {
+		return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("expected %d arguments but got %d", function.arity, argCount))
+	}
+	args := vm.stack[len(vm.stack)-argCount:]
+	result := function.fn(args)
+	vm.stack = vm.stack[:len(vm.stack)-argCount-1]
+	vm.push(result)
 	return nil
 }
 
