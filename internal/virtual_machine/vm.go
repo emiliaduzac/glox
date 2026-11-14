@@ -60,12 +60,20 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 
 		switch op {
 		case c.OP_RETURN:
+			result, err := vm.pop()
+			if err != nil {
+				return err
+			}
 			if len(vm.frames) == 1 && len(vm.stack) > frame.slots+1 {
 				return errors.NewLoxError(vm.currentLine(), "inconsistent Stack Height: should be empty at exit")
 			}
 			vm.stack = vm.stack[:frame.slots]
 			vm.frames = vm.frames[:len(vm.frames)-1]
-			return nil
+			if len(vm.frames) == 0 {
+				return nil
+			}
+			vm.push(result)
+			frame = vm.currentFrame()
 
 		case c.OP_CONSTANT:
 			constant, err := vm.readConstant()

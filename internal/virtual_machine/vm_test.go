@@ -36,6 +36,11 @@ func writeConstant(chunk *c.Chunk, value any) {
 	chunk.Write(byte(index), line)
 }
 
+func writeCall(chunk *c.Chunk, argCount byte) {
+	chunk.Write(byte(c.OP_CALL), line)
+	chunk.Write(argCount, line)
+}
+
 func writeJump(chunk *c.Chunk, op c.OpCode, offset int) {
 	chunk.Write(byte(op), line)
 	chunk.Write(byte(offset>>8), line)
@@ -47,8 +52,9 @@ func writeOp(op c.OpCode) func(chunk *c.Chunk) {
 }
 
 func TestOpReturn(t *testing.T) {
-	t.Run("Stack vacío no da error", func(t *testing.T) {
+	t.Run("El script termina sin error cuando solo queda su valor de retorno", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_RETURN), line)
 
 		err := run(vm, chunk)
@@ -56,8 +62,9 @@ func TestOpReturn(t *testing.T) {
 		utils.AssertNoError(t, err)
 	})
 
-	t.Run("Stack con elementos da error", func(t *testing.T) {
+	t.Run("Error si al terminar el script queda algo además del valor de retorno", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_RETURN), line)
 
@@ -66,8 +73,9 @@ func TestOpReturn(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "inconsistent Stack Height")
 	})
 
-	t.Run("Corta la ejecución", func(t *testing.T) {
+	t.Run("El return del script corta la ejecución", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_RETURN), line)
 		chunk.Write(byte(c.OP_NIL), line)
 
@@ -94,6 +102,7 @@ func TestScriptCallFrame(t *testing.T) {
 
 	t.Run("Al terminar el script no quedan ni valores ni frames", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
+		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_RETURN), line)
 
 		err := run(vm, chunk)
@@ -112,11 +121,13 @@ func TestScriptCallFrame(t *testing.T) {
 		name := failing.AddConstant("a")
 		failing.Write(byte(c.OP_GET_GLOBAL), line)
 		failing.Write(byte(name), line)
+		failing.Write(byte(c.OP_NIL), line)
 		failing.Write(byte(c.OP_RETURN), line)
 
 		working := c.NewChunk()
 		writeConstant(working, 1.0)
 		working.Write(byte(c.OP_PRINT), line)
+		working.Write(byte(c.OP_NIL), line)
 		working.Write(byte(c.OP_RETURN), line)
 
 		utils.AssertError(t, run(vm, failing))
@@ -131,12 +142,9 @@ func TestOpCall(t *testing.T) {
 		function := c.NewFunction()
 		function.Arity = arity
 		body(&function.Chunk)
+		function.Chunk.Write(byte(c.OP_NIL), line)
 		function.Chunk.Write(byte(c.OP_RETURN), line)
 		return function
-	}
-	writeCall := func(chunk *c.Chunk, argCount byte) {
-		chunk.Write(byte(c.OP_CALL), line)
-		chunk.Write(argCount, line)
 	}
 
 	t.Run("Llamar a una función ejecuta el código de su chunk", func(t *testing.T) {
@@ -273,6 +281,90 @@ func TestOpCall(t *testing.T) {
 		err := run(vm, chunk)
 
 		utils.AssertErrorMessage(t, err, "stack overflow")
+	})
+}
+
+func TestReturn(t *testing.T) {
+	returning := func(value any) *c.Function {
+		function := c.NewFunction()
+		writeConstant(&function.Chunk, value)
+		function.Chunk.Write(byte(c.OP_RETURN), line)
+		return function
+	}
+
+	t.Run("Quien llamó recibe el valor que dejó la función y sigue ejecutando", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		writeConstant(chunk, returning(5.0))
+		writeCall(chunk, 0)
+		chunk.Write(byte(c.OP_PRINT), line)
+		writeConstant(chunk, "listo")
+		chunk.Write(byte(c.OP_PRINT), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "5\nlisto\n")
+	})
+
+	t.Run("Al volver se descartan la función y sus argumentos, y queda solo el resultado", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		suma := c.NewFunction()
+		suma.Arity = 2
+		suma.Chunk.Write(byte(c.OP_GET_LOCAL), line)
+		suma.Chunk.Write(1, line)
+		suma.Chunk.Write(byte(c.OP_GET_LOCAL), line)
+		suma.Chunk.Write(2, line)
+		suma.Chunk.Write(byte(c.OP_ADD), line)
+		suma.Chunk.Write(byte(c.OP_RETURN), line)
+		writeConstant(chunk, suma)
+		writeConstant(chunk, 2.0)
+		writeConstant(chunk, 3.0)
+		writeCall(chunk, 2)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], 5.0)
+	})
+
+	t.Run("Llamar a una función muchas veces seguidas no desborda los frames", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		callee := returning(1.0)
+		for i := 0; i < framesMax+5; i++ {
+			writeConstant(chunk, callee)
+			writeCall(chunk, 0)
+			chunk.Write(byte(c.OP_POP), line)
+		}
+		writeConstant(chunk, "listo")
+		chunk.Write(byte(c.OP_PRINT), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "listo\n")
+	})
+
+	t.Run("El valor devuelto pasa por varias llamadas anidadas", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		outer := c.NewFunction()
+		writeConstant(&outer.Chunk, returning(5.0))
+		writeCall(&outer.Chunk, 0)
+		outer.Chunk.Write(byte(c.OP_RETURN), line)
+		writeConstant(chunk, outer)
+		writeCall(chunk, 0)
+		chunk.Write(byte(c.OP_PRINT), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "5\n")
 	})
 }
 
@@ -1373,10 +1465,12 @@ func TestRunChunks(t *testing.T) {
 		first := c.NewChunk()
 		writeConstant(first, 1.0)
 		first.Write(byte(c.OP_PRINT), line)
+		first.Write(byte(c.OP_NIL), line)
 		first.Write(byte(c.OP_RETURN), line)
 		second := c.NewChunk()
 		writeConstant(second, 2.0)
 		second.Write(byte(c.OP_PRINT), line)
+		second.Write(byte(c.OP_NIL), line)
 		second.Write(byte(c.OP_RETURN), line)
 
 		utils.AssertNoError(t, run(vm, first))
@@ -1395,6 +1489,7 @@ func TestRunChunks(t *testing.T) {
 		writeConstant(define, 1.0)
 		define.Write(byte(c.OP_DEFINE_GLOBAL), line)
 		define.Write(byte(name), line)
+		define.Write(byte(c.OP_NIL), line)
 		define.Write(byte(c.OP_RETURN), line)
 
 		read := c.NewChunk()
@@ -1402,6 +1497,7 @@ func TestRunChunks(t *testing.T) {
 		read.Write(byte(c.OP_GET_GLOBAL), line)
 		read.Write(byte(name), line)
 		read.Write(byte(c.OP_PRINT), line)
+		read.Write(byte(c.OP_NIL), line)
 		read.Write(byte(c.OP_RETURN), line)
 
 		utils.AssertNoError(t, run(vm, define))
@@ -1499,6 +1595,7 @@ func TestOpJumpIfFalse(t *testing.T) {
 			chunk.Write(byte(c.OP_PRINT), line)
 			writeJump(chunk, c.OP_JUMP, popSize)
 			chunk.Write(byte(c.OP_POP), line)
+			chunk.Write(byte(c.OP_NIL), line)
 			chunk.Write(byte(c.OP_RETURN), line)
 
 			err := run(vm, chunk)
@@ -1534,6 +1631,7 @@ func TestOpJump(t *testing.T) {
 			chunk.Write(byte(c.OP_POP), line)
 			writeConstant(chunk, 2.0)
 			chunk.Write(byte(c.OP_PRINT), line)
+			chunk.Write(byte(c.OP_NIL), line)
 			chunk.Write(byte(c.OP_RETURN), line)
 
 			err := run(vm, chunk)
@@ -1570,6 +1668,7 @@ func TestAnd(t *testing.T) {
 			chunk.Write(byte(c.OP_POP), line)
 			chunk.Write(byte(test.right), line)
 			chunk.Write(byte(c.OP_PRINT), line)
+			chunk.Write(byte(c.OP_NIL), line)
 			chunk.Write(byte(c.OP_RETURN), line)
 
 			err := run(vm, chunk)
@@ -1606,6 +1705,7 @@ func TestOr(t *testing.T) {
 			chunk.Write(byte(c.OP_POP), line)
 			chunk.Write(byte(test.right), line)
 			chunk.Write(byte(c.OP_PRINT), line)
+			chunk.Write(byte(c.OP_NIL), line)
 			chunk.Write(byte(c.OP_RETURN), line)
 
 			err := run(vm, chunk)
@@ -1651,6 +1751,7 @@ func TestOpLoop(t *testing.T) {
 		// salida
 		chunk.Write(byte(c.OP_POP), line) // saca la condición
 		chunk.Write(byte(c.OP_POP), line) // fin del bloque: saca i
+		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_RETURN), line)
 
 		err := run(vm, chunk)
@@ -1674,6 +1775,7 @@ func TestOpLoop(t *testing.T) {
 		chunk.Write(byte(c.OP_PRINT), line)
 		writeJump(chunk, c.OP_LOOP, backToCondition)
 		chunk.Write(byte(c.OP_POP), line)
+		chunk.Write(byte(c.OP_NIL), line)
 		chunk.Write(byte(c.OP_RETURN), line)
 
 		err := run(vm, chunk)

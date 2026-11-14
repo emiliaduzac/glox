@@ -464,6 +464,7 @@ func (c *Compiler) emit(bytes ...byte) {
 }
 
 func (c *Compiler) emitReturn() {
+	c.emit(byte(chunk.OP_NIL))
 	c.emit(byte(chunk.OP_RETURN))
 }
 
