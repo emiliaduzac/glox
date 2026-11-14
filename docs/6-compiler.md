@@ -109,7 +109,7 @@ De esta forma, no necesita generar una instrucción como `OP_DEFINE_GLOBAL`, ya 
 
 Al finalizar el bloque, resta uno a la profundidad y elimina de su stack falso las variables locales de ese bloque. Además, emite un `OP_POP` por cada una, para asegurarnos de que al terminar un bloque, el stack de la VM quede sin sus variables.
 
-Un detalle más sobre las variables locales es que puede haber como máximo 256 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255.
+Un detalle más sobre las variables locales es que puede haber como máximo 255 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255, y el slot 0 queda reservado para la función.
 
 ### Control de flujo
 
@@ -161,6 +161,14 @@ Para los ciclos necesitamos saltar hacia **atrás**, para volver a ejecutar una 
   - Al final del cuerpo, un `OP_LOOP` vuelve al incremento.
   - Al final del incremento, otro `OP_LOOP` vuelve a la condición.
   Si no hay incremento, el cuerpo vuelve directamente a la condición, como en el `while`. Por último, se completa el salto de salida de la condición.
+
+### Funciones
+
+#### El script como función
+
+Un salto que se da importante al momento de llegar a funciones es que el compilador ya no escribe un chunk ahí suelto, sino que ahora lo hace en una función. Por lo que por este motivo ahora compile pasa a devolver una función. Un detalle es que ahora el programa completo sería como una función implícita. Es por esto que el compilador siempre está dentro de una función y la VM se ejecuta en una. Pero sí que tenemos la observación que esto no es para las globales que tienen un alcance propio. Otro punto a tener en cuenta es que ahora sí distingue entre una función y el script.
+
+Algo importante que se agrega con todo esto es lo del slot 0 en el stack, reservado para que la VM ponga la función que está ejecutando, y por ende, como el operando es de un byte hay 256 lugares y el slot 0 ocupa uno, ahora pasa a soportar hasta 255 variables locales, a diferencia del tree-walk, por lo que esto pasa a ser una **limitación conocida que tenemos en esta versión**.
 
 ### Tests
 
