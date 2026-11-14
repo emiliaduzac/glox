@@ -3,6 +3,7 @@ package chunk
 import (
 	"fmt"
 	"strings"
+	"tp-lox/internal/utils"
 )
 
 type OpCode byte
@@ -25,7 +26,6 @@ const (
 	OP_EQUAL
 	OP_GREATER
 	OP_LESS
-	OP_PRINT_DEC
 
 	OP_CONSTANT
 	OP_DEFINE_GLOBAL
@@ -50,17 +50,16 @@ var opCodeNames = map[OpCode]string{
 	OP_PRINT:  "OP_PRINT",
 	OP_POP:    "OP_POP",
 
-	OP_NEGATE:    "OP_NEGATE",
-	OP_ADD:       "OP_ADD",
-	OP_SUBTRACT:  "OP_SUBTRACT",
-	OP_MULTIPLY:  "OP_MULTIPLY",
-	OP_DIVIDE:    "OP_DIVIDE",
-	OP_MODULO:    "OP_MODULO",
-	OP_NOT:       "OP_NOT",
-	OP_EQUAL:     "OP_EQUAL",
-	OP_GREATER:   "OP_GREATER",
-	OP_LESS:      "OP_LESS",
-	OP_PRINT_DEC: "OP_PRINT_DEC",
+	OP_NEGATE:   "OP_NEGATE",
+	OP_ADD:      "OP_ADD",
+	OP_SUBTRACT: "OP_SUBTRACT",
+	OP_MULTIPLY: "OP_MULTIPLY",
+	OP_DIVIDE:   "OP_DIVIDE",
+	OP_MODULO:   "OP_MODULO",
+	OP_NOT:      "OP_NOT",
+	OP_EQUAL:    "OP_EQUAL",
+	OP_GREATER:  "OP_GREATER",
+	OP_LESS:     "OP_LESS",
 
 	OP_CONSTANT:      "OP_CONSTANT",
 	OP_DEFINE_GLOBAL: "OP_DEFINE_GLOBAL",
@@ -155,7 +154,11 @@ func (c *Chunk) Disassemble(name string) {
 		}
 	}
 
-	fmt.Printf("CONST %v\n", c.Constants)
+	constants := make([]string, len(c.Constants))
+	for i, constant := range c.Constants {
+		constants[i] = utils.DebugString(constant)
+	}
+	fmt.Printf("CONST [%s]\n", strings.Join(constants, ", "))
 }
 
 // constantString muestra una constante del pool, con comillas si es string
@@ -163,8 +166,5 @@ func (c *Chunk) constantString(index byte) string {
 	if int(index) >= len(c.Constants) {
 		return fmt.Sprintf("índice %d inválido", index)
 	}
-	if s, ok := c.Constants[index].(string); ok {
-		return fmt.Sprintf("'%s'", s)
-	}
-	return fmt.Sprintf("%v", c.Constants[index])
+	return utils.DebugString(c.Constants[index])
 }

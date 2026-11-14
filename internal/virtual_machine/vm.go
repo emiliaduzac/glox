@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"sort"
 	"strings"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
@@ -27,6 +28,7 @@ type VirtualMachine struct {
 	stack   []any
 	out     io.Writer
 	globals map[string]any
+	debug   bool
 }
 
 func NewVirtualMachine() *VirtualMachine {
@@ -42,6 +44,10 @@ func NewVirtualMachine() *VirtualMachine {
 	}
 }
 
+func (vm *VirtualMachine) SetDebugMode() {
+	vm.debug = true
+}
+
 func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 	vm.push(function)
 	defer func() {
@@ -54,8 +60,13 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 		return err
 	}
 
+	if vm.debug {
+		_, _ = fmt.Fprintln(vm.out, "\n== RUNTIME ==")
+	}
+
 	frame := vm.currentFrame()
 	for frame.ip < len(frame.function.Chunk.Bytes) {
+		start := frame.ip
 		b, err := vm.readByte()
 		if err != nil {
 			return err
@@ -74,6 +85,9 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			vm.stack = vm.stack[:frame.slots]
 			vm.frames = vm.frames[:len(vm.frames)-1]
 			if len(vm.frames) == 0 {
+				if vm.debug {
+					_, _ = fmt.Fprintf(vm.out, "%04d| THE END\n", start)
+				}
 				return nil
 			}
 			vm.push(result)
@@ -152,6 +166,12 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			value, err := vm.pop()
 			if err != nil {
 				return err
+			}
+			if vm.debug {
+				if _, err := fmt.Fprintf(vm.out, "%04d| SCREEN OUTPUT %s\n", start, utils.Stringify(value)); err != nil {
+					return err
+				}
+				continue
 			}
 			if _, err := fmt.Fprintln(vm.out, utils.Stringify(value)); err != nil {
 				return err
@@ -259,6 +279,10 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
+
+		if vm.debug {
+			vm.printStackAndGlobal(start)
+		}
 	}
 	return nil
 }
@@ -310,6 +334,28 @@ func (vm *VirtualMachine) withStackTrace(err error) error {
 		fmt.Fprintf(&trace, "\n[line %d] in %s", frame.function.Chunk.Lines[frame.ip-1], name)
 	}
 	return fmt.Errorf("%w%s", err, trace.String())
+}
+
+func (vm *VirtualMachine) printStackAndGlobal(offset int) {
+	values := make([]string, len(vm.stack))
+	for i, v := range vm.stack {
+		values[i] = utils.DebugString(v)
+	}
+	_, _ = fmt.Fprintf(vm.out, "%04d| STACK [%s]\n", offset, strings.Join(values, ", "))
+
+	if len(vm.globals) == 0 {
+		return
+	}
+	names := make([]string, 0, len(vm.globals))
+	for name := range vm.globals {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	entries := make([]string, len(names))
+	for i, name := range names {
+		entries[i] = fmt.Sprintf("'%s': %s", name, utils.DebugString(vm.globals[name]))
+	}
+	_, _ = fmt.Fprintf(vm.out, "    | GLOBALS {%s}\n", strings.Join(entries, ", "))
 }
 
 // resetStack descarta todos los valores del stack

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -34,4 +35,28 @@ func gracefulShutdown(sigChan chan os.Signal, done chan struct{}) {
 			return
 		}
 	}()
+}
+
+// validateFlags verifica que la combinación de flags sea válida:
+//   - scanning, parsing y resolve solo se usan solos (modo normal del tree-walking)
+//   - vm puede ir solo o con debug
+//   - debug requiere vm
+func validateFlags(scanning, parsing, resolve, vm, debug bool) error {
+	phases := 0
+	for _, f := range []bool{scanning, parsing, resolve} {
+		if f {
+			phases++
+		}
+	}
+
+	if phases > 1 {
+		return errors.New("--scanning, --parsing and --resolve are mutually exclusive")
+	}
+	if phases == 1 && (vm || debug) {
+		return errors.New("--scanning, --parsing and --resolve cannot be combined with --vm or --debug")
+	}
+	if debug && !vm {
+		return errors.New("--debug can only be used with --vm")
+	}
+	return nil
 }

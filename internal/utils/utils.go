@@ -37,6 +37,14 @@ func Stringify(value any) string {
 	return fmt.Sprintf("%v", value)
 }
 
+// DebugString muestra un valor para las trazas de debug, con comillas simples si es string
+func DebugString(value any) string {
+	if s, ok := value.(string); ok {
+		return "'" + s + "'"
+	}
+	return Stringify(value)
+}
+
 func CheckNumberOperand(line int, operand any) (float64, error) {
 	num, ok := operand.(float64)
 	if !ok {

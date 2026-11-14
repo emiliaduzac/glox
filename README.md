@@ -30,6 +30,7 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Resolver](docs/4-resolver.md)
 - [Bytecode & Virtual Machine](docs/5-bytecode_and_vm.md)
 - [Compiler](docs/6-compiler.md)
+- [Extras propios](docs/7-extra.md)
 - [Benchmarks](docs/z-benchmarks.md)
 
 ## Cómo correr lox
@@ -59,6 +60,12 @@ Por default se ejecuta el tree-walk de la primera parte. Para usar el compilador
 ```bash
 go run ./cmd --vm <archivo.lox>
 ```
+
+Combinaciones de flags permitidas:
+
+- Ninguna flag: tree-walk.
+- Una sola entre `--scanning`, `--parsing` o `--resolve`. No se pueden combinar entre sí ni con `--vm` o `--debug`.
+- `--vm`, solo o seguido de `--debug`. `--debug` no se puede usar sin `--vm`.
 
 Para ver todos los modos:
 
@@ -113,6 +120,6 @@ En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERRO
 - [X] Control de flujo
 - [ ] Funciones y closures
 - [ ] Clases y herencia
-- [ ] Extra propio (?)
+- [x] Extra propio
 - [ ] Uso real del lenguaje
 - [ ] Benchmarks contra la entrega parcial, mejorar la que teniamos y documentación final

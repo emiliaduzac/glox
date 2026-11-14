@@ -35,10 +35,7 @@ func newLox(mode int, debug bool) *Lox {
 func (l *Lox) start() {
 	args := flag.Args()
 
-	if len(args) > 1 {
-		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing|--resolve|--vm [--debug]] [script]")
-		os.Exit(EX_USAGE)
-	} else if len(args) == 1 {
+	if len(args) == 1 {
 		l.runFile(args[0])
 	} else {
 		l.runPrompt()
@@ -135,6 +132,7 @@ func (l *Lox) runVM(tokens []token.Token) error {
 	}
 	if l.debug {
 		function.Chunk.Disassemble(function.String())
+		l.vm.SetDebugMode()
 	}
 	if err := l.vm.Run(function); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -144,12 +142,22 @@ func (l *Lox) runVM(tokens []token.Token) error {
 }
 
 func main() {
-	scanningFlag := flag.Bool("scanning", false, "corre solo el scanner, muestra los tokens")
-	parsingFlag := flag.Bool("parsing", false, "corre el scanner y el parser, muestra el AST")
-	resolveFlag := flag.Bool("resolve", false, "corre el scanner, el parser y el resolver, muestra las distancias resueltas de las variables locales")
-	vmFlag := flag.Bool("vm", false, "corre el scanner, el compilador y la VM")
-	debugFlag := flag.Bool("debug", false, "con --vm, muestra el bytecode compilado antes de ejecutarlo")
+	scanningFlag := flag.Bool("scanning", false, "run only the scanner and print the tokens")
+	parsingFlag := flag.Bool("parsing", false, "run the scanner and the parser and print the AST")
+	resolveFlag := flag.Bool("resolve", false, "run the scanner, the parser and the resolver and print the resolved distances of local variables")
+	vmFlag := flag.Bool("vm", false, "run the scanner, the bytecode compiler and the VM")
+	debugFlag := flag.Bool("debug", false, "with --vm, enable debug mode")
 	flag.Parse()
+
+	err := validateFlags(*scanningFlag, *parsingFlag, *resolveFlag, *vmFlag, *debugFlag)
+	if err == nil && len(flag.Args()) > 1 {
+		err = fmt.Errorf("too many arguments (flags must come before the file)")
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		fmt.Fprintln(os.Stderr, "usage: go run ./cmd [--scanning|--parsing|--resolve | --vm [--debug]] [script]")
+		os.Exit(EX_USAGE)
+	}
 
 	var mode int
 	switch {
