@@ -276,6 +276,42 @@ func TestOpCall(t *testing.T) {
 	})
 }
 
+func TestStackTrace(t *testing.T) {
+	callAt := func(chunk *c.Chunk, line int) {
+		chunk.Write(byte(c.OP_CALL), line)
+		chunk.Write(0, line)
+	}
+	failingCallAt := func(chunk *c.Chunk, line int) {
+		chunk.Write(byte(c.OP_NIL), line)
+		callAt(chunk, line)
+	}
+
+	t.Run("Un error en el script muestra la línea del script", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		failingCallAt(chunk, 3)
+
+		err := run(vm, chunk)
+
+		utils.AssertValue(t, err.Error(), "[line 3] Error: can only call functions and classes\n"+
+			"[line 3] in script")
+	})
+
+	t.Run("Un error dentro de una función muestra esa función y después el script", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		f := c.NewFunction()
+		f.Name = "f"
+		failingCallAt(&f.Chunk, 2)
+		writeConstant(chunk, f)
+		callAt(chunk, 5)
+
+		err := run(vm, chunk)
+
+		utils.AssertValue(t, err.Error(), "[line 2] Error: can only call functions and classes\n"+
+			"[line 2] in f()\n"+
+			"[line 5] in script")
+	})
+}
+
 func TestOpConstant(t *testing.T) {
 	tests := []struct {
 		name  string

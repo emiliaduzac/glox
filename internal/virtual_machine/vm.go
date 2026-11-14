@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"strings"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/utils"
@@ -41,6 +42,7 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 	vm.push(function)
 	defer func() {
 		if err != nil {
+			err = vm.withStackTrace(err)
 			vm.resetStack()
 		}
 	}()
@@ -267,6 +269,22 @@ func (vm *VirtualMachine) call(function *c.Function, argCount int) error {
 	}
 	vm.frames = append(vm.frames, callFrame{function: function, slots: len(vm.stack) - argCount - 1})
 	return nil
+}
+
+func (vm *VirtualMachine) withStackTrace(err error) error {
+	if len(vm.frames) == 0 {
+		return err
+	}
+	var trace strings.Builder
+	for i := len(vm.frames) - 1; i >= 0; i-- {
+		frame := vm.frames[i]
+		name := "script"
+		if frame.function.Name != "" {
+			name = frame.function.Name + "()"
+		}
+		fmt.Fprintf(&trace, "\n[line %d] in %s", frame.function.Chunk.Lines[frame.ip-1], name)
+	}
+	return fmt.Errorf("%w%s", err, trace.String())
 }
 
 // resetStack descarta todos los valores del stack
