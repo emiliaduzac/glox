@@ -213,6 +213,8 @@ func (c *Compiler) statement() error {
 		return c.whileStatement()
 	} else if c.cursor.Match(token.FOR) {
 		return c.forStatement()
+	} else if c.cursor.Match(token.RETURN) {
+		return c.returnStatement()
 	} else if c.cursor.Match(token.LEFT_BRACE) {
 		c.beginScope()
 		defer c.endScope()
@@ -242,6 +244,24 @@ func (c *Compiler) printStatement() error {
 		return err
 	}
 	c.emit(byte(chunk.OP_PRINT))
+	return nil
+}
+
+func (c *Compiler) returnStatement() error {
+	if c.funcType == TYPE_SCRIPT {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't return from top-level code"))
+	}
+	if c.cursor.Match(token.SEMICOLON) {
+		c.emitReturn()
+		return nil
+	}
+	if err := c.expression(); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after return value"); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_RETURN))
 	return nil
 }
 

@@ -285,6 +285,54 @@ func TestCompileFunctionName(t *testing.T) {
 	})
 }
 
+func TestCompileReturn(t *testing.T) {
+	t.Run("Un return con valor compila la expresión y emite OP_RETURN", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() { return 5; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_RETURN),
+			byte(c.OP_NIL), byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Un return sin valor equivale a return nil", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() { return; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_NIL), byte(c.OP_RETURN),
+			byte(c.OP_NIL), byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("El valor del return puede ser una expresión con los parámetros", func(t *testing.T) {
+		chunk := compileSource(t, "fun square(a) { return a * a; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_MULTIPLY),
+			byte(c.OP_RETURN),
+			byte(c.OP_NIL), byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si hay un return en el nivel superior", func(t *testing.T) {
+		err := compileSourceError(t, "return 1;")
+
+		utils.AssertErrorMessage(t, err, "can't return from top-level code")
+	})
+
+	t.Run("Error si falta el punto y coma después del valor del return", func(t *testing.T) {
+		err := compileSourceError(t, "fun f() { return 1 }")
+
+		utils.AssertErrorMessage(t, err, "';' after return value")
+	})
+}
+
 func TestCompileCall(t *testing.T) {
 	argsSource := func(n int) string {
 		return "f(" + strings.Repeat("nil, ", n-1) + "nil);"
