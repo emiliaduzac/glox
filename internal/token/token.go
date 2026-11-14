@@ -49,7 +49,7 @@ const (
 	VAR
 	WHILE
 
-	CONTNIUE
+	CONTINUE
 
 	EOF
 )
@@ -71,7 +71,7 @@ var TokenKeyWords = map[string]TokenType{
 	"true":     TRUE,
 	"var":      VAR,
 	"while":    WHILE,
-	"continue": CONTNIUE,
+	"continue": CONTINUE,
 }
 
 func (t TokenType) String() string {

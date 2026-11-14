@@ -13,6 +13,11 @@ type Local struct {
 	Depth int
 }
 
+type Loop struct {
+	loopStart  int
+	scopeDepth int
+}
+
 type Compiler struct {
 	cursor      *token.TokenCursor
 	chunk       *chunk.Chunk
@@ -21,6 +26,7 @@ type Compiler struct {
 	errs        []error
 	panicMode   bool
 	identifiers map[string]byte
+	loops       []Loop
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
@@ -180,6 +186,8 @@ func (c *Compiler) statement() error {
 		c.beginScope()
 		defer c.endScope()
 		return c.block()
+	} else if c.cursor.Match(token.CONTINUE) {
+		return c.continueStatement()
 	}
 	return c.expressionStatement()
 }
@@ -195,6 +203,14 @@ func (c *Compiler) endScope() {
 		c.emit(byte(chunk.OP_POP))
 		c.locals = c.locals[:len(c.locals)-1]
 	}
+}
+
+func (c *Compiler) beginLoop(loopStart int) {
+	c.loops = append(c.loops, Loop{loopStart: loopStart, scopeDepth: c.scopeDepth})
+}
+
+func (c *Compiler) endLoop() {
+	c.loops = c.loops[:len(c.loops)-1]
 }
 
 func (c *Compiler) printStatement() error {
@@ -249,6 +265,9 @@ func (c *Compiler) ifStatement() error {
 
 func (c *Compiler) whileStatement() error {
 	loopStart := len(c.chunk.Bytes)
+	c.beginLoop(loopStart)
+	defer c.endLoop()
+
 	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after 'while'"); err != nil {
 		return err
 	}
@@ -294,6 +313,8 @@ func (c *Compiler) forStatement() error {
 	if err != nil {
 		return err
 	}
+	c.beginLoop(loopStart)
+	defer c.endLoop()
 
 	if err := c.statement(); err != nil {
 		return err
@@ -357,6 +378,11 @@ func (c *Compiler) forIncrement(loopStart int) (int, error) {
 		return loopStart, err
 	}
 	return incrementStart, nil
+}
+
+func (c *Compiler) continueStatement() error {
+
+	return nil
 }
 
 func (c *Compiler) expressionStatement() error {

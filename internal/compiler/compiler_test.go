@@ -1060,3 +1060,26 @@ func TestCompileFor(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "')' after for clauses")
 	})
 }
+
+func TestCompileLoopsAreClosed(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{"while", "while (false) print 1;"},
+		{"for", "for (var i = 0; i < 1; i = i + 1) print i;"},
+		{"ciclos anidados", "while (false) for (;;) print 1;"},
+		{"error en el cuerpo del ciclo", "while (false) print ;"},
+		{"error en el for antes de apilar, dentro de un while", "while (false) { for x;;) print 1; }"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tokens, _ := scanner.NewScanner(test.source).Scan()
+			compiler := NewCompiler(tokens)
+			_, _ = compiler.Compile()
+
+			utils.AssertValue(t, len(compiler.loops), 0)
+		})
+	}
+}
