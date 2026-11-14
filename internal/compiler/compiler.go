@@ -261,6 +261,22 @@ func (c *Compiler) compileFunction(funcType FunctionType) error {
 	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after function name"); err != nil {
 		return err
 	}
+	if !c.cursor.Check(token.RIGHT_PAREN) {
+		for {
+			fc.function.Arity++
+			if fc.function.Arity > math.MaxUint8 {
+				c.report(errors.NewLoxError(c.cursor.GetLine(), "cannot have more than 255 parameters"))
+			}
+			param, err := fc.parseVariable("parameter name")
+			if err != nil {
+				return err
+			}
+			fc.defineVariable(param)
+			if !c.cursor.Match(token.COMMA) {
+				break
+			}
+		}
+	}
 	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after parameters"); err != nil {
 		return err
 	}

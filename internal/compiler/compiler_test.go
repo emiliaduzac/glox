@@ -147,7 +147,7 @@ func TestCompileFunctionDeclaration(t *testing.T) {
 		}{
 			{"falta el nombre", "fun () {}", "function name"},
 			{"falta el paréntesis que abre", "fun f {}", "'(' after function name"},
-			{"falta el paréntesis que cierra", "fun f( {}", "')' after parameters"},
+			{"falta el paréntesis que cierra", "fun f(a {}", "')' after parameters"},
 			{"falta la llave que abre", "fun f() print 1;", "'{' before function body"},
 		}
 		for _, test := range tests {
@@ -169,6 +169,79 @@ func TestCompileFunctionDeclaration(t *testing.T) {
 		err := compileSourceError(t, "if (true) fun f() {}")
 
 		utils.AssertError(t, err)
+	})
+}
+
+func TestCompileFunctionParameters(t *testing.T) {
+	paramsSource := func(n int) string {
+		names := make([]string, n)
+		for i := range names {
+			names[i] = fmt.Sprintf("a%d", i)
+		}
+		return "fun f(" + strings.Join(names, ", ") + ") {}"
+	}
+
+	arityTests := []struct {
+		name   string
+		source string
+		arity  int
+	}{
+		{"sin parámetros", "fun f() {}", 0},
+		{"un parámetro", "fun f(a) {}", 1},
+		{"varios parámetros", "fun f(a, b) {}", 2},
+	}
+	for _, test := range arityTests {
+		t.Run("La aridad de la función es igual a la cantidad de parámetros: "+test.name, func(t *testing.T) {
+			chunk := compileSource(t, test.source)
+
+			function := chunk.Constants[1].(*c.Function)
+			utils.AssertValue(t, function.Arity, test.arity)
+		})
+	}
+
+	t.Run("Los parámetros son variables locales de la función a continuación del slot cero", func(t *testing.T) {
+		chunk := compileSource(t, "fun f(a, b) { print b; print a; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_GET_LOCAL), 2,
+			byte(c.OP_PRINT),
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Una función admite hasta 255 parámetros", func(t *testing.T) {
+		chunk := compileSource(t, paramsSource(255))
+
+		function := chunk.Constants[1].(*c.Function)
+		utils.AssertValue(t, function.Arity, 255)
+	})
+
+	t.Run("Error si una función tiene más de 255 parámetros", func(t *testing.T) {
+		err := compileSourceError(t, paramsSource(256))
+
+		utils.AssertErrorMessage(t, err, "cannot have more than 255 parameters")
+	})
+
+	t.Run("Errores de sintaxis en la lista de parámetros", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			source   string
+			expected string
+		}{
+			{"falta el nombre del parámetro", "fun f(1) {}", "parameter name"},
+			{"coma al final de la lista", "fun f(a,) {}", "parameter name"},
+			{"falta la coma entre parámetros", "fun f(a b) {}", "')' after parameters"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, test.expected)
+			})
+		}
 	})
 }
 
