@@ -16,6 +16,7 @@ type Local struct {
 type Loop struct {
 	loopStart  int
 	scopeDepth int
+	breakJumps []int
 }
 
 type Compiler struct {
@@ -215,8 +216,8 @@ func (c *Compiler) endLoop() {
 	c.loops = c.loops[:len(c.loops)-1]
 }
 
-func (c *Compiler) getCurrentLoop() Loop {
-	return c.loops[len(c.loops)-1]
+func (c *Compiler) getCurrentLoop() *Loop {
+	return &c.loops[len(c.loops)-1]
 }
 
 func (c *Compiler) printStatement() error {
@@ -296,7 +297,8 @@ func (c *Compiler) whileStatement() error {
 		return err
 	}
 	c.emit(byte(chunk.OP_POP))
-	return nil
+
+	return c.patchBreakJumps()
 }
 
 func (c *Compiler) forStatement() error {
@@ -335,7 +337,8 @@ func (c *Compiler) forStatement() error {
 		}
 		c.emit(byte(chunk.OP_POP))
 	}
-	return nil
+
+	return c.patchBreakJumps()
 }
 
 func (c *Compiler) forInitializer() error {
@@ -403,6 +406,21 @@ func (c *Compiler) continueStatement() error {
 }
 
 func (c *Compiler) breakStatement() error {
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after break"); err != nil {
+		return err
+	}
+	if len(c.loops) == 0 {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "found 'break' outside a loop"))
+		return nil
+	}
+
+	currentLoop := c.getCurrentLoop()
+	for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > currentLoop.scopeDepth; i-- {
+		c.emit(byte(chunk.OP_POP))
+	}
+
+	breakJump := c.emitJump(chunk.OP_JUMP)
+	currentLoop.breakJumps = append(currentLoop.breakJumps, breakJump)
 	return nil
 }
 
@@ -461,6 +479,15 @@ func (c *Compiler) patchJump(offset int) error {
 	}
 	c.chunk.Bytes[offset] = byte(jump >> 8)
 	c.chunk.Bytes[offset+1] = byte(jump)
+	return nil
+}
+
+func (c *Compiler) patchBreakJumps() error {
+	for _, breakJump := range c.getCurrentLoop().breakJumps {
+		if err := c.patchJump(breakJump); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

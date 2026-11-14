@@ -42,10 +42,47 @@ En la VM no hace falta ningún cambio: el `continue` se arma solo con instruccio
 
 ### Break
 
-Un `break`, a diferencia del `continue`, no corta solo la iteración actual: termina el ciclo por completo. Tanto en un `for` como en un `while`, salta a lo que sigue después del ciclo, sin volver a evaluar la condición ni el incremento. Si hay ciclos anidados, sale del más interno.
+Un `break`, a diferencia del `continue`, no corta solo la iteración actual: termina el ciclo por completo. Tanto en un `for` como en un `while`, salta a lo que sigue después del ciclo, sin volver a evaluar la condición ni ejecutar el incremento. Si hay ciclos anidados, sale del más interno.
 
 El primer paso es agregarlo como un token, para que el scanner lo reconozca como palabra reservada.
 
-Al igual que el `continue`, el `break` es un statement, por lo que será manejado dentro de `statement()`, con los mismos requisitos de finalizar con `;`, dejar el stack en el mismo estado, etc.
+Al igual que el `continue`, el `break` es un statement, por lo que será manejado dentro de `statement()`, con los mismos requisitos: finalizar con `;`, estar dentro de un ciclo y dejar el stack en el mismo estado, sacando las variables locales del ciclo antes de saltar.
 
-Luego, pasando al compilador, sabemos que emitiremos un `OP_JUMP`, pero como inicialmente lo hacemos con un placeholder y luego lo remplazamos al terminar de compilar el cuerpo, surge la duda de como resolverlo en este caso. El cuerpo se resuelve dentro del `forStatement()` o `whileStatement()`, por lo que dentro de un `breakStatement()` no podemos saber.
+Luego, pasando al compilador, sabemos que emitiremos un `OP_JUMP`, pero como inicialmente lo hacemos con un placeholder y luego lo reemplazamos, surge la duda de cómo resolverlo en este caso. El ciclo se compila dentro de `forStatement()` o `whileStatement()`, por lo que dentro de `breakStatement()` no podemos saber dónde va a terminar.
+
+Entonces, se dividen las responsabilidades, y tenemos que ver cómo combinarlas:
+
+- el `break` emite un `OP_JUMP` con un placeholder en el bytecode, que después hay que completar
+- los ciclos saben dónde terminan, y por lo tanto cómo completarlo, pero necesitan saber dónde quedó cada placeholder
+
+Es una especie de comunicación entre ambos statements, y ya tenemos un struct que nos ayuda con esto: `Loop`. Le agregamos un campo donde cada `break` indica dónde quedó su placeholder, para que el ciclo lo complete al terminar. Como puede haber más de un `break` en un mismo ciclo, es un slice:
+
+```Go
+type Loop struct {
+	loopStart  int
+	scopeDepth int
+	breakJumps []int
+}
+```
+
+Entonces, cuando nos encontramos con un `break`, hacemos las mismas validaciones que en el `continue`. Si está todo ok, emitimos un `OP_POP` por cada variable local con profundidad mayor a la del ciclo. Finalmente, emitimos el `OP_JUMP` y guardamos la posición de su placeholder en `breakJumps`.
+
+Luego, al terminar cada ciclo, llamamos a `patchBreakJumps()`, que completa todos los `break` del ciclo actual. Lo hacemos después del `OP_POP` de salida porque los dos caminos de salida llegan con el stack distinto: cuando la condición da falsa, la condición todavía está en el stack y ese `OP_POP` la saca, pero cuando se ejecuta un `break`, la condición ya se sacó al entrar al cuerpo. Si el `break` cayera en ese `OP_POP`, sacaría un valor de más. En un `for` sin condición no hay `OP_POP` de salida, así que los `break` caen justo después del último `OP_LOOP`.
+
+Igual que con el `continue`, en la VM no hace falta ningún cambio: el `break` se arma con `OP_POP` y `OP_JUMP`.
+
+### Tests
+
+Para los extras agregados, hicimos distintos tipos de tests:
+
+> unitarios de los **tokens**:
+
+```bash
+go test ./internal/scanner -run '^TestContinueAndBreak$'
+```
+
+> unitarios del **compiler**:
+
+```bash
+go test ./internal/compiler -run '^TestCompile(Continue|Break|LoopsAreClosed)$'
+```
