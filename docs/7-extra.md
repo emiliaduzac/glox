@@ -105,3 +105,11 @@ go test ./internal/scanner -run '^TestContinueAndBreak$'
 ```bash
 go test ./internal/compiler -run '^TestCompile(Continue|Break|LoopsAreClosed)$'
 ```
+
+> real tests: incorporamos un test con usos reales de `break`  y `continue` ([5-break-continue](../real-tests/5-break-continue.lox)):
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm" 5-break-continue
+```
+
+TO DO: ver de agregar funciones + break / continue

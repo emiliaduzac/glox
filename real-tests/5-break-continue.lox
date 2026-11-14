@@ -1,0 +1,119 @@
+print "--- CONTINUE EN WHILE ---";
+var i = 0;
+var sum = 0;
+while (i < 5) {
+    i = i + 1;
+    if (i == 3) continue;
+    sum = sum + i;
+}
+
+if (sum == 12) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- CONTINUE EN FOR (ejecuta el incremento) ---";
+var sumFor = 0;
+for (var j = 0; j < 5; j = j + 1) {
+    if (j == 2) continue;
+    sumFor = sumFor + j;
+}
+
+if (sumFor == 8) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- BREAK EN WHILE ---";
+var n = 0;
+while (true) {
+    n = n + 1;
+    if (n == 4) break;
+}
+
+if (n == 4) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- BREAK EN FOR ---";
+var last = 0;
+for (var k = 0; k < 10; k = k + 1) {
+    last = k;
+    if (k == 6) break;
+}
+
+if (last == 6) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- VARIABLES LOCALES EN EL CUERPO ---";
+var total = 0;
+for (var a = 0; a < 6; a = a + 1) {
+    var doble = a * 2;
+    if (a == 1) continue;
+    var triple = a * 3;
+    if (a == 4) break;
+    total = total + doble + triple;
+}
+
+if (total == 25) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- CICLOS ANIDADOS: BREAK SOLO SALE DEL MAS INTERNO ---";
+var countBreak = 0;
+for (var x = 0; x < 3; x = x + 1) {
+    for (var y = 0; y < 3; y = y + 1) {
+        if (y == 1) break;
+        countBreak = countBreak + 1;
+    }
+}
+
+if (countBreak == 3) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- CICLOS ANIDADOS: CONTINUE SOLO AFECTA AL MAS INTERNO ---";
+var countContinue = 0;
+for (var p = 0; p < 3; p = p + 1) {
+    for (var q = 0; q < 3; q = q + 1) {
+        if (q == 1) continue;
+        countContinue = countContinue + 1;
+    }
+}
+
+if (countContinue == 6) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- BREAK Y CONTINUE DENTRO DE BLOQUES ANIDADOS ---";
+var m = 0;
+var seen = 0;
+while (true) {
+    var v = m;
+    m = m + 1;
+    {
+        var w = v;
+        if (w == 2) break;
+    }
+    if (v == 0) continue;
+    seen = seen + v;
+}
+
+if (seen == 1 and m == 3) {
+    print "OK";
+} else {
+    print "ERROR";
+}

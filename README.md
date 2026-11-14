@@ -120,6 +120,6 @@ En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERRO
 - [X] Control de flujo
 - [ ] Funciones y closures
 - [ ] Clases y herencia
-- [ ] Extra propio (?)
+- [x] Extra propio
 - [ ] Uso real del lenguaje
 - [ ] Benchmarks contra la entrega parcial, mejorar la que teniamos y documentación final
