@@ -213,6 +213,10 @@ func (c *Compiler) endLoop() {
 	c.loops = c.loops[:len(c.loops)-1]
 }
 
+func (c *Compiler) getCurrentLoop() Loop {
+	return c.loops[len(c.loops)-1]
+}
+
 func (c *Compiler) printStatement() error {
 	if err := c.expression(); err != nil {
 		return err
@@ -381,8 +385,19 @@ func (c *Compiler) forIncrement(loopStart int) (int, error) {
 }
 
 func (c *Compiler) continueStatement() error {
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after continue"); err != nil {
+		return err
+	}
+	if len(c.loops) == 0 {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "found 'continue' outside a loop"))
+		return nil
+	}
 
-	return nil
+	currentLoop := c.getCurrentLoop()
+	for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > currentLoop.scopeDepth; i-- {
+		c.emit(byte(chunk.OP_POP))
+	}
+	return c.emitLoop(currentLoop.loopStart)
 }
 
 func (c *Compiler) expressionStatement() error {
