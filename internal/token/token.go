@@ -50,6 +50,7 @@ const (
 	WHILE
 
 	CONTINUE
+	BREAK
 
 	EOF
 )
@@ -72,6 +73,7 @@ var TokenKeyWords = map[string]TokenType{
 	"var":      VAR,
 	"while":    WHILE,
 	"continue": CONTINUE,
+	"break":    BREAK,
 }
 
 func (t TokenType) String() string {
@@ -82,7 +84,8 @@ func (t TokenType) String() string {
 		"GREATER", "GREATER_EQUAL", "LESS", "LESS_EQUAL",
 		"IDENTIFIER", "STRING", "NUMBER",
 		"AND", "CLASS", "ELSE", "FALSE", "FUN", "FOR", "IF", "NIL", "OR",
-		"PRINT", "RETURN", "SUPER", "THIS", "TRUE", "VAR", "WHILE", "CONTINUE",
+		"PRINT", "RETURN", "SUPER", "THIS", "TRUE", "VAR", "WHILE",
+		"CONTINUE", "BREAK",
 		"EOF",
 	}
 	if int(t) < 0 || int(t) >= len(names) {

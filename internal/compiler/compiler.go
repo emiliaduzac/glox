@@ -188,6 +188,8 @@ func (c *Compiler) statement() error {
 		return c.block()
 	} else if c.cursor.Match(token.CONTINUE) {
 		return c.continueStatement()
+	} else if c.cursor.Match(token.BREAK) {
+		return c.breakStatement()
 	}
 	return c.expressionStatement()
 }
@@ -398,6 +400,10 @@ func (c *Compiler) continueStatement() error {
 		c.emit(byte(chunk.OP_POP))
 	}
 	return c.emitLoop(currentLoop.loopStart)
+}
+
+func (c *Compiler) breakStatement() error {
+	return nil
 }
 
 func (c *Compiler) expressionStatement() error {

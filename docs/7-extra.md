@@ -39,3 +39,13 @@ y luego, al `Compiler` le agregamos un `loops []Loop` (muy similar a los `locals
 Finalmente, `continueStatement()` se ejecuta luego de encontrar un `continue`. Primero valida que lo siga un `;` y que esté dentro de un ciclo. Si no lo está, reporta el error y sigue compilando: el código está bien escrito, pero rompe una regla del lenguaje, igual que redeclarar una variable local (ver [Manejo de errores](6-compiler.md#manejo-de-errores)). Si está todo bien, obtiene el ciclo del tope del stack de loop, emite un `OP_POP` por cada variable local con profundidad mayor a la del ciclo y, por último, emite un `OP_LOOP` hacia el `loopStart` que guardó ese ciclo al crearse. En el `while` es la condición, y en el `for`, el incremento: por eso en el `for` apilamos el `Loop` recién después de compilar el incremento, cuando ya conocemos su posición.
 
 En la VM no hace falta ningún cambio: el `continue` se arma solo con instrucciones que ya existían (`OP_POP` y `OP_LOOP`).
+
+### Break
+
+Un `break`, a diferencia del `continue`, no corta solo la iteración actual: termina el ciclo por completo. Tanto en un `for` como en un `while`, salta a lo que sigue después del ciclo, sin volver a evaluar la condición ni el incremento. Si hay ciclos anidados, sale del más interno.
+
+El primer paso es agregarlo como un token, para que el scanner lo reconozca como palabra reservada.
+
+Al igual que el `continue`, el `break` es un statement, por lo que será manejado dentro de `statement()`, con los mismos requisitos de finalizar con `;`, dejar el stack en el mismo estado, etc.
+
+Luego, pasando al compilador, sabemos que emitiremos un `OP_JUMP`, pero como inicialmente lo hacemos con un placeholder y luego lo remplazamos al terminar de compilar el cuerpo, surge la duda de como resolverlo en este caso. El cuerpo se resuelve dentro del `forStatement()` o `whileStatement()`, por lo que dentro de un `breakStatement()` no podemos saber.
