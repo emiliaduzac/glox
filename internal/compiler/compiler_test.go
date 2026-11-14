@@ -276,6 +276,98 @@ func TestCompileFunctionName(t *testing.T) {
 	})
 }
 
+func TestCompileCall(t *testing.T) {
+	argsSource := func(n int) string {
+		return "f(" + strings.Repeat("nil, ", n-1) + "nil);"
+	}
+
+	t.Run("Una llamada sin argumentos carga la función y emite OP_CALL con cero argumentos", func(t *testing.T) {
+		chunk := compileSource(t, "f();")
+
+		assertBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_CALL), 0, byte(c.OP_POP), byte(c.OP_RETURN))
+	})
+
+	t.Run("OP_CALL lleva la cantidad de argumentos que se cargan en orden después de la función", func(t *testing.T) {
+		chunk := compileSource(t, "f(1, 2);")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_CALL), 2,
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[1], 1.0)
+		utils.AssertValue(t, chunk.Constants[2], 2.0)
+	})
+
+	t.Run("Cada argumento es una expresión completa y la coma los separa", func(t *testing.T) {
+		chunk := compileSource(t, "f(1 + 2, 3 * 4);")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_ADD),
+			byte(c.OP_CONSTANT), 3,
+			byte(c.OP_CONSTANT), 4,
+			byte(c.OP_MULTIPLY),
+			byte(c.OP_CALL), 2,
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("La llamada tiene más precedencia que el operador unario", func(t *testing.T) {
+		chunk := compileSource(t, "print -f();")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_NEGATE),
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Se puede llamar al resultado de otra llamada", func(t *testing.T) {
+		chunk := compileSource(t, "f()();")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Una llamada admite hasta 255 argumentos", func(t *testing.T) {
+		chunk := compileSource(t, argsSource(255))
+
+		expected := []byte{byte(c.OP_GET_GLOBAL), 0}
+		expected = append(expected, slices.Repeat([]byte{byte(c.OP_NIL)}, 255)...)
+		expected = append(expected, byte(c.OP_CALL), 255, byte(c.OP_POP), byte(c.OP_RETURN))
+		assertBytes(t, chunk, expected...)
+	})
+
+	t.Run("Error si una llamada tiene más de 255 argumentos", func(t *testing.T) {
+		err := compileSourceError(t, argsSource(256))
+		utils.AssertErrorMessage(t, err, "cannot have more than 255 arguments")
+	})
+
+	t.Run("Error si falta el paréntesis que cierra la lista de argumentos", func(t *testing.T) {
+		err := compileSourceError(t, "f(1;")
+		utils.AssertErrorMessage(t, err, "')' after arguments")
+	})
+
+	t.Run("Error si hay una coma al final de la lista de argumentos", func(t *testing.T) {
+		err := compileSourceError(t, "f(1,);")
+		utils.AssertErrorMessage(t, err, "expected expression")
+	})
+}
+
 func TestCompileEnclosingFunction(t *testing.T) {
 	t.Run("Al terminar una función anidada el compilador sigue escribiendo en la de afuera", func(t *testing.T) {
 		chunk := compileSource(t, "fun a() { fun b() {} print 1; }")

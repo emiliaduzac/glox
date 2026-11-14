@@ -553,6 +553,37 @@ func (c *Compiler) grouping(_ bool) error {
 	return nil
 }
 
+func (c *Compiler) call(_ bool) error {
+	argCount, err := c.argumentList()
+	if err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_CALL), argCount)
+	return nil
+}
+
+func (c *Compiler) argumentList() (byte, error) {
+	argCount := 0
+	if !c.cursor.Check(token.RIGHT_PAREN) {
+		for {
+			if err := c.expression(); err != nil {
+				return 0, err
+			}
+			if argCount == math.MaxUint8 {
+				c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "cannot have more than 255 arguments"))
+			}
+			argCount++
+			if !c.cursor.Match(token.COMMA) {
+				break
+			}
+		}
+	}
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after arguments"); err != nil {
+		return 0, err
+	}
+	return byte(argCount), nil
+}
+
 func (c *Compiler) unary(_ bool) error {
 	operatorType := c.cursor.GetPreviousType()
 	if err := c.parsePrecedence(PREC_UNARY); err != nil {

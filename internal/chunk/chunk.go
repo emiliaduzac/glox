@@ -38,6 +38,8 @@ const (
 	OP_LOOP
 	OP_JUMP_IF_FALSE
 	OP_JUMP
+
+	OP_CALL
 )
 
 var opCodeNames = map[OpCode]string{
@@ -71,6 +73,8 @@ var opCodeNames = map[OpCode]string{
 	OP_LOOP:          "OP_LOOP",
 	OP_JUMP_IF_FALSE: "OP_JUMP_IF_FALSE",
 	OP_JUMP:          "OP_JUMP",
+
+	OP_CALL: "OP_CALL",
 }
 
 func (op OpCode) String() string {
@@ -126,6 +130,11 @@ func (c *Chunk) Disassemble(name string) {
 			// Instrucciones con operandos: slots
 			varIndex := c.Bytes[i+1]
 			fmt.Printf("%s<@%d>\n", op, varIndex)
+			i += 2
+
+		case OP_CALL:
+			argCount := c.Bytes[i+1]
+			fmt.Printf("%s<%d>\n", op, argCount)
 			i += 2
 
 		case OP_JUMP, OP_JUMP_IF_FALSE, OP_LOOP:
