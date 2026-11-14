@@ -126,12 +126,12 @@ func (l *Lox) run(source string) error {
 }
 
 func (l *Lox) runVM(tokens []token.Token) error {
-	chunk, err := compiler.NewCompiler(tokens).Compile()
+	function, err := compiler.NewCompiler(tokens).Compile()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return err
 	}
-	if err := l.vm.Run(chunk); err != nil {
+	if err := l.vm.Run(&function.Chunk); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return err
 	}

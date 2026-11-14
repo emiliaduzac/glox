@@ -13,9 +13,17 @@ type Local struct {
 	Depth int
 }
 
+type FunctionType int
+
+const (
+	TYPE_FUNCTION FunctionType = iota
+	TYPE_SCRIPT
+)
+
 type Compiler struct {
 	cursor      *token.TokenCursor
-	chunk       *chunk.Chunk
+	function    *chunk.Function
+	funcType    FunctionType
 	locals      []Local
 	scopeDepth  int
 	errs        []error
@@ -27,22 +35,32 @@ type Compiler struct {
 func NewCompiler(tokens []token.Token) *Compiler {
 	return &Compiler{
 		cursor:      token.NewTokenCursor(tokens),
-		chunk:       chunk.NewChunk(),
-		locals:      []Local{},
+		function:    chunk.NewFunction(),
+		funcType:    TYPE_SCRIPT,
+		locals:      []Local{{Depth: 0}},
 		scopeDepth:  0,
 		identifiers: map[string]byte{},
 	}
 }
 
-func (c *Compiler) Compile() (*chunk.Chunk, error) {
+func (c *Compiler) currentChunk() *chunk.Chunk {
+	return &c.function.Chunk
+}
+
+func (c *Compiler) Compile() (*chunk.Function, error) {
 	for !c.cursor.Match(token.EOF) {
 		c.declaration()
 	}
+	function := c.endCompiler()
 	if len(c.errs) > 0 {
 		return nil, stderrors.Join(c.errs...)
 	}
+	return function, nil
+}
+
+func (c *Compiler) endCompiler() *chunk.Function {
 	c.emitReturn()
-	return c.chunk, nil
+	return c.function
 }
 
 func (c *Compiler) expression() error {
@@ -248,7 +266,7 @@ func (c *Compiler) ifStatement() error {
 }
 
 func (c *Compiler) whileStatement() error {
-	loopStart := len(c.chunk.Bytes)
+	loopStart := len(c.currentChunk().Bytes)
 	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after 'while'"); err != nil {
 		return err
 	}
@@ -285,7 +303,7 @@ func (c *Compiler) forStatement() error {
 		return err
 	}
 
-	loopStart := len(c.chunk.Bytes)
+	loopStart := len(c.currentChunk().Bytes)
 	exitJump, err := c.forCondition()
 	if err != nil {
 		return err
@@ -342,7 +360,7 @@ func (c *Compiler) forIncrement(loopStart int) (int, error) {
 	}
 
 	bodyJump := c.emitJump(chunk.OP_JUMP)
-	incrementStart := len(c.chunk.Bytes)
+	incrementStart := len(c.currentChunk().Bytes)
 	if err := c.expression(); err != nil {
 		return loopStart, err
 	}
@@ -373,7 +391,7 @@ func (c *Compiler) expressionStatement() error {
 // emit escribe uno o más bytes en el chunk, con la línea del último token consumido
 func (c *Compiler) emit(bytes ...byte) {
 	for _, b := range bytes {
-		c.chunk.Write(b, c.cursor.GetPreviousLine())
+		c.currentChunk().Write(b, c.cursor.GetPreviousLine())
 	}
 }
 
@@ -392,13 +410,13 @@ func (c *Compiler) emitConstant(value any) error {
 
 func (c *Compiler) emitJump(instruction chunk.OpCode) int {
 	c.emit(byte(instruction), 0xff, 0xff)
-	return len(c.chunk.Bytes) - 2
+	return len(c.currentChunk().Bytes) - 2
 }
 
 func (c *Compiler) emitLoop(loopStart int) error {
 	c.emit(byte(chunk.OP_LOOP))
 
-	offset := len(c.chunk.Bytes) - loopStart + 2
+	offset := len(c.currentChunk().Bytes) - loopStart + 2
 	if offset > math.MaxUint16 {
 		return errors.NewLoxError(c.cursor.GetPreviousLine(), "loop body too large")
 	}
@@ -408,17 +426,17 @@ func (c *Compiler) emitLoop(loopStart int) error {
 }
 
 func (c *Compiler) patchJump(offset int) error {
-	jump := len(c.chunk.Bytes) - offset - 2
+	jump := len(c.currentChunk().Bytes) - offset - 2
 	if jump > math.MaxUint16 {
 		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too much code to jump over")
 	}
-	c.chunk.Bytes[offset] = byte(jump >> 8)
-	c.chunk.Bytes[offset+1] = byte(jump)
+	c.currentChunk().Bytes[offset] = byte(jump >> 8)
+	c.currentChunk().Bytes[offset+1] = byte(jump)
 	return nil
 }
 
 func (c *Compiler) makeConstant(value any) (byte, error) {
-	index := c.chunk.AddConstant(value)
+	index := c.currentChunk().AddConstant(value)
 	if index > math.MaxUint8 {
 		return 0, errors.NewLoxError(c.cursor.GetPreviousLine(), "too many constants in one chunk")
 	}

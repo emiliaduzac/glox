@@ -16,9 +16,9 @@ func compileSource(t *testing.T, source string) *c.Chunk {
 	tokens, err := scanner.NewScanner(source).Scan()
 	utils.AssertNoError(t, err)
 
-	chunk, err := NewCompiler(tokens).Compile()
+	function, err := NewCompiler(tokens).Compile()
 	utils.AssertNoError(t, err)
-	return chunk
+	return &function.Chunk
 }
 
 // compileSourceError escanea el código fuente (que debe ser válido para el scanner) y devuelve el error del compilador.
@@ -62,6 +62,21 @@ func assertBytes(t *testing.T, chunk *c.Chunk, expected ...byte) {
 func assertExprBytes(t *testing.T, chunk *c.Chunk, expected ...byte) {
 	t.Helper()
 	assertBytes(t, chunk, slices.Concat(expected, []byte{byte(c.OP_PRINT), byte(c.OP_RETURN)})...)
+}
+
+func TestCompileScript(t *testing.T) {
+	t.Run("Un programa se compila a una función sin nombre y sin parámetros, que es el script", func(t *testing.T) {
+		tokens, err := scanner.NewScanner("print 1;").Scan()
+		utils.AssertNoError(t, err)
+
+		function, err := NewCompiler(tokens).Compile()
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, function.Name, "")
+		utils.AssertValue(t, function.Arity, 0)
+		utils.AssertValue(t, utils.Stringify(function), "<script>")
+		assertBytes(t, &function.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+	})
 }
 
 func TestCompileLiterals(t *testing.T) {
@@ -394,10 +409,10 @@ func TestCompileErrorSynchronization(t *testing.T) {
 		tokens, err := scanner.NewScanner("print 1 +; print 2;").Scan()
 		utils.AssertNoError(t, err)
 
-		chunk, err := NewCompiler(tokens).Compile()
+		function, err := NewCompiler(tokens).Compile()
 
 		utils.AssertError(t, err)
-		utils.AssertValue(t, chunk == nil, true)
+		utils.AssertValue(t, function == nil, true)
 	})
 
 	t.Run("Un error dentro de un bloque anidado se muestra una sola vez", func(t *testing.T) {
@@ -604,14 +619,14 @@ func TestCompileLocalLimit(t *testing.T) {
 		return sb.String()
 	}
 
-	t.Run("Un scope admite hasta 256 variables locales", func(t *testing.T) {
-		chunk := compileSource(t, localsSource(256))
+	t.Run("Un scope admite hasta 255 variables locales, porque el slot cero está reservado", func(t *testing.T) {
+		chunk := compileSource(t, localsSource(255))
 
 		utils.AssertValue(t, len(chunk.Constants), 0)
 	})
 
-	t.Run("Error si un scope tiene más de 256 variables locales", func(t *testing.T) {
-		err := compileSourceError(t, localsSource(257))
+	t.Run("Error si un scope tiene más de 255 variables locales", func(t *testing.T) {
+		err := compileSourceError(t, localsSource(256))
 
 		utils.AssertErrorMessage(t, err, "too many local variables in scope")
 	})
@@ -621,7 +636,7 @@ func TestCompileLocalVariableRead(t *testing.T) {
 	t.Run("Leer una variable local se compila a OP_GET_LOCAL con su indice, no con su nombre", func(t *testing.T) {
 		chunk := compileSource(t, "{ var a = 1; print a; }")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_GET_LOCAL), 0, byte(c.OP_PRINT), byte(c.OP_POP), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_GET_LOCAL), 1, byte(c.OP_PRINT), byte(c.OP_POP), byte(c.OP_RETURN))
 		utils.AssertValue(t, len(chunk.Constants), 1)
 		utils.AssertValue(t, chunk.Constants[0], 1.0)
 	})
@@ -630,11 +645,11 @@ func TestCompileLocalVariableRead(t *testing.T) {
 		chunk := compileSource(t, "{ var a = 1; var b = 2; print b; print a; }")
 
 		assertBytes(t, chunk,
-			byte(c.OP_CONSTANT), 0, // a: indice 0
-			byte(c.OP_CONSTANT), 1, // b: indice 1
-			byte(c.OP_GET_LOCAL), 1, // print b
+			byte(c.OP_CONSTANT), 0, // a: indice 1
+			byte(c.OP_CONSTANT), 1, // b: indice 2
+			byte(c.OP_GET_LOCAL), 2, // print b
 			byte(c.OP_PRINT),
-			byte(c.OP_GET_LOCAL), 0, // print a
+			byte(c.OP_GET_LOCAL), 1, // print a
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
 			byte(c.OP_POP),
@@ -646,12 +661,12 @@ func TestCompileLocalVariableRead(t *testing.T) {
 		chunk := compileSource(t, "{ var a = 1; { var a = 2; print a; } print a; }")
 
 		assertBytes(t, chunk,
-			byte(c.OP_CONSTANT), 0, // a externa, indice 0
-			byte(c.OP_CONSTANT), 1, // a interna, indice 1
-			byte(c.OP_GET_LOCAL), 1, // print a: lee la interna
+			byte(c.OP_CONSTANT), 0, // a externa, indice 1
+			byte(c.OP_CONSTANT), 1, // a interna, indice 2
+			byte(c.OP_GET_LOCAL), 2, // print a: lee la interna
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
-			byte(c.OP_GET_LOCAL), 0, // print a fuera del bloque interno: lee la externa
+			byte(c.OP_GET_LOCAL), 1, // print a fuera del bloque interno: lee la externa
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
 			byte(c.OP_RETURN),
@@ -671,7 +686,7 @@ func TestCompileLocalAssignment(t *testing.T) {
 		assertBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0, // el 1
 			byte(c.OP_CONSTANT), 1, // el 2
-			byte(c.OP_SET_LOCAL), 0, // a esta en la posicion 0 de locals
+			byte(c.OP_SET_LOCAL), 1, // a esta en la posicion 1 de locals (la 0 es el slot reservado)
 			byte(c.OP_POP),
 			byte(c.OP_POP),
 			byte(c.OP_RETURN),
@@ -685,7 +700,7 @@ func TestCompileLocalAssignment(t *testing.T) {
 		assertBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0,
 			byte(c.OP_CONSTANT), 1,
-			byte(c.OP_SET_LOCAL), 0,
+			byte(c.OP_SET_LOCAL), 1,
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
 			byte(c.OP_RETURN),
@@ -699,8 +714,8 @@ func TestCompileLocalAssignment(t *testing.T) {
 			byte(c.OP_NIL),
 			byte(c.OP_NIL),
 			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_SET_LOCAL), 2,
 			byte(c.OP_SET_LOCAL), 1,
-			byte(c.OP_SET_LOCAL), 0,
 			byte(c.OP_POP),
 			byte(c.OP_POP),
 			byte(c.OP_POP),
@@ -713,10 +728,10 @@ func TestCompileLocalAssignment(t *testing.T) {
 
 		assertBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0,
-			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_GET_LOCAL), 1,
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_ADD),
-			byte(c.OP_SET_LOCAL), 0,
+			byte(c.OP_SET_LOCAL), 1,
 			byte(c.OP_POP),
 			byte(c.OP_POP),
 			byte(c.OP_RETURN),
@@ -734,20 +749,20 @@ func TestCompileLocalAndGlobalVariables(t *testing.T) {
 			byte(c.OP_CONSTANT), 2,
 			byte(c.OP_GET_GLOBAL), 0,
 			byte(c.OP_PRINT),
-			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_GET_LOCAL), 1,
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
 			byte(c.OP_RETURN),
 		)
 	})
 
-	t.Run("Al terminar no quedan locales ni scopes abiertos", func(t *testing.T) {
+	t.Run("Al terminar no quedan locales de usuario ni scopes abiertos", func(t *testing.T) {
 		tokens, _ := scanner.NewScanner("{ var a = 1; print 1 +; } print 2;").Scan()
 		compiler := NewCompiler(tokens)
 		_, err := compiler.Compile()
 
 		utils.AssertError(t, err)
-		utils.AssertValue(t, len(compiler.locals), 0)
+		utils.AssertValue(t, len(compiler.locals), 1)
 		utils.AssertValue(t, compiler.scopeDepth, 0)
 	})
 }
@@ -1012,7 +1027,7 @@ func TestCompileFor(t *testing.T) {
 
 		assertBytes(t, compiled,
 			byte(c.OP_CONSTANT), 0, // var i = 0: se ejecuta una sola vez, antes del ciclo
-			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_GET_LOCAL), 1,
 			byte(c.OP_PRINT),
 			byte(c.OP_LOOP), 0, byte(backToStart),
 			byte(c.OP_POP), // endScope: saca i
