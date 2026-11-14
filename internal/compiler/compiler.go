@@ -399,9 +399,7 @@ func (c *Compiler) continueStatement() error {
 	}
 
 	currentLoop := c.getCurrentLoop()
-	for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > currentLoop.scopeDepth; i-- {
-		c.emit(byte(chunk.OP_POP))
-	}
+	c.popLoopLocals(currentLoop)
 	return c.emitLoop(currentLoop.loopStart)
 }
 
@@ -415,10 +413,7 @@ func (c *Compiler) breakStatement() error {
 	}
 
 	currentLoop := c.getCurrentLoop()
-	for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > currentLoop.scopeDepth; i-- {
-		c.emit(byte(chunk.OP_POP))
-	}
-
+	c.popLoopLocals(currentLoop)
 	breakJump := c.emitJump(chunk.OP_JUMP)
 	currentLoop.breakJumps = append(currentLoop.breakJumps, breakJump)
 	return nil
@@ -489,6 +484,12 @@ func (c *Compiler) patchBreakJumps() error {
 		}
 	}
 	return nil
+}
+
+func (c *Compiler) popLoopLocals(currentLoop *Loop) {
+	for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > currentLoop.scopeDepth; i-- {
+		c.emit(byte(chunk.OP_POP))
+	}
 }
 
 func (c *Compiler) makeConstant(value any) (byte, error) {

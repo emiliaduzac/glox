@@ -2,8 +2,6 @@
 
 Como extra, decidimos incorporar **break** y **continue** a los ciclos. Como vimos en clase, cuando queremos agregar funcionalidad nueva, tenemos que ir en el orden correspondiente: _scanner → compiler → vm_.
 
-> Estas funcionalidades solo están implementadas en el bytecode compiler, el tree-walk interpreter no las soporta.
-
 ### Continue
 
 `continue` corta la iteración actual de un ciclo y pasa directamente a la siguiente: lo que queda del cuerpo no se ejecuta. En un `while`, vuelve a evaluar la condición directo, pero en un `for` tiene que ejecutar el incremento y recién después volver a la condición.
@@ -17,9 +15,9 @@ Luego, seguimos por el compiler. Sabemos que un `continue` debe ser un **stateme
 3. al no ser una expresión no tenemos que modificar la tabla del _Pratt Parser_
 4. finaliza con un `;`
 5. tiene que dejar el stack tal cual lo encuentra. Con esto vemos que si en el cuerpo de un ciclo se definen variables locales, el `continue` antes de volver al inicio, debe asegurarse de sacar esas variables del stack para que la nueva iteración empiece limpia. Cuando no hay `continue`, esto se limpia solo al llegar al `endScope()`.
-6. si o si deben estar dentro de un ciclo, en caso contrario sería un error. Pero también debe soportar estar anidado dentro de más ciclos o ifs.
+6. sí o sí deben estar dentro de un ciclo, en caso contrario sería un error. Pero también debe soportar estar anidado dentro de más ciclos o ifs.
 
-Primero agregamos el `CONTINUE` al `statement()`, pero ahí nos surgió la duda de como seguir: un nuevo statement no tiene conocimiento de los demás statements, como sabe si efectivamente está en un ciclo? y como sabría a donde volver? y y que variables locales eliminar?.
+Primero agregamos el `CONTINUE` al `statement()`, pero ahí nos surgió la duda de como seguir: un nuevo statement no tiene conocimiento de los demás statements, cómo sabe si efectivamente está en un ciclo? y cómo sabría a donde volver? y que variables locales eliminar?.
 
 **Solución:**
 
@@ -70,6 +68,27 @@ Entonces, cuando nos encontramos con un `break`, hacemos las mismas validaciones
 Luego, al terminar cada ciclo, llamamos a `patchBreakJumps()`, que completa todos los `break` del ciclo actual. Lo hacemos después del `OP_POP` de salida porque los dos caminos de salida llegan con el stack distinto: cuando la condición da falsa, la condición todavía está en el stack y ese `OP_POP` la saca, pero cuando se ejecuta un `break`, la condición ya se sacó al entrar al cuerpo. Si el `break` cayera en ese `OP_POP`, sacaría un valor de más. En un `for` sin condición no hay `OP_POP` de salida, así que los `break` caen justo después del último `OP_LOOP`.
 
 Igual que con el `continue`, en la VM no hace falta ningún cambio: el `break` se arma con `OP_POP` y `OP_JUMP`.
+
+### Limitaciones y posibles mejoras
+
+- **Es una extensión de Lox.** Lox no tiene `break` ni `continue`, así que un programa que los use puede no funcionar en otras implementaciones del lenguaje.
+
+- **Solo en el bytecode compiler, pero el scanner es compartido.** Como el tree-walk interpreter usa el mismo scanner, `break` y `continue` pasaron a ser palabras reservadas en los dos modos, pero si se usan como statements sin `--vm`, el parser del tree-walk da un error de sintaxis.
+
+- **Solo salen del ciclo más interno.** No hay forma de salir de varios ciclos a la vez, como un `break` con un número de niveles (por ej `break 2` si está anidado en 2 loops) o con el tipo de ciclo del que se quiere salir (`break while`). Son extensiones que se proponen en [este hilo de r/ProgrammingLanguages](https://www.reddit.com/r/ProgrammingLanguages/comments/o671sd/what_is_the_correct_approach_to_implementing/).
+
+- **El tamaño del salto.** Al usar `OP_JUMP` y `OP_LOOP`, el salto se guarda en un operando de 2 bytes, así que un `break` o un `continue` puede saltar como máximo 65.535 bytes: si el cuerpo del ciclo es más grande, el compilador da error. No es una limitación nueva (es la misma de los `if` y los ciclos), pero vale la pena destacarla.
+
+- **El código inalcanzable se compila igual.** Lo que viene después de un `break` o un `continue` en el mismo bloque nunca se ejecuta, pero el compilador lo emite de todas formas:
+
+  ```c
+  for (var i = 0; i < 10; i = i + 1) {
+    break;     // o continue;
+    print i;   // nunca se ejecuta, pero se compila
+  }
+  ```
+
+  Una posible mejora sería no emitir ese código, quizá empezando por el caso más simple: lo que sigue a un `break` o `continue` dentro de su mismo bloque, que nunca se ejecuta. Si el `break` está dentro de un `if`, lo que viene después del `if` sí puede llegar a ejecutarse si la condición es falsa (lo sabríamos recién en runtime), así que eso hay que seguir compilándolo.
 
 ### Tests
 
