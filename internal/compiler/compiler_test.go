@@ -751,3 +751,312 @@ func TestCompileLocalAndGlobalVariables(t *testing.T) {
 		utils.AssertValue(t, compiler.scopeDepth, 0)
 	})
 }
+
+const (
+	literalSize  = 1 // OP_TRUE - OP_FALSE - OP_NIL
+	popSize      = 1
+	printSize    = 1
+	constantSize = 2 // OP_CONSTANT + indice
+	jumpSize     = 3 // OP_JUMP - OP_JUMP_IF_FALSE + 2 bytes de offset
+	loopSize     = 3 // OP_LOOP + 2 bytes de offset
+	getLocalSize = 2 // OP_GET_LOCAL + índice
+
+	// offsets de los saltos para un then o un else de la forma `print n;`
+	skipThen = popSize + constantSize + printSize + jumpSize // el then y el JUMP que saltea el else
+	skipElse = popSize + constantSize + printSize            // el POP de la condición y el else
+)
+
+func TestCompileIfWithoutElse(t *testing.T) {
+	t.Run("If sin else", func(t *testing.T) {
+		compiled := compileSource(t, "if (true) print 1;")
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen),
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(popSize),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("If anidado sin else: el salto externo incluye al interno completo", func(t *testing.T) {
+		chunk := compileSource(t, "if (true) if (false) print 1;")
+		innerIfSize := literalSize + jumpSize + skipThen + popSize
+		skipOuterThen := popSize + innerIfSize + jumpSize
+
+		assertBytes(t, chunk,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipOuterThen),
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen),
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(popSize),
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(popSize),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el paréntesis de apertura", func(t *testing.T) {
+		err := compileSourceError(t, "if true) print 1;")
+		utils.AssertErrorMessage(t, err, "'(' after if")
+	})
+
+	t.Run("Error si falta el paréntesis de cierre", func(t *testing.T) {
+		err := compileSourceError(t, "if (true print 1;")
+		utils.AssertErrorMessage(t, err, "')' after condition")
+	})
+
+	t.Run("Error si falta el cuerpo del if", func(t *testing.T) {
+		err := compileSourceError(t, "if (true)")
+		utils.AssertError(t, err)
+		utils.AssertErrorMessage(t, err, "expected expression")
+	})
+}
+
+func TestCompileIfWithElse(t *testing.T) {
+	t.Run("If con else", func(t *testing.T) {
+		compiled := compileSource(t, "if (true) print 1; else print 2;")
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen), // si es falso, va al else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(skipElse), // si se ejecutó el then, saltea el else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Else anidado pertenece al if más cercano", func(t *testing.T) {
+		compiled := compileSource(t, "if (true) if (false) print 1; else print 2;")
+		innerIfSize := literalSize + jumpSize + skipThen + skipElse
+		skipOuterThen := popSize + innerIfSize + jumpSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipOuterThen), // externo: saltea todo el if interno
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen), // interno: va a su else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(skipElse), // interno: saltea su else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(popSize), // externo: no tiene else, solo saltea su POP
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Else if encadenado: el else contiene a otro if", func(t *testing.T) {
+		compiled := compileSource(t, "if (true) print 1; else if (false) print 2;")
+		// el else del if externo contiene al if interno completo (sin else)
+		innerIfSize := literalSize + jumpSize + skipThen + popSize
+		skipElseIf := popSize + innerIfSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen), // externo: si es falso, va al else
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(skipElseIf), // externo: saltea el else, que es el if interno
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipThen), // interno: saltea su then
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_JUMP), 0, byte(popSize), // interno: saltea su POP
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el cuerpo del else", func(t *testing.T) {
+		err := compileSourceError(t, "if (true) print 1; else")
+		utils.AssertErrorMessage(t, err, "expected expression")
+	})
+}
+
+func TestCompileAnd(t *testing.T) {
+	t.Run("And se compila como un salto sobre el operando derecho", func(t *testing.T) {
+		compiled := compileSource(t, "true and false;")
+		skipRight := popSize + literalSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipRight),
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el operando derecho", func(t *testing.T) {
+		err := compileSourceError(t, "true and;")
+		utils.AssertError(t, err)
+	})
+
+	t.Run("Error si falta el operando izquierdo", func(t *testing.T) {
+		err := compileSourceError(t, "and true;")
+		utils.AssertError(t, err)
+	})
+}
+
+func TestCompileOr(t *testing.T) {
+	t.Run("Or se compila como dos saltos: si el izquierdo es verdadero, saltea el derecho", func(t *testing.T) {
+		compiled := compileSource(t, "true or false;")
+		skipRight := popSize + literalSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_TRUE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(jumpSize),
+			byte(c.OP_JUMP), 0, byte(skipRight),
+			byte(c.OP_POP),
+			byte(c.OP_FALSE),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el operando derecho", func(t *testing.T) {
+		err := compileSourceError(t, "true or;")
+		utils.AssertError(t, err)
+	})
+
+	t.Run("Error si falta el operando izquierdo", func(t *testing.T) {
+		err := compileSourceError(t, "or ture;")
+		utils.AssertError(t, err)
+	})
+}
+
+func TestCompileWhile(t *testing.T) {
+	t.Run("While: el cuerpo vuelve a la condición", func(t *testing.T) {
+		compiled := compileSource(t, "while (false) print 1;")
+		skipBody := popSize + constantSize + printSize + loopSize // el POP, el cuerpo y el LOOP
+		backToCondition := literalSize + jumpSize + skipBody      // todo, desde la condición hasta el final del LOOP
+
+		assertBytes(t, compiled,
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody), // si es falsa, sale del ciclo
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToCondition), // vuelve a evaluar la condición
+			byte(c.OP_POP), // salida: saca la condición
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el paréntesis de apertura", func(t *testing.T) {
+		err := compileSourceError(t, "while true) print 1;")
+		utils.AssertErrorMessage(t, err, "'(' after 'while'")
+	})
+
+	t.Run("Error si falta el paréntesis de cierre", func(t *testing.T) {
+		err := compileSourceError(t, "while (true print 1;")
+		utils.AssertErrorMessage(t, err, "')' after condition")
+	})
+}
+
+func TestCompileFor(t *testing.T) {
+	t.Run("Sin nada: ciclo infinito, sin salto de salida", func(t *testing.T) {
+		compiled := compileSource(t, "for (;;) print 1;")
+		backToStart := constantSize + printSize + loopSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToStart),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Solo con condición: igual que un while", func(t *testing.T) {
+		compiled := compileSource(t, "for (; false;) print 1;")
+		skipBody := popSize + constantSize + printSize + loopSize
+		backToCondition := literalSize + jumpSize + skipBody
+
+		assertBytes(t, compiled,
+			byte(c.OP_FALSE),
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipBody),
+			byte(c.OP_POP),
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToCondition),
+			byte(c.OP_POP),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Con inicializador: la variable es local al for", func(t *testing.T) {
+		compiled := compileSource(t, "for (var i = 0;;) print i;")
+		backToStart := getLocalSize + printSize + loopSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_CONSTANT), 0, // var i = 0: se ejecuta una sola vez, antes del ciclo
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToStart),
+			byte(c.OP_POP), // endScope: saca i
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Con incremento: el cuerpo vuelve al incremento y el incremento a la condición", func(t *testing.T) {
+		compiled := compileSource(t, "for (; false; 2) print 1;")
+		incrementSize := constantSize + popSize
+		bodySize := constantSize + printSize
+		skipToExit := popSize + jumpSize + incrementSize + loopSize + bodySize + loopSize
+		skipIncrement := incrementSize + loopSize
+		backToCondition := literalSize + jumpSize + popSize + jumpSize + incrementSize + loopSize
+		backToIncrement := incrementSize + loopSize + bodySize + loopSize
+
+		assertBytes(t, compiled,
+			byte(c.OP_FALSE),                              // condición: inicio del ciclo
+			byte(c.OP_JUMP_IF_FALSE), 0, byte(skipToExit), // si es falsa, sale del ciclo
+			byte(c.OP_POP),
+			byte(c.OP_JUMP), 0, byte(skipIncrement), // saltea el incremento y va al cuerpo
+			byte(c.OP_CONSTANT), 0, // incremento
+			byte(c.OP_POP),
+			byte(c.OP_LOOP), 0, byte(backToCondition), // después del incremento, vuelve a la condición
+			byte(c.OP_CONSTANT), 1, // cuerpo
+			byte(c.OP_PRINT),
+			byte(c.OP_LOOP), 0, byte(backToIncrement), // después del cuerpo, vuelve al incremento
+			byte(c.OP_POP), // salida: saca la condición
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta el paréntesis de apertura", func(t *testing.T) {
+		err := compileSourceError(t, "for ;;) print 1;")
+		utils.AssertErrorMessage(t, err, "'(' after 'for'")
+	})
+
+	t.Run("Error si falta el ';' después de la condición", func(t *testing.T) {
+		err := compileSourceError(t, "for (; true) print 1;")
+		utils.AssertErrorMessage(t, err, "';' after loop condition")
+	})
+
+	t.Run("Error si falta el paréntesis de cierre", func(t *testing.T) {
+		err := compileSourceError(t, "for (;; 2 print 1;")
+		utils.AssertErrorMessage(t, err, "')' after for clauses")
+	})
+}

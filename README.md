@@ -54,7 +54,7 @@ Si se quiere especificar el modo (como `--scanning`, `--parsing`, etc):
 go run ./cmd --<mode>
 ```
 
-Por deafult se ejecuta el tree-walk de la primera parte. Para usar el compilador a bytecode y la VM se agrega la flag `--vm`:
+Por default se ejecuta el tree-walk de la primera parte. Para usar el compilador a bytecode y la VM se agrega la flag `--vm`:
 
 ```bash
 go run ./cmd --vm <archivo.lox>
@@ -90,13 +90,19 @@ go test -v ./...
 
 ## Tests de la cátedra
 
-Para ejecutar los tests de la cátedra:
+Para ejecutar los tests de la cátedra en el modo **tree walking interpreter**:
 
 ```bash
 python3 real-tests/script.py "go run ./cmd"
 ```
 
-Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
+Para la segunda implementación: **bytecode compiler**:
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm"
+```
+
+En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
 
 ## To Do List
 
@@ -104,7 +110,7 @@ Se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de hab
 - [X] Compilador base, expresiones
 - [X] statements, variables globales 
 - [X] bloques y variables locales
-- [ ] Control de flujo
+- [X] Control de flujo
 - [ ] Funciones y closures
 - [ ] Clases y herencia
 - [ ] Extra propio (?)

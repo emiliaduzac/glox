@@ -2,6 +2,7 @@ package compiler
 
 import (
 	stderrors "errors"
+	"math"
 	"tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/token"
@@ -140,7 +141,7 @@ func (c *Compiler) declareLocalVariable() {
 }
 
 func (c *Compiler) addLocal(name token.Token) {
-	if len(c.locals) == 256 {
+	if len(c.locals) == math.MaxUint8+1 {
 		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope"))
 		return
 	}
@@ -169,11 +170,16 @@ func (c *Compiler) synchronize() {
 func (c *Compiler) statement() error {
 	if c.cursor.Match(token.PRINT) {
 		return c.printStatement()
+	} else if c.cursor.Match(token.IF) {
+		return c.ifStatement()
+	} else if c.cursor.Match(token.WHILE) {
+		return c.whileStatement()
+	} else if c.cursor.Match(token.FOR) {
+		return c.forStatement()
 	} else if c.cursor.Match(token.LEFT_BRACE) {
 		c.beginScope()
-		err := c.block()
-		c.endScope() // siempre cerramos el scope, haya habido error o no
-		return err
+		defer c.endScope()
+		return c.block()
 	}
 	return c.expressionStatement()
 }
@@ -209,6 +215,150 @@ func (c *Compiler) block() error {
 	return c.cursor.Consume(token.RIGHT_BRACE, "'}' after block")
 }
 
+func (c *Compiler) ifStatement() error {
+	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after if"); err != nil {
+		return err
+	}
+	if err := c.expression(); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after condition"); err != nil {
+		return err
+	}
+	thenJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	c.emit(byte(chunk.OP_POP))
+	if err := c.statement(); err != nil {
+		return err
+	}
+	elseJump := c.emitJump(chunk.OP_JUMP)
+	if err := c.patchJump(thenJump); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
+
+	if c.cursor.Match(token.ELSE) {
+		if err := c.statement(); err != nil {
+			return err
+		}
+	}
+	if err := c.patchJump(elseJump); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Compiler) whileStatement() error {
+	loopStart := len(c.chunk.Bytes)
+	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after 'while'"); err != nil {
+		return err
+	}
+	if err := c.expression(); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after condition"); err != nil {
+		return err
+	}
+
+	exitJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	c.emit(byte(chunk.OP_POP))
+	if err := c.statement(); err != nil {
+		return err
+	}
+	if err := c.emitLoop(loopStart); err != nil {
+		return err
+	}
+	if err := c.patchJump(exitJump); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
+	return nil
+}
+
+func (c *Compiler) forStatement() error {
+	c.beginScope()
+	defer c.endScope()
+
+	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after 'for'"); err != nil {
+		return err
+	}
+	if err := c.forInitializer(); err != nil {
+		return err
+	}
+
+	loopStart := len(c.chunk.Bytes)
+	exitJump, err := c.forCondition()
+	if err != nil {
+		return err
+	}
+	loopStart, err = c.forIncrement(loopStart)
+	if err != nil {
+		return err
+	}
+
+	if err := c.statement(); err != nil {
+		return err
+	}
+	if err := c.emitLoop(loopStart); err != nil {
+		return err
+	}
+
+	if exitJump != -1 {
+		if err := c.patchJump(exitJump); err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_POP))
+	}
+	return nil
+}
+
+func (c *Compiler) forInitializer() error {
+	if c.cursor.Match(token.SEMICOLON) {
+		return nil // sin inicializador
+	}
+	if c.cursor.Match(token.VAR) {
+		return c.varDeclaration()
+	}
+	return c.expressionStatement()
+}
+
+func (c *Compiler) forCondition() (int, error) {
+	if c.cursor.Match(token.SEMICOLON) {
+		return -1, nil // sin condición
+	}
+	if err := c.expression(); err != nil {
+		return -1, err
+	}
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after loop condition"); err != nil {
+		return -1, err
+	}
+	exitJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	c.emit(byte(chunk.OP_POP))
+	return exitJump, nil
+}
+
+func (c *Compiler) forIncrement(loopStart int) (int, error) {
+	if c.cursor.Match(token.RIGHT_PAREN) {
+		return loopStart, nil // sin incremento
+	}
+
+	bodyJump := c.emitJump(chunk.OP_JUMP)
+	incrementStart := len(c.chunk.Bytes)
+	if err := c.expression(); err != nil {
+		return loopStart, err
+	}
+	c.emit(byte(chunk.OP_POP))
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after for clauses"); err != nil {
+		return loopStart, err
+	}
+	if err := c.emitLoop(loopStart); err != nil {
+		return loopStart, err
+	}
+	if err := c.patchJump(bodyJump); err != nil {
+		return loopStart, err
+	}
+	return incrementStart, nil
+}
+
 func (c *Compiler) expressionStatement() error {
 	if err := c.expression(); err != nil {
 		return err
@@ -240,9 +390,36 @@ func (c *Compiler) emitConstant(value any) error {
 	return nil
 }
 
+func (c *Compiler) emitJump(instruction chunk.OpCode) int {
+	c.emit(byte(instruction), 0xff, 0xff)
+	return len(c.chunk.Bytes) - 2
+}
+
+func (c *Compiler) emitLoop(loopStart int) error {
+	c.emit(byte(chunk.OP_LOOP))
+
+	offset := len(c.chunk.Bytes) - loopStart + 2
+	if offset > math.MaxUint16 {
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "loop body too large")
+	}
+
+	c.emit(byte(offset>>8), byte(offset))
+	return nil
+}
+
+func (c *Compiler) patchJump(offset int) error {
+	jump := len(c.chunk.Bytes) - offset - 2
+	if jump > math.MaxUint16 {
+		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too much code to jump over")
+	}
+	c.chunk.Bytes[offset] = byte(jump >> 8)
+	c.chunk.Bytes[offset+1] = byte(jump)
+	return nil
+}
+
 func (c *Compiler) makeConstant(value any) (byte, error) {
 	index := c.chunk.AddConstant(value)
-	if index > 255 {
+	if index > math.MaxUint8 {
 		return 0, errors.NewLoxError(c.cursor.GetPreviousLine(), "too many constants in one chunk")
 	}
 	return byte(index), nil
@@ -408,10 +585,32 @@ func (c *Compiler) variable(canAssign bool) error {
 	return c.namedVariable(c.cursor.Previous(), canAssign)
 }
 
-// TO DO:
 func (c *Compiler) logicAnd(_ bool) error {
+	endJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	c.emit(byte(chunk.OP_POP))
+	if err := c.parsePrecedence(PREC_AND); err != nil {
+		return err
+	}
+	if err := c.patchJump(endJump); err != nil {
+		return err
+	}
 	return nil
 }
+
 func (c *Compiler) logicOr(_ bool) error {
+	elseJump := c.emitJump(chunk.OP_JUMP_IF_FALSE)
+	endJump := c.emitJump(chunk.OP_JUMP)
+
+	if err := c.patchJump(elseJump); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
+
+	if err := c.parsePrecedence(PREC_OR); err != nil {
+		return err
+	}
+	if err := c.patchJump(endJump); err != nil {
+		return err
+	}
 	return nil
 }

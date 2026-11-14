@@ -40,10 +40,10 @@ Un truco que aplica el libro es no generar instrucciones nuevas para `!=`, `>=` 
 
 #### Literales
 
-Los números y los strings se compilan de la misma forma, se guarda el valor entre las constantes del chunk y se crea un `OP_CONSTANT` con su índice. Es por esto mismo que en la tabla los números y strings apuntan a la misma función `value()` que agarra el valor que el scanner dejó en el token y lo deja como constante.
-Un detalle de diferencia con el libro es que para los strings el compilador tiene que sacar las comillas, pero para nuestra implementación eso no es necesario porque eso ya lo hace el scanner. Y otra cosa interesante es que en el libro necesita copiar los caracteres al heap para que el mismo string sea dueño de su memoria, pero nosotros en glox no hacemos eso porque en Go los strings son inmutables así que se pueden compartir sin copiarlos.
+Los números y los strings se compilan de la misma forma, se guarda el valor entre las constantes del chunk y se crea un `OP_CONSTANT` con su índice. Es por esto mismo que en la tabla los números y strings apuntan a la misma función `value()`, que agarra el valor que el scanner dejó en el token y lo deja como constante.
+Una diferencia con el libro es que para los strings, el compilador tiene que sacar las comillas, pero para nuestra implementación eso no es necesario porque eso ya lo hace el scanner. Y otra cosa interesante es que en el libro necesita copiar los caracteres al heap para que el mismo string sea dueño de su memoria, pero nosotros en glox no hacemos eso porque en Go los strings son inmutables así que se pueden compartir sin copiarlos.
 
-Tenemos el límite que el mismo libro habla, sobre que la posición de cada constante ocupa un solo byte así que un chunk puede tener como máximo 256 constantes. Quizás acá es un punto a mejorar, pero por ahora lo que tenemos es que para gastar menos lugar los nombres de las variables no se repiten y eso lo explicamos más a detalle en la sección de nombres repetidos.
+Tenemos el límite que el mismo libro habla, sobre que la posición de cada constante ocupa un solo byte así que un chunk puede tener como máximo 256 constantes. Quizás acá es un punto a mejorar, pero por ahora lo que tenemos es que para gastar menos lugar los nombres de las variables no se repiten y eso lo explicamos más a detalle en la sección de [nombres repetidos](#nombres-repetidos).
 
 #### Asociatividad
 
@@ -56,23 +56,27 @@ Cuando se llama a una de esas funciones, lo que está a la izquierda del operado
 
 ### Statements
 
-Con los statements ahora pasamos a tener una lista de declaraciones que se compilan hasta llegar a un `EOF`. Acá aparecen dos funciones, una que es `declaration` que si lo que viene empieza con `var` compila la declaración de la variable y si no se lo pasa a `statement`. Esta última básicamente compila el resto, como es `print`, los bloques y las expresiones que terminan en `;`. La separamos así porque en el libro habla de que en Lox una declaración no puede ser el cuerpo de un `if` o `while` porque no quedaría claro hasta dónde llega la variable.
+Con los statements, un programa pasa a ser una lista de declaraciones que se compilan hasta llegar a un `EOF`. Acá aparecen dos funciones: `declaration`, que si lo que viene empieza con `var` compila la declaración de la variable, y si no se lo pasa a `statement`. Esta última compila el resto de las sentencias: `print`, bloques, `if`, ciclos y las expresiones que terminan en `;`. Las separamos así porque, como explica el libro, en Lox una declaración no puede ser el cuerpo de un `if` o un `while`, ya que no quedaría claro hasta dónde llega la variable.
 
-Importante es ver el efecto que generan los statements agregados al stack de la VM, porque cada una cambia esa cantidad del stack. La idea de fondo es que una expresión siempre deja un valor más y un statement tiene que dejar el stack como estaba. Un ejemplo de esto es con `print 1 + 2;` ahí se apila el 1, después el 2, y `OP_ADD` los saca y apila el 3, entonces queda con un valor más a como originalmente estaba, pero cuando llega `OP_PRINT` saca el resultado y lo imprime, entonces el statement termina dejando el stack como estaba. O si solo se hace `1 + 2;` entonces `OP_POP` se emite para tirar el valor que deja la expresión y queda de nuevo como estaba el stack. En la primera parte del tree-walk eso era evaluar y descartar, pero ahora ese descarte lo tenemos como una instrucción. Y lo importante de esto es que al tener muchos statements seguidos si cada uno sigue sumando al stack crecería constantemente y de esta manera no es así.
+Es importante ver el efecto que tiene cada statement sobre el stack de la VM (su _stack effect_). La idea de fondo es que una expresión siempre deja un valor más en el stack, y un statement tiene que dejarlo como estaba. Por ejemplo, en `print 1 + 2;` se apila el 1, después el 2, y `OP_ADD` los saca y apila el 3: la expresión dejó un valor más. Después, `OP_PRINT` saca ese resultado y lo imprime, así que el statement termina dejando el stack como estaba. Si en cambio solo se escribe `1 + 2;`, el compilador emite un `OP_POP` para tirar el valor que dejó la expresión. En el tree-walk, ese descarte lo hacía Go, ignorando el valor devuelto; ahora es una instrucción más.
 
-Un detalle acá es que controlamos que si cuando llega `OP_RETURN` el stack no está vacío entonces levantamos un error.
+Esto es importante porque, si cada statement dejara algo en el stack, con muchos statements seguidos el stack crecería constantemente. Además, es lo que permite que los índices de las variables locales coincidan con su posición en el stack (ver [variables locales y scopes](#variables-locales-y-scopes)). La única excepción es la declaración de una variable local, que deja su valor en el stack a propósito, porque ese valor es la variable, y se saca recién al cerrar su bloque.
+
+Para asegurarnos de que esto se cumpla, cuando la VM llega a `OP_RETURN` verifica que el stack esté vacío. Si no lo está, levanta un error, porque significa que el compilador dejó algo de más.
 
 ### Manejo de errores
 
-Acá llegó un gran cambio frente al tree-walk de la primera parte porque este al detectar un error cortaba y solo mostraba ese, pero no seguía para ver si había más errores y devolverlos todos a la vez. Si bien funciona, acá creemos que llega un poco más de salto de calidad en cuanto a la experiencia que se puede percibir de esta segunda parte, porque la idea es seguir así se muestran todos los errores y se pueden corregir todos juntos, si no caería en que te muestra el primer error, el programador lo corrige, y luego le muestra un error que ya existía pero venía después del primero. Pero seguir después del primero trae un detalle a tener en cuenta, el compilador queda parado en una línea rota, que si sigue leyendo levantaría errores falsos propios de donde retoma, entonces para eso entra la sincronización que es avanzar hasta llegar a que empiece un statement nuevo o un `var`, `print` y desde ahí recién seguir compilando.
+Acá llegó un gran cambio frente al tree-walk de la primera parte: este, al detectar un error, cortaba y solo mostraba ese, pero no seguía para ver si habían más errores y devolverlos todos a la vez. Si bien funciona, acá creemos que llega un poco más de salto de calidad en cuanto a la experiencia que se puede percibir de esta segunda parte, porque la idea es seguir así se muestran todos los errores y se pueden corregir todos juntos. Si no, en un caso de muchos errores, te mostraría el primer error, el programador tendría que corregirlo, y luego vería otro error que ya existía pero venía después del primero, así que no se había enterado.
+Pero seguir después del primero trae un detalle a tener en cuenta, el compilador queda parado en una línea rota, que si sigue leyendo levantaría errores falsos propios de donde retoma, entonces para eso entra la **sincronización** que es avanzar hasta llegar a que empiece un statement nuevo o un `var`, `print` y desde ahí recién seguir compilando.
 
-Una situación que nos surgió es primero pensar en que para devolver errores nos podemos aprovechar de cortar el statement con el error y subirlo, algo típico para Go, el tema es que cuando llegaron las variables locales por los scopes esto nos trajo problema en que al querer sincronizar lo hacíamos dos veces, una dentro del scope local y otra al salir, por lo que introdujo un error falso de que faltaba un `}`. Ahí entonces decidimos pegarnos un poco más al libro con la idea de la flag, pero con la diferencia de que en vez de mostrar ahí el error nos vamos guardando los errores. Entonces la flag se prende cuando hay un error, mientras está prendida los errores nuevos se ignoran, y cuando se sincroniza y arranca el statement nuevo se apaga, así cada error solo lo vemos una vez y donde corresponde. Una diferencia más con el libro es que en C no cortaba el error y sigue leyendo y en Go sí. Entonces tenemos dos caminos, uno de retornar error cuando no se puede seguir leyendo y otro de reportarlo cuando sí, que es lo que hacemos con los errores de las variables locales.
+Una situación que nos surgió es primero pensar en que para devolver errores nos podemos aprovechar de cortar el statement con el error y subirlo, algo típico para Go, el tema es que cuando llegaron las variables locales por los scopes esto nos trajo un problema: al querer sincronizar lo hacíamos dos veces, una dentro del scope local y otra al salir. Esto introducía un error falso de que faltaba un `}`. Ahí, decidimos pegarnos un poco más al libro con la idea del _flag_, pero con la diferencia de que en vez de mostrar ahí el error nos vamos guardando los errores. Entonces el flag se prende cuando hay un error, mientras está prendida los errores nuevos se ignoran, y cuando se sincroniza y arranca el statement nuevo se apaga, así cada error solo lo vemos una vez y donde corresponde. 
+Una diferencia más con el libro es que, en C, reportar un error no corta la ejecución: la función sigue leyendo tokens. En Go, en cambio, devolver un error corta la función en ese punto. Por eso tenemos dos caminos: cuando el código está mal escrito y no se puede seguir leyendo (por ejemplo, falta un `)`), devolvemos el error y se sincroniza. Cuando el código está bien escrito pero rompe una regla (como redeclarar una variable local en el mismo scope), lo reportamos con `report` y seguimos compilando normalmente. Es lo que hacemos con los errores de las variables locales.
 
-Al final los errores se guardan y se devuelven todos juntos y además no se genera el chunk.
+Al terminar de compilar, si hubo errores, se devuelven todos juntos en un solo error, así se pueden ver todos de una vez en lugar de ir arreglándolos de a uno. Además, en ese caso no se devuelve el chunk: el bytecode generado puede estar incompleto (por ejemplo, con saltos sin completar), así que la VM no llega a ejecutar nada.
 
 ### Variables globales
 
-En la primera parte una variable global era una entrada más del `Environment` y el intérprete la buscaba por nombre cuando la necesitaba. Acá el compilador no se guarda el valor de la variable, lo que hace es emitir las instrucciones para que la VM se encargue cuando se ejecuta. Las globales en Lox se resuelven tarde (_late bound_), es decir que se buscan por nombre recién en la ejecución. El tema es que un nombre es un string y no entra como operando de una instrucción, que es de un solo byte, entonces el nombre se guarda entre las constantes del chunk y la instrucción lleva la posición donde quedó. Y para saber si una variable es global pasa lo mismo que con el resolver de la primera parte, si no se encuentra en ningún scope local se considera global.
+En la primera parte una variable global era una entrada más del `Environment` y el intérprete la buscaba por nombre cuando la necesitaba. Acá el compilador no se guarda el valor de la variable, lo que hace es emitir las instrucciones para que la VM se encargue cuando se ejecuta. Las globales en Lox se resuelven tarde (_late bound_), es decir que se buscan por nombre recién en la ejecución. El tema es que un nombre es un string y no entra como operando de una instrucción, que es de un solo byte. Para resolver esto, el nombre se guarda entre las constantes del chunk y la instrucción lleva la posición donde quedó. Y para saber si una variable es global pasa lo mismo que con el resolver de la primera parte, si no se encuentra en ningún scope local se considera global.
 
 #### Declaración
 
@@ -106,6 +110,57 @@ De esta forma, no necesita generar una instrucción como `OP_DEFINE_GLOBAL`, ya 
 Al finalizar el bloque, resta uno a la profundidad y elimina de su stack falso las variables locales de ese bloque. Además, emite un `OP_POP` por cada una, para asegurarnos de que al terminar un bloque, el stack de la VM quede sin sus variables.
 
 Un detalle más sobre las variables locales es que puede haber como máximo 256 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255.
+
+### Control de flujo
+
+#### If - Else
+
+En el tree-walk interpreter, un `if` de Lox se ejecutaba directamente con un if de Go. En el bytecode compiler, en cambio, lo implementamos como lo haría una CPU: con saltos.
+
+Hasta ahora todas las instrucciones venían siendo secuenciales, pero para los `if-else`, vamos a querer que saltee instrucciones según la rama en la que cae. Es decir: si la condición del `if` es verdadera, seguimos secuencial, pero salteamos toda la parte del `else` (si la hay). Lo mismo si la condición no se cumple: queremos saltear el cuerpo del `if`.
+
+Para eso, tenemos dos nuevas instrucciones:
+
+- `OP_JUMP`: salta la cantidad de bytes que indica su operando. Lo usamos luego del cuerpo del `if`, para que se saltee toda la parte del `else` y su cuerpo.
+- `OP_JUMP_IF_FALSE`: mira el tope del stack, donde quedó la condición, y solo si es falsa salta la cantidad de bytes que indica su operando. Lo usamos si la condición del `if` no se cumple y no queremos ejecutar su cuerpo.
+
+En ambos casos, cuando el compilador emite el salto, todavía no sabe cuántos bytes tiene que saltear, ya que, como mencionamos, vamos leyendo secuencialmente. Al emitir el `OP_JUMP_IF_FALSE` todavía no compiló el cuerpo del `if`, así que no sabe cuánto ocupa. Lo mismo pasa con el `OP_JUMP` y el cuerpo del `else`. Para resolverlo se usa el truco de **backpatching**: ponemos un placeholder de dos bytes (para abarcar cuerpos posiblemente grandes) y una vez compilado el cuerpo, volvemos y escribimos el valor real.
+
+Por último, se debe dejar el stack limpio, como cualquier statement. Cuando hay un `if`, la condición puede ser verdadera o falsa, pero en ambos casos queda en el tope del stack. Además, el compilador no sabe como se evalúa la condición, entonces tenemos que cubrir ambos casos. El orden quedaría:
+
+```
+<condición>
+OP_JUMP_IF_FALSE <hasta el POP del else, antes de ejecutar el cuerpo del else>
+OP_POP // solo se va a ejecutar si la condición dio verdadera
+<cuerpo del if>
+OP_JUMP <hasta después del else>
+OP_POP // a partir de acá, solo si la condición dio falsa, aunque no haya cuerpo de else
+<cuerpo del else (opcional)>
+<lo que sigue>
+```
+
+#### Operadores lógicos
+
+Para los operadores lógicos tampoco vamos a crear nuevas instrucciones: vamos a aprovechar los saltos.
+
+- **and**: si el primer operando es falso, no hace falta evaluar el segundo: el resultado es el primero. Entonces compilamos el primer operando y emitimos un `OP_JUMP_IF_FALSE`. Justo después emitimos un `OP_POP` y compilamos el segundo operando: si el primero era verdadero, la VM lo descarta y el resultado pasa a ser el segundo. Una vez compilado el segundo operando, ya podemos completar cuántos bytes tiene que saltear el `OP_JUMP_IF_FALSE`.
+- **or**: este caso es al revés: si el primer operando es verdadero, no hace falta evaluar el segundo, y si es falso, sí. Como no existe una instrucción para saltar si es verdadero, usamos dos saltos: después del primer operando emitimos un `OP_JUMP_IF_FALSE` y seguido un `OP_JUMP`. Si el primero dio falso, el `OP_JUMP_IF_FALSE` saltea el `OP_JUMP`, se descarta el primer operando con un `OP_POP` y se evalúa el segundo. Si era verdadero, no salta nada, pero se encuentra con el `OP_JUMP`, que saltea el segundo operando. Del `OP_JUMP_IF_FALSE` ya sabemos cuánto tiene que saltear: solo el `OP_JUMP` que le sigue. El `OP_JUMP` lo completamos una vez compilado el segundo operando.
+
+Algo interesante, igual que en la implementación anterior, es que el resultado no es necesariamente un booleano, sino uno de los dos operandos tal cual. Cuál de los dos depende de si el primero es *truthy* (en Lox, todo menos `false` y `nil`). Por ejemplo, `"hola" or "chau"` da `"hola"`, porque `"hola"` es *truthy*.
+
+#### Iteraciones
+
+Para los ciclos necesitamos saltar hacia **atrás**, para volver a ejecutar una parte del código. Para eso agregamos una nueva instrucción: `OP_LOOP`. Funciona igual que `OP_JUMP` pero resta en vez de sumar. A diferencia de los otros saltos, no necesita backpatching: cuando se emite, ya sabemos a dónde tiene que volver: el inicio del ciclo, que ya fue compilado.
+
+- **while**: apenas nos encontramos con un `while`, guardamos la posición actual del chunk, que es donde va a empezar la condición. Luego compilamos la condición y emitimos un `OP_JUMP_IF_FALSE`, que actúa igual que en el `if`: si la condición es falsa, saltea todo el cuerpo. Le sigue un `OP_POP` para eliminar la condición del stack, que solo se ejecuta si la condición fue verdadera (sino, se hubiese salteado). Luego se compila el cuerpo y el `OP_LOOP` que vuelve a la posición que habíamos guardado, para evaluar la condición otra vez. Recién ahí terminan las instrucciones del ciclo y podemos completar el `OP_JUMP_IF_FALSE`, que salta hasta un último `OP_POP`, que se ejecuta una vez que la condición es falsa.
+- **for**: este tipo de ciclo tiene 3 partes y todas son opcionales. Todo el `for` está dentro de un scope propio, así que una variable declarada en el inicializador es local al ciclo.
+  En primer lugar, el _inicializador_, que puede ser la declaración de una variable o una expresión, y **se debe ejecutar una única vez**. Recién después de eso marcamos el inicio del ciclo, guardando la posición actual del chunk.
+  A eso le sigue la _condición_, que, igual que en el `while`, emite un `OP_JUMP_IF_FALSE` para salir del ciclo cuando no se cumple. Si no hay condición, no hay salto y el ciclo sería infinito.
+  Finalmente, el _incremento_, que a pesar de estar escrito antes del cuerpo, debe ejecutarse **después** de cada iteración. Como el compilador lo emite en el orden en que lo lee, el incremento queda en el bytecode entre la condición y el cuerpo, y lo resolvemos con saltos para que la VM los recorra en este orden:
+  - Después de la condición, un `OP_JUMP` saltea el incremento y va directo al cuerpo.
+  - Al final del cuerpo, un `OP_LOOP` vuelve al incremento.
+  - Al final del incremento, otro `OP_LOOP` vuelve a la condición.
+  Si no hay incremento, el cuerpo vuelve directamente a la condición, como en el `while`. Por último, se completa el salto de salida de la condición.
 
 ### Tests
 
