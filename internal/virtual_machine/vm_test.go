@@ -126,6 +126,99 @@ func TestScriptCallFrame(t *testing.T) {
 	})
 }
 
+func TestOpCall(t *testing.T) {
+	newFunction := func(arity int, body func(chunk *c.Chunk)) *c.Function {
+		function := c.NewFunction()
+		function.Arity = arity
+		body(&function.Chunk)
+		function.Chunk.Write(byte(c.OP_RETURN), line)
+		return function
+	}
+	writeCall := func(chunk *c.Chunk, argCount byte) {
+		chunk.Write(byte(c.OP_CALL), line)
+		chunk.Write(argCount, line)
+	}
+
+	t.Run("Llamar a una función ejecuta el código de su chunk", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		callee := newFunction(0, func(body *c.Chunk) {
+			writeConstant(body, "hola")
+			body.Write(byte(c.OP_PRINT), line)
+		})
+		writeConstant(chunk, callee)
+		writeCall(chunk, 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "hola\n")
+	})
+
+	t.Run("El argumento queda atado al parámetro de la función", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		callee := newFunction(1, func(body *c.Chunk) {
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(1, line)
+			body.Write(byte(c.OP_PRINT), line)
+		})
+		writeConstant(chunk, callee)
+		writeConstant(chunk, 4.0)
+		writeCall(chunk, 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "4\n")
+	})
+
+	t.Run("Cada argumento queda atado al parámetro de su posición", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		callee := newFunction(2, func(body *c.Chunk) {
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(2, line)
+			body.Write(byte(c.OP_PRINT), line)
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(1, line)
+			body.Write(byte(c.OP_PRINT), line)
+		})
+		writeConstant(chunk, callee)
+		writeConstant(chunk, 1.0)
+		writeConstant(chunk, 2.0)
+		writeCall(chunk, 2)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "2\n1\n")
+	})
+
+	tests := []struct {
+		name  string
+		value any
+	}{
+		{"número", 1.0},
+		{"string", "hola"},
+		{"nil", nil},
+	}
+	for _, test := range tests {
+		t.Run("Error si se llama a un valor que no es una función: "+test.name, func(t *testing.T) {
+			vm, chunk := setUpVM(t)
+			writeConstant(chunk, test.value)
+			writeCall(chunk, 0)
+
+			err := run(vm, chunk)
+
+			utils.AssertErrorMessage(t, err, "can only call functions and classes")
+		})
+	}
+}
+
 func TestOpConstant(t *testing.T) {
 	tests := []struct {
 		name  string

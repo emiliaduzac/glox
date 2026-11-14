@@ -39,12 +39,14 @@ func NewVirtualMachine() *VirtualMachine {
 
 func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 	vm.push(function)
-	vm.frames = append(vm.frames, callFrame{function: function})
 	defer func() {
 		if err != nil {
 			vm.resetStack()
 		}
 	}()
+	if err := vm.call(function, 0); err != nil {
+		return err
+	}
 
 	frame := vm.currentFrame()
 	for frame.ip < len(frame.function.Chunk.Bytes) {
@@ -56,7 +58,7 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 
 		switch op {
 		case c.OP_RETURN:
-			if len(vm.stack) > frame.slots+1 {
+			if len(vm.frames) == 1 && len(vm.stack) > frame.slots+1 {
 				return errors.NewLoxError(vm.currentLine(), "inconsistent Stack Height: should be empty at exit")
 			}
 			vm.stack = vm.stack[:frame.slots]
@@ -199,6 +201,20 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			vm.stack[frame.slots+int(slot)] = value
 
+		case c.OP_CALL:
+			argCount, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			callee, err := vm.peek(int(argCount))
+			if err != nil {
+				return err
+			}
+			if err := vm.callValue(callee, int(argCount)); err != nil {
+				return err
+			}
+			frame = vm.currentFrame()
+
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
 			offset, err := vm.readShort()
@@ -230,6 +246,20 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
 	}
+	return nil
+}
+
+func (vm *VirtualMachine) callValue(callee any, argCount int) error {
+	switch function := callee.(type) {
+	case *c.Function:
+		return vm.call(function, argCount)
+	default:
+		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
+	}
+}
+
+func (vm *VirtualMachine) call(function *c.Function, argCount int) error {
+	vm.frames = append(vm.frames, callFrame{function: function, slots: len(vm.stack) - argCount - 1})
 	return nil
 }
 
