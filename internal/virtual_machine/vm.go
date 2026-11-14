@@ -5,6 +5,8 @@ import (
 	"io"
 	"math"
 	"os"
+	"sort"
+	"strings"
 	c "tp-lox/internal/chunk"
 	"tp-lox/internal/errors"
 	"tp-lox/internal/utils"
@@ -16,6 +18,7 @@ type VirtualMachine struct {
 	chunk   *c.Chunk
 	out     io.Writer
 	globals map[string]any
+	debug   bool
 }
 
 func NewVirtualMachine() *VirtualMachine {
@@ -23,7 +26,12 @@ func NewVirtualMachine() *VirtualMachine {
 		stack:   []any{},
 		out:     os.Stdout,
 		globals: map[string]any{},
+		debug:   false,
 	}
+}
+
+func (vm *VirtualMachine) SetDebugMode() {
+	vm.debug = true
 }
 
 func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
@@ -35,7 +43,12 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 		}
 	}()
 
+	if vm.debug {
+		_, _ = fmt.Fprintln(vm.out, "\n== RUNTIME ==")
+	}
+
 	for vm.ip < len(vm.chunk.Bytes) {
+		start := vm.ip
 		b, err := vm.readByte()
 		if err != nil {
 			return err
@@ -46,6 +59,9 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 		case c.OP_RETURN:
 			if len(vm.stack) > 0 {
 				return errors.NewLoxError(vm.currentLine(), "inconsistent Stack Height: should be empty at exit")
+			}
+			if vm.debug {
+				_, _ = fmt.Fprintf(vm.out, "%04d| THE END\n", start)
 			}
 			return nil
 
@@ -122,6 +138,12 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			value, err := vm.pop()
 			if err != nil {
 				return err
+			}
+			if vm.debug {
+				if _, err := fmt.Fprintf(vm.out, "%04d| SCREEN OUTPUT %s\n", start, utils.Stringify(value)); err != nil {
+					return err
+				}
+				continue
 			}
 			if _, err := fmt.Fprintln(vm.out, utils.Stringify(value)); err != nil {
 				return err
@@ -215,8 +237,34 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
 		}
+
+		if vm.debug {
+			vm.printStackAndGlobal(start)
+		}
 	}
 	return nil
+}
+
+func (vm *VirtualMachine) printStackAndGlobal(offset int) {
+	values := make([]string, len(vm.stack))
+	for i, v := range vm.stack {
+		values[i] = utils.DebugString(v)
+	}
+	_, _ = fmt.Fprintf(vm.out, "%04d| STACK [%s]\n", offset, strings.Join(values, ", "))
+
+	if len(vm.globals) == 0 {
+		return
+	}
+	names := make([]string, 0, len(vm.globals))
+	for name := range vm.globals {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	entries := make([]string, len(names))
+	for i, name := range names {
+		entries[i] = fmt.Sprintf("'%s': %s", name, utils.DebugString(vm.globals[name]))
+	}
+	_, _ = fmt.Fprintf(vm.out, "    | GLOBALS {%s}\n", strings.Join(entries, ", "))
 }
 
 // resetStack descarta todos los valores del stack

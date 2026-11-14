@@ -132,6 +132,7 @@ func (l *Lox) runVM(tokens []token.Token) error {
 	}
 	if l.debug {
 		chunk.Disassemble()
+		l.vm.SetDebugMode()
 	}
 	if err := l.vm.Run(chunk); err != nil {
 		fmt.Fprintln(os.Stderr, err)
