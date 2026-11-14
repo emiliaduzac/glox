@@ -28,6 +28,7 @@ type parserState struct {
 
 type Compiler struct {
 	*parserState
+	enclosing   *Compiler
 	function    *chunk.Function
 	funcType    FunctionType
 	locals      []Local
@@ -38,12 +39,13 @@ type Compiler struct {
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
 func NewCompiler(tokens []token.Token) *Compiler {
 	state := &parserState{cursor: token.NewTokenCursor(tokens)}
-	return newFunctionCompiler(state, TYPE_SCRIPT)
+	return newFunctionCompiler(state, nil, TYPE_SCRIPT)
 }
 
-func newFunctionCompiler(state *parserState, funcType FunctionType) *Compiler {
+func newFunctionCompiler(state *parserState, enclosing *Compiler, funcType FunctionType) *Compiler {
 	return &Compiler{
 		parserState: state,
+		enclosing:   enclosing,
 		function:    chunk.NewFunction(),
 		funcType:    funcType,
 		locals:      []Local{{Depth: 0}},
@@ -253,7 +255,7 @@ func (c *Compiler) funDeclaration() error {
 }
 
 func (c *Compiler) compileFunction(funcType FunctionType) error {
-	fc := newFunctionCompiler(c.parserState, funcType)
+	fc := newFunctionCompiler(c.parserState, c, funcType)
 	fc.beginScope()
 
 	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after function name"); err != nil {

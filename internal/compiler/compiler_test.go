@@ -172,6 +172,47 @@ func TestCompileFunctionDeclaration(t *testing.T) {
 	})
 }
 
+func TestCompileEnclosingFunction(t *testing.T) {
+	t.Run("Al terminar una función anidada el compilador sigue escribiendo en la de afuera", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() { fun b() {} print 1; }")
+
+		outer := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &outer.Chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+		inner := outer.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &inner.Chunk, byte(c.OP_RETURN))
+	})
+
+	t.Run("Al terminar una función el compilador sigue escribiendo en el script", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() {} print 2;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_PRINT),
+			byte(c.OP_RETURN),
+		)
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_RETURN))
+	})
+
+	t.Run("Las funciones se pueden anidar en más de un nivel", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() { fun b() { fun c() {} } }")
+
+		a := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &a.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_RETURN))
+		b := a.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &b.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_RETURN))
+		innermost := b.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &innermost.Chunk, byte(c.OP_RETURN))
+	})
+}
+
 func TestCompileLiterals(t *testing.T) {
 	tests := []struct {
 		name   string
