@@ -242,6 +242,38 @@ func TestOpCall(t *testing.T) {
 
 		utils.AssertErrorMessage(t, err, "expected 1 arguments but got 2")
 	})
+
+	nestedCalls := func(depth int) *c.Function {
+		callee := newFunction(0, func(body *c.Chunk) {})
+		for i := 1; i < depth; i++ {
+			next := callee
+			callee = newFunction(0, func(body *c.Chunk) {
+				writeConstant(body, next)
+				writeCall(body, 0)
+			})
+		}
+		return callee
+	}
+
+	t.Run("Se permiten llamadas anidadas hasta la profundidad máxima", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, nestedCalls(framesMax-1))
+		writeCall(chunk, 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+	})
+
+	t.Run("Error de stack overflow si las llamadas anidadas superan la profundidad máxima", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, nestedCalls(framesMax))
+		writeCall(chunk, 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "stack overflow")
+	})
 }
 
 func TestOpConstant(t *testing.T) {
