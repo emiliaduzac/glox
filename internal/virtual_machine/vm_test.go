@@ -217,6 +217,31 @@ func TestOpCall(t *testing.T) {
 			utils.AssertErrorMessage(t, err, "can only call functions and classes")
 		})
 	}
+
+	t.Run("Error si se llama a una función con menos argumentos de los esperados", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		callee := newFunction(2, func(body *c.Chunk) {})
+		writeConstant(chunk, callee)
+		writeConstant(chunk, 1.0)
+		writeCall(chunk, 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "expected 2 arguments but got 1")
+	})
+
+	t.Run("Error si se llama a una función con más argumentos de los esperados", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		callee := newFunction(1, func(body *c.Chunk) {})
+		writeConstant(chunk, callee)
+		writeConstant(chunk, 1.0)
+		writeConstant(chunk, 2.0)
+		writeCall(chunk, 2)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "expected 1 arguments but got 2")
+	})
 }
 
 func TestOpConstant(t *testing.T) {

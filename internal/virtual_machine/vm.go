@@ -259,6 +259,9 @@ func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 }
 
 func (vm *VirtualMachine) call(function *c.Function, argCount int) error {
+	if argCount != function.Arity {
+		return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("expected %d arguments but got %d", function.Arity, argCount))
+	}
 	vm.frames = append(vm.frames, callFrame{function: function, slots: len(vm.stack) - argCount - 1})
 	return nil
 }
