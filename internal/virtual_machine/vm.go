@@ -30,11 +30,15 @@ type VirtualMachine struct {
 }
 
 func NewVirtualMachine() *VirtualMachine {
+	globals := map[string]any{}
+	for name, function := range builtinNatives() {
+		globals[name] = function
+	}
 	return &VirtualMachine{
 		frames:  make([]callFrame, 0, framesMax),
 		stack:   make([]any, 0, stackMax),
 		out:     os.Stdout,
-		globals: map[string]any{},
+		globals: globals,
 	}
 }
 

@@ -36,6 +36,12 @@ func writeConstant(chunk *c.Chunk, value any) {
 	chunk.Write(byte(index), line)
 }
 
+func writeGetGlobal(chunk *c.Chunk, name string) {
+	index := chunk.AddConstant(name)
+	chunk.Write(byte(c.OP_GET_GLOBAL), line)
+	chunk.Write(byte(index), line)
+}
+
 func writeCall(chunk *c.Chunk, argCount byte) {
 	chunk.Write(byte(c.OP_CALL), line)
 	chunk.Write(argCount, line)
@@ -321,6 +327,23 @@ func TestNativeCall(t *testing.T) {
 		utils.AssertValue(t, stackValues(vm)[0], 30.0)
 	})
 
+	t.Run("Una función nativa se puede guardar en una variable y llamarla desde ahí", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, subtract)
+		alias := chunk.AddConstant("alias")
+		chunk.Write(byte(c.OP_DEFINE_GLOBAL), line)
+		chunk.Write(byte(alias), line)
+		writeGetGlobal(chunk, "alias")
+		writeConstant(chunk, 33.0)
+		writeConstant(chunk, 3.0)
+		writeCall(chunk, 2)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, stackValues(vm)[0], 30.0)
+	})
+
 	t.Run("Error si se llama a una función nativa con menos argumentos de los esperados", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		writeConstant(chunk, subtract)
@@ -356,6 +379,20 @@ func TestNativeCall(t *testing.T) {
 
 		utils.AssertNoError(t, err)
 		utils.AssertValue(t, out.String(), "<native fn>\n")
+	})
+}
+
+func TestClock(t *testing.T) {
+	t.Run("Una VM nueva ya tiene definida la función nativa clock", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeGetGlobal(chunk, "clock")
+		writeCall(chunk, 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		_, isNumber := stackValues(vm)[0].(float64)
+		utils.AssertValue(t, isNumber, true)
 	})
 }
 
