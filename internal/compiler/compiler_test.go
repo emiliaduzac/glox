@@ -1921,3 +1921,31 @@ func TestCompileUpvalues(t *testing.T) {
 		assertBytes(t, &b.Chunk, byte(c.OP_CLOSURE), 0, 0, 0, byte(c.OP_NIL), byte(c.OP_RETURN))                         // c captura el upvalue 0 de b
 	})
 }
+
+func TestCompileCloseUpvalue(t *testing.T) {
+	t.Run("Al cerrar un bloque, una local capturada se saca con OP_CLOSE_UPVALUE", func(t *testing.T) {
+		chunk := compileSource(t, "{ var x = 1; fun f() { print x; } }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_CLOSURE), 1, 1, 1,
+			byte(c.OP_POP),
+			byte(c.OP_CLOSE_UPVALUE),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Una local que nadie captura se sigue sacando con OP_POP", func(t *testing.T) {
+		chunk := compileSource(t, "{ var x = 1; fun f() { print 2; } }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_CLOSURE), 1,
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+}
