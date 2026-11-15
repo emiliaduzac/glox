@@ -78,6 +78,12 @@ Si es una función, chequea dos cosas antes de abrir el frame. Primero que la ar
 
 Si pasa todos los chequeos se abre el frame, y ahí está lo importante. El slots apunta a la función dentro del stack, y siguiendo están los argumentos. Como los parámetros son las primeras variables locales de la función, cada uno coincide con el argumento que le toca, así que no hace falta copiarlos porque el frame arranca desde ahí directamente.
 
+#### Stack trace
+
+Cuando hay un error en tiempo de ejecución además del mensaje con la línea mostramos el stack trace, que es el camino de llamadas que llevó hasta el error, desde la función donde falló hasta el script con la línea de cada una. Por ejemplo [line 3] in inner(), [line 4] in outer() y [line 6] in script. Esto lo trae el libro y el tree-walk no lo tiene, ahí solo se ve la línea del error. Como en el libro, mostramos primero la función más interna.
+
+Acá hay una diferencia con el libro, que lo imprime en el momento en que ocurre el error. En glox la VM devuelve los errores y no los imprime, entonces el trace se arma en el defer de Run, que se ejecuta cuando falla cualquier instrucción, y se lo agrega al error antes de reiniciar el stack porque después de eso ya no quedarían los frames para recorrer.
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
