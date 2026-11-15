@@ -9,8 +9,9 @@ import (
 )
 
 type Local struct {
-	Name  token.Token
-	Depth int
+	Name       token.Token
+	Depth      int
+	IsCaptured bool
 }
 
 type FunctionType int
@@ -32,6 +33,11 @@ type Loop struct {
 	breakJumps []int
 }
 
+type Upvalue struct {
+	index   byte
+	isLocal bool
+}
+
 type Compiler struct {
 	*parserState
 	enclosing   *Compiler
@@ -41,6 +47,7 @@ type Compiler struct {
 	scopeDepth  int
 	identifiers map[string]byte
 	loops       []Loop
+	upvalues    []Upvalue
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
@@ -188,7 +195,7 @@ func (c *Compiler) addLocal(name token.Token) {
 		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope"))
 		return
 	}
-	local := Local{Name: name, Depth: -1} // no inicializada
+	local := Local{Name: name, Depth: -1, IsCaptured: false} // no inicializada
 	c.locals = append(c.locals, local)
 }
 
@@ -244,7 +251,7 @@ func (c *Compiler) endScope() {
 	c.scopeDepth--
 
 	for len(c.locals) > 0 && c.locals[len(c.locals)-1].Depth > c.scopeDepth {
-		c.emit(byte(chunk.OP_POP))
+		c.emitPopLocal(c.locals[len(c.locals)-1])
 		c.locals = c.locals[:len(c.locals)-1]
 	}
 }
@@ -355,7 +362,20 @@ func (c *Compiler) compileFunction(funcType FunctionType) error {
 		return err
 	}
 
-	return c.emitConstant(fc.endCompiler())
+	index, err := c.makeConstant(fc.endCompiler())
+	if err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_CLOSURE), index)
+
+	for _, upvalue := range fc.upvalues {
+		isLocal := byte(0)
+		if upvalue.isLocal {
+			isLocal = 1
+		}
+		c.emit(isLocal, upvalue.index)
+	}
+	return nil
 }
 
 func (c *Compiler) block() error {
@@ -616,6 +636,14 @@ func (c *Compiler) patchBreakJumps() error {
 
 func (c *Compiler) popLoopLocals(currentLoop *Loop) {
 	for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > currentLoop.scopeDepth; i-- {
+		c.emitPopLocal(c.locals[i])
+	}
+}
+
+func (c *Compiler) emitPopLocal(local Local) {
+	if local.IsCaptured {
+		c.emit(byte(chunk.OP_CLOSE_UPVALUE))
+	} else {
 		c.emit(byte(chunk.OP_POP))
 	}
 }
@@ -798,10 +826,12 @@ func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
 	var getOp, setOp chunk.OpCode
 	var arg byte
 
-	localIndex := c.resolveLocal(name)
-	if localIndex != -1 {
+	if localIndex := c.resolveLocal(name); localIndex != -1 {
 		getOp, setOp = chunk.OP_GET_LOCAL, chunk.OP_SET_LOCAL
 		arg = byte(localIndex)
+	} else if upIndex := c.resolveUpvalue(name); upIndex != -1 {
+		getOp, setOp = chunk.OP_GET_UPVALUE, chunk.OP_SET_UPVALUE
+		arg = byte(upIndex)
 	} else {
 		var err error
 		arg, err = c.identifierConstant(name)
@@ -833,6 +863,38 @@ func (c *Compiler) resolveLocal(name token.Token) int {
 		}
 	}
 	return -1
+}
+
+func (c *Compiler) resolveUpvalue(name token.Token) int {
+	if c.enclosing == nil {
+		return -1
+	}
+
+	if local := c.enclosing.resolveLocal(name); local != -1 {
+		c.enclosing.locals[local].IsCaptured = true
+		return c.addUpvalue(byte(local), true)
+	}
+	if upvalue := c.enclosing.resolveUpvalue(name); upvalue != -1 {
+		return c.addUpvalue(byte(upvalue), false)
+	}
+	return -1
+}
+
+func (c *Compiler) addUpvalue(index byte, isLocal bool) int {
+	for i, upvalue := range c.upvalues {
+		if upvalue.index == index && upvalue.isLocal == isLocal {
+			return i
+		}
+	}
+
+	if len(c.upvalues) == math.MaxUint8+1 {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "too many closure variables in function"))
+		return 0
+	}
+
+	c.upvalues = append(c.upvalues, Upvalue{index: index, isLocal: isLocal})
+	c.function.UpvalueCount++
+	return len(c.upvalues) - 1
 }
 
 func (c *Compiler) variable(canAssign bool) error {

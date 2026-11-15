@@ -102,6 +102,38 @@ Una nativa no tiene bytecode ni chunk solo la cantidad de argumentos que espera 
 
 Una difernecia con el libro que tenemos es qye para agregar una nativa el libro usa defineNative que además apila y desapila valores para protegerlos de su garbage collector. En glox eso no hace falta así que tenemos una tabla con las nativas que la VM instala como globales al crearse y agregar otra es sumar una entrada a esa tabla. Otra diferencia es el clock porque el de clox mide el tiempo de CPU y el nuestro devuelve el tiempo del reloj igual que el del tree-walk así los dos caminos miden lo mismo y los benchmarks se pueden comparar. 
 
+#### Closures
+
+Antes las funciones se cargaban con `OP_CONSTANT` como cualquier otra constante. Ahora la VM las carga con `OP_CLOSURE`, que crea un closure con un puntero a la `Function` y sus propios **upvalues**, y pushea el closure a su stack.
+
+Como todas las funciones se emiten con `OP_CLOSURE`, en el stack y en las variables nunca hay una `Function`, siempre un closure que la envuelve. Eso implica que el `callFrame` ahora guarda el closure que se está ejecutando, no la `Function`. Esto es importante, porque mientras se ejecuta una función la VM necesita llegar a sus upvalues, pero la `Function` solo sabe cuántos upvalues hay y de dónde sacarlos, y eso es igual para todos sus closures. En cambio, la variable concreta cambia en cada uno: dos closures de la misma función pueden haberse creado en llamadas distintas a la función de afuera, y cada uno captura la variable de su llamada. Por eso las referencias están en el closure.
+
+El script es el único que no se crea con `OP_CLOSURE`, porque no está declarado dentro de ninguna función, así que la VM lo envuelve en un closure cuando lo recibe en `Run()`, antes de ejecutarlo.
+
+**Upvalues**
+
+Los upvalues son punteros a variables que declara otra función, una más externa. Los necesitamos para que cuando la interna se ejecute pueda usar esas variables, aunque no estén entre sus locales ni entre las globales. Que sea un puntero nos permite que, al modificar la variable, el cambio quede aplicado para todas las llamadas y también se vea desde los niveles de anidamiento más afuera.
+
+En los call frames habíamos mencionado que, a diferencia del libro, usábamos un índice y no un puntero para marcar dónde empieza la ventana del stack de una función, porque si el stack crecía, Go podía moverlo y el puntero quedaba viejo. Acá sí usamos un puntero al stack, y es seguro porque el stack de la VM se crea con una capacidad fija y nunca crece, así que Go no lo mueve.
+
+Cuando una variable sale del stack (terminó un bloque o una función retornó), el puntero quedaría apuntando a un lugar inválido. Como contamos en el compilador, justo antes de que esto pase movemos la variable al heap, así luego puede seguir usándose. Para eso, se suma al `upvalue` un campo llamado `closed`. Al sacarla del stack, copiamos el valor directamente a este campo y el puntero pasa a apuntar ahí. A esto se le dice **cerrar** el upvalue: mientras apunta al stack está abierto, y cuando ya tiene su propia copia, está cerrado.
+
+**Instrucciones**
+
+- **`OP_CLOSURE`**: crea el closure y lee los pares `<isLocal> <index>` que dejó el compilador. Como en ese momento está corriendo la función de afuera, si la variable es local de ella está en su ventana, en `slots + index`. Ahí la VM busca en `openUpvalues` si ya hay un upvalue para esa posición: si lo hay, lo reutiliza, y si no crea uno y lo inserta en orden. Si la variable no es local, la función de afuera ya la tiene como upvalue, así que reutiliza el que está en su closure, en la posición `index`.
+- **`OP_GET_UPVALUE` / `OP_SET_UPVALUE`**: buscan el upvalue en el closure que se está ejecutando y leen o escriben a través del puntero.
+- **`OP_CLOSE_UPVALUE`**: el compilador la emite al terminar un bloque para cada variable capturada. Cierra el upvalue de la variable que está en el tope del stack y la saca del stack.
+- **`OP_RETURN`**: antes de recortar el stack, cierra todos los upvalues que apuntan a la ventana de la función que termina.
+
+**Upvalues abiertos**
+
+`openUpvalues` es una lista enlazada de upvalues que guarda la VM con todos los upvalues que todavía apuntan al stack. Lo usan dos de las instrucciones de arriba:
+
+- **Al cerrar** (`OP_CLOSE_UPVALUE` y `OP_RETURN`), la VM sabe qué posición del stack se está liberando, pero necesita los upvalues que apuntan ahí. Cada closure tiene sus upvalues, y estos sus punteros al stack, pero desde las posiciones a liberar del stack no tenemos otra forma de saber cuales son los upvalues que lo estaban referenciando. Para eso se crea esta lista: se recorre desde el inicio, cada upvalue que apunta a la posición que se libera o más arriba se cierra y se saca de la lista, y en cuanto aparece uno que apunta más abajo, corta.
+- **Al crear un closure** (`OP_CLOSURE`), sirve para que dos closures que capturan la misma variable compartan el mismo upvalue. Si cada uno tuviera uno propio, al moverse al heap cada uno copiaría el valor en su propio `closed`, y desde ahí serían dos variables distintas: si uno la modifica, el otro no se entera (cada puntero apunta a un lugar distinto). Por eso, al crear un upvalue, primero se fija en esta lista si ya existe uno para esa posición.
+
+La lista enlazada está ordenada por posición en el stack, empezando por la más alta (porque el stack siempre se va liberando desde su tope). El libro elige esta estructura porque para mantener el orden a veces hay que insertar en el medio, y al cerrar se sacan los primeros: en un array habría que mover los demás elementos, y en una lista enlazada alcanza con cambiar punteros. Como cada elemento es un upvalue, a estos les agregamos un campo `next` con el siguiente elemento. Por último, el libro compara punteros para mantener la lista ordenada. Como en Go no se pueden comparar punteros con `>`, guardamos también la posición del stack (`stackIndex`) y comparamos eso.
+
 #### Clases e instancias
 
 Creamos una clase que por ahora solo tiene como dato su nombre. Además de eso el método string para que el Stringify pueda llamarlo e imprimirlo. Si bien el libro habla de que no es estrictamente necesario para el programador que lo use, está bueno para mostrar el nombre en runtime como por ejemplo para el stack trace. 
@@ -139,6 +171,7 @@ Sobre limitaciones conocidas para esta parte tenemos que no se puede borrar un c
 7. **OP_DEFINE_GLOBAL**: en el libro primero se guarda el valor en la tabla mirándolo con `peek` y recién después se saca del stack, porque si la tabla tiene que crecer justo en ese momento su garbage collector podría perder el valor. En Go ese problema no existe, así que nosotros lo sacamos del stack directamente y lo guardamos en el `map`.
 8. **OP_SET_GLOBAL**: en el libro se guarda el valor en la tabla y si la variable no existía se borra y se levanta el error. Nosotros hacemos la pregunta antes, nos fijamos si la variable existe en el `map`, y si no existe levantamos el error sin haber guardado nada, así nunca hay que borrar. El resultado es el mismo, una variable que no se declaró no se crea por asignarla.
 9. **Leer el nombre de una variable**: en el libro el `READ_STRING` no chequea que la constante sea un string, y en glox el `readString()` sí lo chequea y devuelve un error si no lo es.
+10. **Orden de los upvalues abiertos**: el libro ordena la lista comparando punteros, y en Go no se puede, así que cada upvalue guarda su posición en el stack (`stackIndex`) y comparamos eso.
 
 ### Limitaciones conocidas
 

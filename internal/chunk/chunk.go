@@ -35,11 +35,16 @@ const (
 	OP_GET_LOCAL
 	OP_SET_LOCAL
 
+	OP_GET_UPVALUE
+	OP_SET_UPVALUE
+	OP_CLOSE_UPVALUE
+
 	OP_LOOP
 	OP_JUMP_IF_FALSE
 	OP_JUMP
 
 	OP_CALL
+	OP_CLOSURE
 
 	OP_CLASS
 
@@ -74,11 +79,16 @@ var opCodeNames = map[OpCode]string{
 	OP_GET_LOCAL: "OP_GET_LOCAL",
 	OP_SET_LOCAL: "OP_SET_LOCAL",
 
+	OP_GET_UPVALUE:   "OP_GET_UPVALUE",
+	OP_SET_UPVALUE:   "OP_SET_UPVALUE",
+	OP_CLOSE_UPVALUE: "OP_CLOSE_UPVALUE",
+
 	OP_LOOP:          "OP_LOOP",
 	OP_JUMP_IF_FALSE: "OP_JUMP_IF_FALSE",
 	OP_JUMP:          "OP_JUMP",
 
-	OP_CALL: "OP_CALL",
+	OP_CALL:    "OP_CALL",
+	OP_CLOSURE: "OP_CLOSURE",
 
 	OP_CLASS: "OP_CLASS",
 
@@ -135,7 +145,23 @@ func (c *Chunk) Disassemble(name string) {
 			fmt.Printf("%s<%s>\n", op, c.constantString(constantIndex))
 			i += 2
 
-		case OP_GET_LOCAL, OP_SET_LOCAL:
+		case OP_CLOSURE:
+			index := c.Bytes[i+1]
+			function := c.Constants[index].(*Function)
+			fmt.Printf("%s<%s>\n", op, c.constantString(index))
+			i += 2
+			for j := 0; j < function.UpvalueCount; j++ {
+				isLocal := c.Bytes[i]
+				upIndex := c.Bytes[i+1]
+				kind := "upvalue"
+				if isLocal == 1 {
+					kind = "local"
+				}
+				fmt.Printf("%04d|      | %s %d\n", i, kind, upIndex)
+				i += 2
+			}
+
+		case OP_GET_LOCAL, OP_SET_LOCAL, OP_GET_UPVALUE, OP_SET_UPVALUE:
 			// Instrucciones con operandos: slots
 			varIndex := c.Bytes[i+1]
 			fmt.Printf("%s<@%d>\n", op, varIndex)

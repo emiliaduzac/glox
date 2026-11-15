@@ -8,55 +8,6 @@ import (
 	"tp-lox/internal/utils"
 )
 
-var line = 1
-
-func setUpVM(t *testing.T) (*VirtualMachine, *c.Chunk) {
-	t.Helper()
-	chunk := c.NewChunk()
-	vm := NewVirtualMachine()
-	return vm, chunk
-}
-
-func run(vm *VirtualMachine, chunk *c.Chunk) error {
-	function := c.NewFunction()
-	function.Chunk = *chunk
-	return vm.Run(function)
-}
-
-func stackValues(vm *VirtualMachine) []any {
-	if len(vm.stack) == 0 {
-		return vm.stack
-	}
-	return vm.stack[1:]
-}
-
-func writeConstant(chunk *c.Chunk, value any) {
-	index := chunk.AddConstant(value)
-	chunk.Write(byte(c.OP_CONSTANT), line)
-	chunk.Write(byte(index), line)
-}
-
-func writeGetGlobal(chunk *c.Chunk, name string) {
-	index := chunk.AddConstant(name)
-	chunk.Write(byte(c.OP_GET_GLOBAL), line)
-	chunk.Write(byte(index), line)
-}
-
-func writeCall(chunk *c.Chunk, argCount byte) {
-	chunk.Write(byte(c.OP_CALL), line)
-	chunk.Write(argCount, line)
-}
-
-func writeJump(chunk *c.Chunk, op c.OpCode, offset int) {
-	chunk.Write(byte(op), line)
-	chunk.Write(byte(offset>>8), line)
-	chunk.Write(byte(offset), line)
-}
-
-func writeOp(op c.OpCode) func(chunk *c.Chunk) {
-	return func(chunk *c.Chunk) { chunk.Write(byte(op), line) }
-}
-
 func TestOpReturn(t *testing.T) {
 	t.Run("El script termina sin error cuando solo queda su valor de retorno", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
@@ -102,7 +53,7 @@ func TestScriptCallFrame(t *testing.T) {
 		err := vm.Run(function)
 
 		utils.AssertNoError(t, err)
-		utils.AssertValue(t, vm.stack[0], any(function))
+		utils.AssertValue(t, vm.stack[0].(*closure).function, function)
 		utils.AssertValue(t, vm.stack[1], 1.0)
 	})
 
@@ -161,7 +112,7 @@ func TestOpCall(t *testing.T) {
 			writeConstant(body, "hola")
 			body.Write(byte(c.OP_PRINT), line)
 		})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeCall(chunk, 0)
 
 		err := run(vm, chunk)
@@ -179,7 +130,7 @@ func TestOpCall(t *testing.T) {
 			body.Write(1, line)
 			body.Write(byte(c.OP_PRINT), line)
 		})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeConstant(chunk, 4.0)
 		writeCall(chunk, 1)
 
@@ -201,7 +152,7 @@ func TestOpCall(t *testing.T) {
 			body.Write(1, line)
 			body.Write(byte(c.OP_PRINT), line)
 		})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeConstant(chunk, 1.0)
 		writeConstant(chunk, 2.0)
 		writeCall(chunk, 2)
@@ -235,7 +186,7 @@ func TestOpCall(t *testing.T) {
 	t.Run("Error si se llama a una función con menos argumentos de los esperados", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		callee := newFunction(2, func(body *c.Chunk) {})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeConstant(chunk, 1.0)
 		writeCall(chunk, 1)
 
@@ -247,7 +198,7 @@ func TestOpCall(t *testing.T) {
 	t.Run("Error si se llama a una función con más argumentos de los esperados", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		callee := newFunction(1, func(body *c.Chunk) {})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeConstant(chunk, 1.0)
 		writeConstant(chunk, 2.0)
 		writeCall(chunk, 2)
@@ -262,7 +213,7 @@ func TestOpCall(t *testing.T) {
 		for i := 1; i < depth; i++ {
 			next := callee
 			callee = newFunction(0, func(body *c.Chunk) {
-				writeConstant(body, next)
+				writeClosure(body, next)
 				writeCall(body, 0)
 			})
 		}
@@ -271,7 +222,7 @@ func TestOpCall(t *testing.T) {
 
 	t.Run("Se permiten llamadas anidadas hasta la profundidad máxima", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
-		writeConstant(chunk, nestedCalls(framesMax-1))
+		writeClosure(chunk, nestedCalls(framesMax-1))
 		writeCall(chunk, 0)
 
 		err := run(vm, chunk)
@@ -281,7 +232,7 @@ func TestOpCall(t *testing.T) {
 
 	t.Run("Error de stack overflow si las llamadas anidadas superan la profundidad máxima", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
-		writeConstant(chunk, nestedCalls(framesMax))
+		writeClosure(chunk, nestedCalls(framesMax))
 		writeCall(chunk, 0)
 
 		err := run(vm, chunk)
@@ -408,7 +359,7 @@ func TestReturn(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		var out bytes.Buffer
 		vm.out = &out
-		writeConstant(chunk, returning(5.0))
+		writeClosure(chunk, returning(5.0))
 		writeCall(chunk, 0)
 		chunk.Write(byte(c.OP_PRINT), line)
 		writeConstant(chunk, "listo")
@@ -430,7 +381,7 @@ func TestReturn(t *testing.T) {
 		suma.Chunk.Write(2, line)
 		suma.Chunk.Write(byte(c.OP_ADD), line)
 		suma.Chunk.Write(byte(c.OP_RETURN), line)
-		writeConstant(chunk, suma)
+		writeClosure(chunk, suma)
 		writeConstant(chunk, 2.0)
 		writeConstant(chunk, 3.0)
 		writeCall(chunk, 2)
@@ -448,9 +399,8 @@ func TestReturn(t *testing.T) {
 		vm.out = &out
 		callee := returning(1.0)
 		for i := 0; i < framesMax+5; i++ {
-			writeConstant(chunk, callee)
-			writeCall(chunk, 0)
-			chunk.Write(byte(c.OP_POP), line)
+			writeClosure(chunk, callee)
+			writeCallStatement(chunk)
 		}
 		writeConstant(chunk, "listo")
 		chunk.Write(byte(c.OP_PRINT), line)
@@ -466,10 +416,10 @@ func TestReturn(t *testing.T) {
 		var out bytes.Buffer
 		vm.out = &out
 		outer := c.NewFunction()
-		writeConstant(&outer.Chunk, returning(5.0))
+		writeClosure(&outer.Chunk, returning(5.0))
 		writeCall(&outer.Chunk, 0)
 		outer.Chunk.Write(byte(c.OP_RETURN), line)
-		writeConstant(chunk, outer)
+		writeClosure(chunk, outer)
 		writeCall(chunk, 0)
 		chunk.Write(byte(c.OP_PRINT), line)
 
@@ -505,7 +455,7 @@ func TestStackTrace(t *testing.T) {
 		f := c.NewFunction()
 		f.Name = "f"
 		failingCallAt(&f.Chunk, 2)
-		writeConstant(chunk, f)
+		writeClosure(chunk, f)
 		callAt(chunk, 5)
 
 		err := run(vm, chunk)
@@ -1894,6 +1844,162 @@ func TestOpLoop(t *testing.T) {
 
 		utils.AssertNoError(t, err)
 		utils.AssertValue(t, out.String(), "")
+	})
+}
+
+func TestUpvalues(t *testing.T) {
+	t.Run("OP_GET_UPVALUE lee una local de la función de afuera", func(t *testing.T) {
+		// fun afuera() { var x = "hola"; fun adentro() { print x; } adentro(); }  afuera();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		afuera := c.NewFunction()
+		writeConstant(&afuera.Chunk, "hola")
+		writeClosure(&afuera.Chunk, newPrintUpvalue(), 1, 1) // captura la local 1 de afuera: x
+		writeCallStatement(&afuera.Chunk)
+		writeReturnNil(&afuera.Chunk)
+		writeClosure(chunk, afuera)
+		writeCallStatement(chunk)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "hola\n")
+	})
+
+	t.Run("OP_SET_UPVALUE cambia la variable de la función de afuera", func(t *testing.T) {
+		// fun afuera() { var x = 1; fun adentro() { x = 2; } adentro(); print x; }  afuera();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		adentro := c.NewFunction()
+		adentro.UpvalueCount = 1
+		writeConstant(&adentro.Chunk, 2.0)
+		adentro.Chunk.Write(byte(c.OP_SET_UPVALUE), line)
+		adentro.Chunk.Write(0, line)
+		adentro.Chunk.Write(byte(c.OP_POP), line)
+		writeReturnNil(&adentro.Chunk)
+		afuera := c.NewFunction()
+		writeConstant(&afuera.Chunk, 1.0)
+		writeClosure(&afuera.Chunk, adentro, 1, 1)
+		writeCallStatement(&afuera.Chunk)
+		afuera.Chunk.Write(byte(c.OP_GET_LOCAL), line)
+		afuera.Chunk.Write(1, line)
+		afuera.Chunk.Write(byte(c.OP_PRINT), line)
+		writeReturnNil(&afuera.Chunk)
+		writeClosure(chunk, afuera)
+		writeCallStatement(chunk)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "2\n") // afuera ve el cambio: es la misma variable
+	})
+
+	t.Run("Con tres niveles, la función de adentro usa el upvalue de la del medio", func(t *testing.T) {
+		// fun a() { var x = "hola"; fun b() { fun c() { print x; } c(); } b(); }  a();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		b := c.NewFunction()
+		b.UpvalueCount = 1
+		writeClosure(&b.Chunk, newPrintUpvalue(), 0, 0) // c comparte el upvalue 0 de b
+		writeCallStatement(&b.Chunk)
+		writeReturnNil(&b.Chunk)
+		a := c.NewFunction()
+		writeConstant(&a.Chunk, "hola")
+		writeClosure(&a.Chunk, b, 1, 1) // b captura la local 1 de a
+		writeCallStatement(&a.Chunk)
+		writeReturnNil(&a.Chunk)
+		writeClosure(chunk, a)
+		writeCallStatement(chunk)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "hola\n")
+	})
+}
+
+func TestCloseUpvalues(t *testing.T) {
+	t.Run("OP_CLOSE_UPVALUE mantiene la variable aunque salga del stack al cerrar un bloque", func(t *testing.T) {
+		// { var x = "hola"; fun mostrar() { print x; } f = mostrar; }  f();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		writeConstant(chunk, "hola")
+		writeClosure(chunk, newPrintUpvalue(), 1, 1)
+		writeDefineGlobal(chunk, "f")
+		chunk.Write(byte(c.OP_CLOSE_UPVALUE), line)
+		writeCallGlobal(chunk, "f")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "hola\n")
+	})
+
+	t.Run("OP_RETURN cierra los upvalues de la función que termina", func(t *testing.T) {
+		// fun crearContador() { var cuenta = 0; fun contar() { cuenta = cuenta + 1; print cuenta; } return contar; }
+		// var contador = crearContador();  contador();  contador();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		contar := c.NewFunction()
+		contar.UpvalueCount = 1
+		contar.Chunk.Write(byte(c.OP_GET_UPVALUE), line)
+		contar.Chunk.Write(0, line)
+		writeConstant(&contar.Chunk, 1.0)
+		contar.Chunk.Write(byte(c.OP_ADD), line)
+		contar.Chunk.Write(byte(c.OP_SET_UPVALUE), line)
+		contar.Chunk.Write(0, line)
+		contar.Chunk.Write(byte(c.OP_PRINT), line)
+		writeReturnNil(&contar.Chunk)
+		crearContador := c.NewFunction()
+		writeConstant(&crearContador.Chunk, 0.0)
+		writeClosure(&crearContador.Chunk, contar, 1, 1)
+		crearContador.Chunk.Write(byte(c.OP_RETURN), line)
+		writeClosure(chunk, crearContador)
+		writeCall(chunk, 0)
+		writeDefineGlobal(chunk, "contador")
+		writeCallGlobal(chunk, "contador")
+		writeCallGlobal(chunk, "contador")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "1\n2\n")
+	})
+
+	t.Run("Dos closures que capturan la misma variable la siguen compartiendo después de cerrarse", func(t *testing.T) {
+		// fun main() { var a = "initial"; fun set() { a = "updated"; } fun get() { print a; } globalSet = set; globalGet = get; }
+		// main();  globalSet();  globalGet();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		set := c.NewFunction()
+		set.UpvalueCount = 1
+		writeConstant(&set.Chunk, "updated")
+		set.Chunk.Write(byte(c.OP_SET_UPVALUE), line)
+		set.Chunk.Write(0, line)
+		set.Chunk.Write(byte(c.OP_POP), line)
+		writeReturnNil(&set.Chunk)
+		main := c.NewFunction()
+		writeConstant(&main.Chunk, "initial")
+		writeClosure(&main.Chunk, set, 1, 1)
+		writeDefineGlobal(&main.Chunk, "globalSet")
+		writeClosure(&main.Chunk, newPrintUpvalue(), 1, 1)
+		writeDefineGlobal(&main.Chunk, "globalGet")
+		writeReturnNil(&main.Chunk)
+		writeClosure(chunk, main)
+		writeCallStatement(chunk)
+		writeCallGlobal(chunk, "globalSet")
+		writeCallGlobal(chunk, "globalGet")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "updated\n")
 	})
 }
 

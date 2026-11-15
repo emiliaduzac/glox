@@ -198,6 +198,51 @@ El return es un statement que si tiene una expresión la compila y emite un OP_R
 
 Un return fuera de una función no tiene sentido porque no hay nada de donde salir. Para detectarlo el compilador se fija si lo que está compilando es el script y si es así da un error. Ese error no corta la compilación si no que sigue leyendo para avisar si hay más errores porque el código está bien escrito y solo rompe una regla del lenguaje. Con esto nos acomplamso a lo que dice el libro que se podria permitir esto pero elige que sea un error. 
 
+### Closures
+
+#### Variables de otra función
+
+Al definir las funciones, permitíamos que estas usaran las variables declaradas dentro de su propio cuerpo (locales) o las globales, pero como las funciones se pueden anidar, podrían usar variables que son locales de otra función que las envuelve, y ahí no calificarían ni como globales ni como locales de la función más interna. Además, la función interna se podría devolver o guardar en una variable de afuera y seguir viva después de que la función que la envuelve retornó y su ventana se sacó del stack, junto con la variable que la interna necesitaba.
+
+Otro problema es que la declaración de una función interna se ejecuta una vez por cada llamada a la de afuera, y cada una de esas llamadas tiene sus propias variables. Entonces la función interna tiene siempre el mismo código, pero cada vez tiene que usar variables distintas, y no alcanza con guardarlas en la función compilada porque hay una sola, y terminarían usando las mismas variables.
+
+En el tree-walk interpreter esto no pasaba porque cada scope era un `Environment` en el heap y cada función guardaba una referencia al suyo, así que seguía vivo mientras se lo usara.
+
+#### Function y Closure
+
+Para resolverlo el libro separa la función en dos:
+
+- **`Function`:** la arma el compilador, una sola por cada declaración. Tiene el código de la función y queda como constante en el chunk de la función que la contiene.
+- **`Closure`:** lo crea la VM cada vez que se ejecuta la declaración. Tiene un puntero a la `Function` y las variables de afuera que esa función usa (**upvalues**).
+
+Así el código de la función es el mismo, pero cada closure tiene sus propias variables.
+
+#### Upvalues
+
+Ahora, cuando compilamos el cuerpo de una función y encontramos una variable, buscamos en este orden: es local? → es un upvalue? → es global?. Por este orden, si una local tiene el mismo nombre que una variable de afuera, gana la local (como pasaba antes entre locales y globales).
+
+Un **upvalue** es una variable local pero externa: la función la usa, pero no la declaró ella, sino otra función que la envuelve.
+Para validar si es un upvalue, primero se busca en las locales del `enclosing` y, si no está, se ve si el `enclosing` la tiene como upvalue propio. Para que esto funcione, una función captura no solo las variables de afuera que usa ella, sino también las que usan las funciones declaradas dentro suyo. Esto es porque cuando se crea el closure de una función interna, solo se está ejecutando la que la envuelve directamente, y las de más arriba podrían haber retornado, así que la del medio es la única que puede pasarle la variable.
+
+#### Cambios en el compilador
+
+Lo primero que tuvimos que hacer es dejar de emitir `OP_CONSTANT` para las funciones y emitir `OP_CLOSURE`, para que la VM distinga y sepa que tiene que crear el closure.
+
+Luego, al compilar las funciones, cada vez que detectamos un upvalue lo guardamos en un nuevo slice **`upvalues`**. Por cada upvalue, nos guardamos un booleano que indica si es una local de la función que la envuelve o un upvalue de ella (la variable viene de más afuera), y su índice en las locales o en los upvalues de esa función, según el caso. Al igual que con las locales, no solo las guardamos sino que emitimos `OP_GET_UPVALUE` / `OP_SET_UPVALUE`, con la posición en ese slice como operando, para que la VM sepa dónde ir a buscarla.
+
+Como la VM no tiene acceso al `Compiler`, después del `OP_CLOSURE` el compilador escribe la lista de upvalues de la función como pares de bytes `<isLocal> <index>`, que la VM usa para capturar las variables al crear el closure. Y como el `Compiler` desaparece al terminar de compilar, cada `Function` guarda la cantidad de upvalues que tiene, así la VM sabe cuántos pares tiene que leer luego de un `OP_CLOSURE`.
+
+Si una función usa la misma variable varias veces, se guarda un solo upvalue para no ocupar lugares de más en el slice. Como su posición se emite en un byte, una función puede tener hasta 256 upvalues, y esto queda como **limitación conocida**.
+
+#### Cerrar upvalues
+
+El último problema a resolver era qué pasa cuando un bloque termina o una función retorna y sus variables salen del stack: si alguna estaba capturada como upvalue, el closure quedaría apuntando a un lugar inválido. El libro trata de aprovechar lo máximo posible la velocidad del stack, entonces usa la variable ahí mientras pueda y recién cuando está por salir la pasa al heap.
+
+Para eso, cuando el compilador encuentra un upvalue que es local de la función que la envuelve, marca esa local como IsCaptured. La marca queda en las locales de la función que declaró la variable (el enclosing de la interna), que es quien luego la va a sacar del stack. Si el upvalue hallado no es local de la de afuera, no hay que marcarlo porque ya se marcó un nivel más arriba.
+
+Entonces al terminar un bloque, por cada local emite `OP_CLOSE_UPVALUE` si fue capturada por una función más interna y `OP_POP` si no, indicándole a la VM que tiene que moverla al heap antes de sacarla, para que luego pueda ser usada. Cuando una función retorna, el compilador no tiene que hacer nada distinto, porque `OP_RETURN` saca todas sus locales de una vez moviendo la ventana y no hay una instrucción por variable que reemplazar (eso lo resuelve la VM cuando lee el `OP_RETURN`).
+Esto también se aplicó a `break` y `continue`, que al sacar las locales del ciclo antes de saltar también emiten `OP_CLOSE_UPVALUE` para las que estén capturadas.
+
 ### Clases
 
 #### Declaracion de clases
