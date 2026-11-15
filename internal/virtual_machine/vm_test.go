@@ -2120,6 +2120,68 @@ func TestCallClass(t *testing.T) {
 	})
 }
 
+func TestCallBoundMethod(t *testing.T) {
+	newMethod := func(name string, arity int, body func(chunk *c.Chunk)) *closure {
+		function := c.NewFunction()
+		function.Name = name
+		function.Arity = arity
+		body(&function.Chunk)
+		writeReturnNil(&function.Chunk)
+		return newClosure(function)
+	}
+
+	t.Run("Llamar a un bound method ejecuta el código del método", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		saludar := newMethod("saludar", 0, func(body *c.Chunk) {
+			writeConstant(body, "hola")
+			body.Write(byte(c.OP_PRINT), line)
+		})
+		writeConstant(chunk, newBoundMethod(newInstance(newClass("Persona")), saludar))
+		writeCall(chunk, 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "hola\n")
+	})
+
+	t.Run("Los argumentos quedan atados a los parámetros del método", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		restar := newMethod("restar", 2, func(body *c.Chunk) {
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(1, line)
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(2, line)
+			body.Write(byte(c.OP_SUBTRACT), line)
+			body.Write(byte(c.OP_PRINT), line)
+		})
+		writeConstant(chunk, newBoundMethod(newInstance(newClass("Calculadora")), restar))
+		writeConstant(chunk, 10.0)
+		writeConstant(chunk, 4.0)
+		writeCall(chunk, 2)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "6\n")
+	})
+
+	t.Run("Error si se llama a un bound method con otra cantidad de argumentos", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		acelerar := newMethod("acelerar", 1, func(body *c.Chunk) {})
+		writeConstant(chunk, newBoundMethod(newInstance(newClass("Auto")), acelerar))
+		writeCall(chunk, 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "expected 1 arguments but got 0")
+	})
+}
+
 func TestOpGetProperty(t *testing.T) {
 	getProperty := func(chunk *c.Chunk, object any, name string) {
 		writeConstant(chunk, object)
