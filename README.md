@@ -119,7 +119,7 @@ En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERRO
 - [X] bloques y variables locales
 - [X] Control de flujo
 - [X] Funciones
-- [C] Closures
+- [X] Closures
 - [X] Clases
 - [ ] Herencia
 - [x] Extra propio
