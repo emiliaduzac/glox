@@ -1882,3 +1882,42 @@ func TestCompileBreak(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "';' after break")
 	})
 }
+
+func TestCompileUpvalues(t *testing.T) {
+	t.Run("Leer una local de la función de afuera emite OP_GET_UPVALUE", func(t *testing.T) {
+		chunk := compileSource(t, "fun afuera() { var x = 1; fun adentro() { print x; } }")
+
+		afuera := chunk.Constants[1].(*c.Function)
+		adentro := afuera.Chunk.Constants[1].(*c.Function)
+		assertBytes(t, &adentro.Chunk, byte(c.OP_GET_UPVALUE), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, &afuera.Chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_CLOSURE), 1, 1, 1, // isLocal = 1, indice de x en afuera = 1
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Asignar una local de la función de afuera emite OP_SET_UPVALUE", func(t *testing.T) {
+		chunk := compileSource(t, "fun afuera() { var x = 1; fun adentro() { x = 2; } }")
+
+		afuera := chunk.Constants[1].(*c.Function)
+		adentro := afuera.Chunk.Constants[1].(*c.Function)
+		assertBytes(t, &adentro.Chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_SET_UPVALUE), 0,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Con tres niveles, la función del medio también captura la variable", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() { var x = 1; fun b() { fun c() { print x; } } }")
+
+		a := chunk.Constants[1].(*c.Function)
+		b := a.Chunk.Constants[1].(*c.Function)
+		assertBytes(t, &a.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_CLOSURE), 1, 1, 1, byte(c.OP_NIL), byte(c.OP_RETURN)) // b captura la local 1 de a
+		assertBytes(t, &b.Chunk, byte(c.OP_CLOSURE), 0, 0, 0, byte(c.OP_NIL), byte(c.OP_RETURN))                         // c captura el upvalue 0 de b
+	})
+}

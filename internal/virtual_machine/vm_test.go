@@ -36,10 +36,13 @@ func writeConstant(chunk *c.Chunk, value any) {
 	chunk.Write(byte(index), line)
 }
 
-func writeClosure(chunk *c.Chunk, function *c.Function) {
+func writeClosure(chunk *c.Chunk, function *c.Function, upvalues ...byte) {
 	index := chunk.AddConstant(function)
 	chunk.Write(byte(c.OP_CLOSURE), line)
 	chunk.Write(byte(index), line)
+	for _, b := range upvalues {
+		chunk.Write(b, line)
+	}
 }
 
 func writeGetGlobal(chunk *c.Chunk, name string) {
@@ -1900,5 +1903,101 @@ func TestOpLoop(t *testing.T) {
 
 		utils.AssertNoError(t, err)
 		utils.AssertValue(t, out.String(), "")
+	})
+}
+
+func TestUpvalues(t *testing.T) {
+	// printUpvalue arma una función con upvalue
+	//   fun adentro() { print x; }
+	printUpvalue := func() *c.Function {
+		adentro := c.NewFunction()
+		adentro.UpvalueCount = 1
+		adentro.Chunk.Write(byte(c.OP_GET_UPVALUE), line)
+		adentro.Chunk.Write(0, line)
+		adentro.Chunk.Write(byte(c.OP_PRINT), line)
+		adentro.Chunk.Write(byte(c.OP_NIL), line)
+		adentro.Chunk.Write(byte(c.OP_RETURN), line)
+		return adentro
+	}
+	// f();
+	callAndDiscard := func(chunk *c.Chunk) {
+		writeCall(chunk, 0)
+		chunk.Write(byte(c.OP_POP), line)
+	}
+	returnNil := func(chunk *c.Chunk) {
+		chunk.Write(byte(c.OP_NIL), line)
+		chunk.Write(byte(c.OP_RETURN), line)
+	}
+
+	t.Run("OP_GET_UPVALUE lee una local de la función de afuera", func(t *testing.T) {
+		// fun afuera() { var x = "hola"; fun adentro() { print x; } adentro(); }  afuera();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		afuera := c.NewFunction()
+		writeConstant(&afuera.Chunk, "hola")
+		writeClosure(&afuera.Chunk, printUpvalue(), 1, 1) // captura la local 1 de afuera: x
+		callAndDiscard(&afuera.Chunk)
+		returnNil(&afuera.Chunk)
+		writeClosure(chunk, afuera)
+		callAndDiscard(chunk)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "hola\n")
+	})
+
+	t.Run("OP_SET_UPVALUE cambia la variable de la función de afuera", func(t *testing.T) {
+		// fun afuera() { var x = 1; fun adentro() { x = 2; } adentro(); print x; }  afuera();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		adentro := c.NewFunction()
+		adentro.UpvalueCount = 1
+		writeConstant(&adentro.Chunk, 2.0)
+		adentro.Chunk.Write(byte(c.OP_SET_UPVALUE), line)
+		adentro.Chunk.Write(0, line)
+		adentro.Chunk.Write(byte(c.OP_POP), line)
+		returnNil(&adentro.Chunk)
+		afuera := c.NewFunction()
+		writeConstant(&afuera.Chunk, 1.0)
+		writeClosure(&afuera.Chunk, adentro, 1, 1)
+		callAndDiscard(&afuera.Chunk)
+		afuera.Chunk.Write(byte(c.OP_GET_LOCAL), line)
+		afuera.Chunk.Write(1, line)
+		afuera.Chunk.Write(byte(c.OP_PRINT), line)
+		returnNil(&afuera.Chunk)
+		writeClosure(chunk, afuera)
+		callAndDiscard(chunk)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "2\n") // afuera ve el cambio: es la misma variable
+	})
+
+	t.Run("Con tres niveles, la función de adentro usa el upvalue de la del medio", func(t *testing.T) {
+		// fun a() { var x = "hola"; fun b() { fun c() { print x; } c(); } b(); }  a();
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		b := c.NewFunction()
+		b.UpvalueCount = 1
+		writeClosure(&b.Chunk, printUpvalue(), 0, 0) // c comparte el upvalue 0 de b
+		callAndDiscard(&b.Chunk)
+		returnNil(&b.Chunk)
+		a := c.NewFunction()
+		writeConstant(&a.Chunk, "hola")
+		writeClosure(&a.Chunk, b, 1, 1) // b captura la local 1 de a
+		callAndDiscard(&a.Chunk)
+		returnNil(&a.Chunk)
+		writeClosure(chunk, a)
+		callAndDiscard(chunk)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "hola\n")
 	})
 }
