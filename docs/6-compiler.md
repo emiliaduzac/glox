@@ -1,4 +1,4 @@
-## Compiler
+# Compiler
 
 Siguiendo la clase y el libro, nuestro compilador tendrá dos responsabilidades:
 
@@ -8,7 +8,7 @@ Siguiendo la clase y el libro, nuestro compilador tendrá dos responsabilidades:
 Es decir que reemplazará a nuestro **parser** y a nuestro **resolver**. Esto se define como un **Single Pass Compiler**: de los tokens pasamos directamente a bytecode, emitiendo a medida que leemos (la entrada son los _tokens_ y la salida son los _chunks_).
 Otras implementaciones de compiladores aprovechan el AST parseado, pero el libro elige un single pass compiler por su simplicidad. Además, indica que originalmente muchos compiladores se hacían de esta forma por razones de memoria y que este enfoque podría no servir para cualquier lenguaje, pero Lox lo permite por ser de tipado dinámico: el compilador no necesita conocer los tipos de lo que todavía no leyó, porque se resuelven en tiempo de ejecución.
 
-### Comparación con la primera entrega
+## Comparación con la primera entrega
 
 **Tree-walk**: scanner → parser → resolver → interpreter
 
@@ -18,17 +18,23 @@ Para mantener ambos enfoques y evitar duplicar código, se agregó un `TokenCurs
 
 Además nos guardamos el anterior, que el compilador usa para saber en qué línea está cada instrucción que emite. Al avanzar se guarda lo que se consumió como anterior, así que siempre existe uno y eso cubre un caso más borde que nos importa, el caso de que llega solo un `EOF`, que sería un programa vacío, ahí no se rompe, como sí pasaría si calculáramos el anterior como `actual - 1`, porque ahí no habría nada en el anterior.
 
-### Pratt Parser
+## Pratt Parser
 
-Para la etapa de parseo de expresiones, se utiliza el algoritmo _Pratt Parser_. A diferencia del _Recursive Descent Parser_ de nuestro [parser](2-parser.md), donde cada nivel de precedencia tiene su propia regla y su propia función, el Pratt Parser usa una **tabla** y una única función: a medida que recorre los tokens, obtiene la información de cada uno desde la tabla y ejecuta lo que corresponda.
+Para la etapa de parseo de expresiones, se utiliza el algoritmo _Pratt Parser_. A diferencia del _Recursive Descent Parser_ de nuestro [parser anterior](2-parser.md), donde cada nivel de precedencia tiene su propia regla y su propia función, el Pratt Parser usa una **tabla** y una única función: a medida que recorre los tokens, obtiene la información de cada uno desde la tabla y ejecuta lo que corresponda.
 
 La tabla ([`precedence.go`](../internal/compiler/precedence.go)) indica para cada tipo de token:
 
-- **prefix**: dice que hacer si el token empieza una expresión
+- **prefix**: que hacer si el token empieza una expresión. Por ejemplo, el `-` en `-1`.
 - **infix**: que hacer si el token aparece después de un operando. Por ejemplo, el `+` en `1 + 2`.
-- **precedence**: qué tan fuerte es el token como operador infijo (es lo que nos dice precedencia. Por ejemplo, `*` tiene un nivel mayor de precedencia que `+`)
+- **precedence**: qué tan fuerte es el token como operador infijo. Por ejemplo, `*` tiene un nivel mayor de precedencia que `+`.
 
-### Expresiones
+Una diferencia con el libro es cómo armamos la tabla. En clox es un array con una entrada para todos los tokens, incluso los que no participan en expresiones. Nosotros usamos un `map`, y como un token que no está devuelve el valor cero (sin funciones y con `PREC_NONE`), solo listamos los que importan: los que no están obtienen el comportamiento esperado igual.
+
+Además, para las funciones hicimos un tipo `parseFn func(c *Compiler, canAssign bool) error`, y la tabla guarda métodos del compilador, como `(*Compiler).binary`, que al llamarlos reciben el compilador como primer parámetro y devuelven un `error`.
+
+Por último, la tabla y las funciones de parseo dependen una de la otra: la tabla referencia a las funciones, y las funciones usan la tabla a través de `getRule()`. En C, el libro lo resuelve declarando `getRule()` antes de las funciones y definiéndola después de la tabla. En Go, inicializar la tabla directamente da un error de _initialization cycle_, así que la armamos dentro de `init()`.
+
+## Expresiones
 
 Para compilar expresiones, la función `parsePrecedence(precedence)` recibe una precedencia, que indica la mínima que puede aceptar. Funciona así:
 
@@ -54,7 +60,7 @@ Cuando se llama a una de esas funciones, lo que está a la izquierda del operado
 - Si la función pide una precedencia **mayor** que la del operador actual, un operador que tenga el mismo nivel no alcanzaría el mínimo, así que no entra a la expresión: queda para la de afuera. La asociatividad es **a izquierda**.
 - Si pide la **misma o una menor**, el siguiente operador sí alcanza el mínimo, así que entra y se resuelve primero. La asociatividad es **a derecha**.
 
-### Statements
+## Statements
 
 Con los statements, un programa pasa a ser una lista de declaraciones que se compilan hasta llegar a un `EOF`. Acá aparecen dos funciones: `declaration`, que si lo que viene empieza con `var` compila la declaración de la variable, y si no se lo pasa a `statement`. Esta última compila el resto de las sentencias: `print`, bloques, `if`, ciclos y las expresiones que terminan en `;`. Las separamos así porque, como explica el libro, en Lox una declaración no puede ser el cuerpo de un `if` o un `while`, ya que no quedaría claro hasta dónde llega la variable.
 
@@ -64,7 +70,7 @@ Esto es importante porque, si cada statement dejara algo en el stack, con muchos
 
 Para asegurarnos de que esto se cumpla, cuando termina el script la VM verifica que el stack haya quedado vacío y si no levanta un error, porque significa que el compilador dejó algo de más.
 
-### Manejo de errores
+## Manejo de errores
 
 Acá llegó un gran cambio frente al tree-walk de la primera parte: este, al detectar un error, cortaba y solo mostraba ese, pero no seguía para ver si habían más errores y devolverlos todos a la vez. Si bien funciona, acá creemos que llega un poco más de salto de calidad en cuanto a la experiencia que se puede percibir de esta segunda parte, porque la idea es seguir así se muestran todos los errores y se pueden corregir todos juntos. Si no, en un caso de muchos errores, te mostraría el primer error, el programador tendría que corregirlo, y luego vería otro error que ya existía pero venía después del primero, así que no se había enterado.
 Pero seguir después del primero trae un detalle a tener en cuenta, el compilador queda parado en una línea rota, que si sigue leyendo levantaría errores falsos propios de donde retoma, entonces para eso entra la **sincronización** que es avanzar hasta llegar a que empiece un statement nuevo o un `var`, `print` y desde ahí recién seguir compilando.
@@ -74,7 +80,7 @@ Una diferencia más con el libro es que, en C, reportar un error no corta la eje
 
 Al terminar de compilar, si hubo errores, se devuelven todos juntos en un solo error, así se pueden ver todos de una vez en lugar de ir arreglándolos de a uno. Además, en ese caso no se devuelve el chunk: el bytecode generado puede estar incompleto (por ejemplo, con saltos sin completar), así que la VM no llega a ejecutar nada.
 
-### Variables globales
+## Variables globales
 
 En la primera parte una variable global era una entrada más del `Environment` y el intérprete la buscaba por nombre cuando la necesitaba. Acá el compilador no se guarda el valor de la variable, lo que hace es emitir las instrucciones para que la VM se encargue cuando se ejecuta. Las globales en Lox se resuelven tarde (_late bound_), es decir que se buscan por nombre recién en la ejecución. El tema es que un nombre es un string y no entra como operando de una instrucción, que es de un solo byte. Para resolver esto, el nombre se guarda entre las constantes del chunk y la instrucción lleva la posición donde quedó. Y para saber si una variable es global pasa lo mismo que con el resolver de la primera parte, si no se encuentra en ningún scope local se considera global.
 
@@ -96,7 +102,7 @@ El tema acá es que como compilamos en una sola pasada, cuando se lee `a` todav�
 
 En el libro cada vez que aparece una variable se guarda su nombre de nuevo entre las constantes, y deja como ejercicio evitarlo. Sabemos que con el límite de 256 constantes esto es un problema si en un programa se usa muchas veces la misma variable, porque cada uso gasta un lugar, por lo tanto lo quisimos resolver. En el compilador decidimos crear un `map` de nombre a posición para saber si una variable ya apareció, porque nos pareció la forma más simple y que no toca nada de la VM. Si ya apareció, reusamos esa posición en vez de guardarla otra vez, así que a la VM no le cambia nada porque sigue recibiendo una posición que apunta al nombre correcto. El costo que nos queda es una consulta al `map` cada vez que se usa una variable al compilar. Los números y strings literales no los tocamos, esos se siguen guardando cada vez que aparecen.
 
-### Variables locales y scopes
+## Variables locales y scopes
 
 En nuestra implementación anterior, en el manejo de scopes tenían un rol importante el resolver y el intérprete. El resolver ayudaba a dejar definido antes del runtime a qué distancia estaba cada variable definida, para que luego el intérprete usara eso en vez de calcularlo en ejecución. Con esa distancia, el intérprete subía hasta el entorno correspondiente y ahí buscaba la variable por nombre.
 
@@ -111,9 +117,9 @@ Al finalizar el bloque, resta uno a la profundidad y elimina de su stack falso l
 
 Un detalle más sobre las variables locales es que puede haber como máximo 255 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255, y el slot 0 queda reservado para la función.
 
-### Control de flujo
+## Control de flujo
 
-#### If - Else
+### If - Else
 
 En el tree-walk interpreter, un `if` de Lox se ejecutaba directamente con un if de Go. En el bytecode compiler, en cambio, lo implementamos como lo haría una CPU: con saltos.
 
@@ -139,7 +145,7 @@ OP_POP // a partir de acá, solo si la condición dio falsa, aunque no haya cuer
 <lo que sigue>
 ```
 
-#### Operadores lógicos
+### Operadores lógicos
 
 Para los operadores lógicos tampoco vamos a crear nuevas instrucciones: vamos a aprovechar los saltos.
 
@@ -148,7 +154,7 @@ Para los operadores lógicos tampoco vamos a crear nuevas instrucciones: vamos a
 
 Algo interesante, igual que en la implementación anterior, es que el resultado no es necesariamente un booleano, sino uno de los dos operandos tal cual. Cuál de los dos depende de si el primero es *truthy* (en Lox, todo menos `false` y `nil`). Por ejemplo, `"hola" or "chau"` da `"hola"`, porque `"hola"` es *truthy*.
 
-#### Iteraciones
+### Iteraciones
 
 Para los ciclos necesitamos saltar hacia **atrás**, para volver a ejecutar una parte del código. Para eso agregamos una nueva instrucción: `OP_LOOP`. Funciona igual que `OP_JUMP` pero resta en vez de sumar. A diferencia de los otros saltos, no necesita backpatching: cuando se emite, ya sabemos a dónde tiene que volver: el inicio del ciclo, que ya fue compilado.
 
@@ -162,20 +168,22 @@ Para los ciclos necesitamos saltar hacia **atrás**, para volver a ejecutar una 
   - Al final del incremento, otro `OP_LOOP` vuelve a la condición.
   Si no hay incremento, el cuerpo vuelve directamente a la condición, como en el `while`. Por último, se completa el salto de salida de la condición.
 
-### Funciones
+## Funciones
 
-#### El script como función
+### El script como función
 
 Un salto que se da importante al momento de llegar a funciones es que el compilador ya no escribe un chunk ahí suelto, sino que ahora lo hace en una función. Por lo que por este motivo ahora compile pasa a devolver una función. Un detalle es que ahora el programa completo sería como una función implícita. Es por esto que el compilador siempre está dentro de una función y la VM se ejecuta en una. Pero sí que tenemos la observación que esto no es para las globales que tienen un alcance propio. Otro punto a tener en cuenta es que ahora sí distingue entre una función y el script.
 
 Algo importante que se agrega con todo esto es lo del slot 0 en el stack, reservado para que la VM ponga la función que está ejecutando, y por ende, como el operando es de un byte hay 256 lugares y el slot 0 ocupa uno, ahora pasa a soportar hasta 255 variables locales, a diferencia del tree-walk, por lo que esto pasa a ser una **limitación conocida que tenemos en esta versión**.
 
-#### Una funcion con su propio chunk
+### Una funcion con su propio chunk
+
 Agregar funciones hizo que pasemos de que el compilador escriba todo en un único chunk, a que teniendo funciones cada una tiene su propio código entonces la VM tiene que poder pasar de uno a otro cuando se llama a una función. En el libro marca que una función en lox es un valor como un número o string, así que tiene que poder guardarse como una variable. Además tiene un nombre para identificarla, su propio chunk y los parámetros, los cuales chequeamos para saber si recibe los esperados.
 
 En cuanto a una diferencia importante en general con el libro es que en estos capítulos usa C para implementar clox, por lo que tiene que hacer manejo de memoria, pero nosotros en glox lo usamos como un struct común que luego se libera por el garbage collector propio de Go cuando no tiene más referencias.
 
-#### Declaracion de fucniones
+### Declaracion de fucniones
+
 Cuando el compilador esta compilando el script y se topa con una funcoin tiene que dejar ahi y pasar a compialr el cuempo de esa funcion porqu eva a tener su chunk, su variables locales yc uando termine tiene que vovler al scrip donde habia quedado. Pra resolver esto el libro plantea tener un compilador neuvo por cad afuncion y cad auno cuarda una referecia al compilador de la funcion que lo continee que eso es el enclosing., asi soabe donde vovler. 
 
 Aca suge una diferencia con el libro, porque ahhi propone guardar lo que comparten todos los compiladores en dos variables globales, parser (por dónde va leyendo los tokens, los errores que encontró y si está en modo pánico) y current (el compilador de la función que se está compilando, que se cambia al entrar a una función y se vuelve a poner al salir).
@@ -184,23 +192,24 @@ Nosotros lo hicimos distinto al libro donde current es un puntero que hay que ir
 
 Entonces lo que se comparte lo juntamos en parserState, que usan todos los compiladores por puntero, y lo propio de cada función queda en su Compiler. Se comparte por puntero porque tiene que haber un solo cursor, una sola lista de errores y un solo modo pánico. Si cada función tuviera una copia, cuando termina el cuerpo de una función el compilador de afuera no sabría por dónde seguir leyendo.
 
-#### Parametros
+### Parametros
 
 Los parametros de una funcion para nosotros son varibles locales de la funcion, y cada uno suma a la aridad de la misma. Asi que los aprametros ocupan las primeras posiciones que siguen depues de la funcion misma que es donde la vm deja los agumento cuando se llma asi que no hace falta copiar anda ahi. El maximo sigue siendo de 255 parametro igual que la primera parte del tree-walk.
 
-#### Llamadas
+### Llamadas
+
 Una llamada a la funcion como por ejemplo add(1,2) para compilarla, primero se compila lo que se queire llamar que es add en este caso, despues los argumentos de izquierda a derecha y al final se emite un OP_CALL que lleva al cantidad de argumentos. Como esa cantidad va en un byte enteonces la maxima cantidad es de 255 igual que en el tree walk. 
 Para qu el compilador puede reconocer la llmada , el '(' pasa a ser un operador infijo en el pratt parser con la precedencia de llamada.  
 
-#### Return
+### Return
 
 El return es un statement que si tiene una expresión la compila y emite un OP_RETURN, y si no tiene devuelve nil, es decir que emite un OP_NIL y un OP_RETURN igual que lo que se agrega al final de cada función. Acá hay una diferencia importante con el tree-walk, porque allá el recorrido era recursivo y para salir de varias llamadas anidadas usamos como un truco que era que el ReturnValue sube como si fuera un error. En la VM eso no hace falta porque el bytecode es una secuencia plana y el return es una instrucción más, que corta la llamada y vuelve al frame anterior como vimos en return de la VM.
 
 Un return fuera de una función no tiene sentido porque no hay nada de donde salir. Para detectarlo el compilador se fija si lo que está compilando es el script y si es así da un error. Ese error no corta la compilación si no que sigue leyendo para avisar si hay más errores porque el código está bien escrito y solo rompe una regla del lenguaje. Con esto nos acomplamso a lo que dice el libro que se podria permitir esto pero elige que sea un error. 
 
-### Closures
+## Closures
 
-#### Variables de otra función
+### Variables de otra función
 
 Al definir las funciones, permitíamos que estas usaran las variables declaradas dentro de su propio cuerpo (locales) o las globales, pero como las funciones se pueden anidar, podrían usar variables que son locales de otra función que las envuelve, y ahí no calificarían ni como globales ni como locales de la función más interna. Además, la función interna se podría devolver o guardar en una variable de afuera y seguir viva después de que la función que la envuelve retornó y su ventana se sacó del stack, junto con la variable que la interna necesitaba.
 
@@ -208,7 +217,7 @@ Otro problema es que la declaración de una función interna se ejecuta una vez 
 
 En el tree-walk interpreter esto no pasaba porque cada scope era un `Environment` en el heap y cada función guardaba una referencia al suyo, así que seguía vivo mientras se lo usara.
 
-#### Function y Closure
+### Function y Closure
 
 Para resolverlo el libro separa la función en dos:
 
@@ -217,14 +226,14 @@ Para resolverlo el libro separa la función en dos:
 
 Así el código de la función es el mismo, pero cada closure tiene sus propias variables.
 
-#### Upvalues
+### Upvalues
 
 Ahora, cuando compilamos el cuerpo de una función y encontramos una variable, buscamos en este orden: es local? → es un upvalue? → es global?. Por este orden, si una local tiene el mismo nombre que una variable de afuera, gana la local (como pasaba antes entre locales y globales).
 
 Un **upvalue** es una variable local pero externa: la función la usa, pero no la declaró ella, sino otra función que la envuelve.
 Para validar si es un upvalue, primero se busca en las locales del `enclosing` y, si no está, se ve si el `enclosing` la tiene como upvalue propio. Para que esto funcione, una función captura no solo las variables de afuera que usa ella, sino también las que usan las funciones declaradas dentro suyo. Esto es porque cuando se crea el closure de una función interna, solo se está ejecutando la que la envuelve directamente, y las de más arriba podrían haber retornado, así que la del medio es la única que puede pasarle la variable.
 
-#### Cambios en el compilador
+### Cambios en el compilador
 
 Lo primero que tuvimos que hacer es dejar de emitir `OP_CONSTANT` para las funciones y emitir `OP_CLOSURE`, para que la VM distinga y sepa que tiene que crear el closure.
 
@@ -234,7 +243,7 @@ Como la VM no tiene acceso al `Compiler`, después del `OP_CLOSURE` el compilado
 
 Si una función usa la misma variable varias veces, se guarda un solo upvalue para no ocupar lugares de más en el slice. Como su posición se emite en un byte, una función puede tener hasta 256 upvalues, y esto queda como **limitación conocida**.
 
-#### Cerrar upvalues
+### Cerrar upvalues
 
 El último problema a resolver era qué pasa cuando un bloque termina o una función retorna y sus variables salen del stack: si alguna estaba capturada como upvalue, el closure quedaría apuntando a un lugar inválido. El libro trata de aprovechar lo máximo posible la velocidad del stack, entonces usa la variable ahí mientras pueda y recién cuando está por salir la pasa al heap.
 
@@ -243,9 +252,9 @@ Para eso, cuando el compilador encuentra un upvalue que es local de la función 
 Entonces al terminar un bloque, por cada local emite `OP_CLOSE_UPVALUE` si fue capturada por una función más interna y `OP_POP` si no, indicándole a la VM que tiene que moverla al heap antes de sacarla, para que luego pueda ser usada. Cuando una función retorna, el compilador no tiene que hacer nada distinto, porque `OP_RETURN` saca todas sus locales de una vez moviendo la ventana y no hay una instrucción por variable que reemplazar (eso lo resuelve la VM cuando lee el `OP_RETURN`).
 Esto también se aplicó a `break` y `continue`, que al sacar las locales del ciclo antes de saltar también emiten `OP_CLOSE_UPVALUE` para las que estén capturadas.
 
-### Clases
+## Clases
 
-#### Declaracion de clases
+### Declaracion de clases
 
 Compilar una clase se hace como una declaración de una variable pero usando OP_CLASS que crea la clase y después esta se define como una variable global o queda como local en su slot. Si queda como local las reglas que ya tenemos siguen valiendo para las clases, como el shadowing para una variable de afuera, y que es un error repetir el nombre en el mismo scope local. Y en cuanto a si queda global vale la regla de que sí se puede redeclarar como pasa cuando usamos var.
 
@@ -255,7 +264,7 @@ Cuando hay una variable local, ya sea que fue por fun o var, parseVariable no ag
 
 Una diferencia con el libro es que el consume del libro reporta el error y la función sigue, pero en Go devuelve el error y hay que cortar, es por eso que classDeclaration devuelve error y en el libro tienen un void.
 
-#### Get y set de propiedades
+### Get y set de propiedades
 
 Agregamos el punto, que es un operador infijo porque tiene algo a izquierda que es la expresión de la instancia, pero además este operador suma que tiene a la derecha también algo, que es un nombre y no una expresión. Si suponemos el ejemplo de que tenemos el x.a, ahí el 'a' no es una variable sino un nombre que tenemos que guardarnos y lo hacemos entre las constantes para que después la vm pueda buscar eso para la instancia.
 
@@ -265,7 +274,7 @@ Particularmente sobre el set y el get, se fija si se puede asignar y si viene un
 
 Una diferencia que ya viene de antes es el tema de las constantes cuando aparece un nombre, porque el libro agrega una nueva y nosotros la reutilizamos, esto lo mencionamos antes, y aca se vuelve a hacer uso de esto que ayuda a no llegar tan rápido al límite de 256 constantes por función. Un detalle es que esto pasa tanto para algo como a.x + a.x que usa la misma x, como también si hacemos algo como x.x, donde la variable x y el campo x comparten la misma constante porque se guarda por nombre.
 
-### Tests
+# Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
 
