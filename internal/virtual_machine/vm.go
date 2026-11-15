@@ -275,6 +275,26 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			vm.stack[len(vm.stack)-1] = value
 
+		case c.OP_SET_PROPERTY:
+			object, err := vm.peek(1)
+			if err != nil {
+				return err
+			}
+			instance, ok := object.(*instance)
+			if !ok {
+				return errors.NewLoxError(vm.currentLine(), "only instances have fields")
+			}
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			value, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			instance.fields[name] = value
+			vm.stack[len(vm.stack)-1] = value
+
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
 			offset, err := vm.readShort()
