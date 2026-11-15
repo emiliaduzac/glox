@@ -118,7 +118,8 @@ En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERRO
 - [X] statements, variables globales 
 - [X] bloques y variables locales
 - [X] Control de flujo
-- [ ] Funciones y closures
+- [X] Funciones
+- [ ] Closures
 - [ ] Clases y herencia
 - [x] Extra propio
 - [ ] Uso real del lenguaje
