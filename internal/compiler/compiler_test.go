@@ -16,9 +16,9 @@ func compileSource(t *testing.T, source string) *c.Chunk {
 	tokens, err := scanner.NewScanner(source).Scan()
 	utils.AssertNoError(t, err)
 
-	chunk, err := NewCompiler(tokens).Compile()
+	function, err := NewCompiler(tokens).Compile()
 	utils.AssertNoError(t, err)
-	return chunk
+	return &function.Chunk
 }
 
 // compileSourceError escanea el código fuente (que debe ser válido para el scanner) y devuelve el error del compilador.
@@ -61,7 +61,415 @@ func assertBytes(t *testing.T, chunk *c.Chunk, expected ...byte) {
 
 func assertExprBytes(t *testing.T, chunk *c.Chunk, expected ...byte) {
 	t.Helper()
-	assertBytes(t, chunk, slices.Concat(expected, []byte{byte(c.OP_PRINT), byte(c.OP_RETURN)})...)
+	assertBytes(t, chunk, slices.Concat(expected, []byte{byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN)})...)
+}
+
+func TestCompileScript(t *testing.T) {
+	t.Run("Un programa se compila a una función sin nombre y sin parámetros, que es el script", func(t *testing.T) {
+		tokens, err := scanner.NewScanner("print 1;").Scan()
+		utils.AssertNoError(t, err)
+
+		function, err := NewCompiler(tokens).Compile()
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, function.Name, "")
+		utils.AssertValue(t, function.Arity, 0)
+		utils.AssertValue(t, utils.Stringify(function), "<script>")
+		assertBytes(t, &function.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+}
+
+func TestCompileFunctionDeclaration(t *testing.T) {
+	t.Run("Una función global se guarda como constante y se define como variable global", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() {}")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		utils.AssertValue(t, chunk.Constants[0], "f")
+		function := chunk.Constants[1].(*c.Function)
+		utils.AssertValue(t, function.Arity, 0)
+		assertBytes(t, &function.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("El cuerpo se compila en el chunk de la función y no en el del script", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() { print 1; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+		utils.AssertValue(t, len(function.Chunk.Constants), 1)
+		utils.AssertValue(t, function.Chunk.Constants[0], 1.0)
+		utils.AssertValue(t, len(chunk.Constants), 2)
+	})
+
+	t.Run("Dentro de un bloque la función es una variable local", func(t *testing.T) {
+		chunk := compileSource(t, "{ fun f() {} }")
+
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
+		_, isFunction := chunk.Constants[0].(*c.Function)
+		utils.AssertValue(t, isFunction, true)
+	})
+
+	t.Run("Una función declarada dentro de otra queda en el chunk de la de afuera", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() { fun b() {} }")
+
+		outer := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &outer.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		_, isFunction := outer.Chunk.Constants[0].(*c.Function)
+		utils.AssertValue(t, isFunction, true)
+	})
+
+	t.Run("Las variables del cuerpo son locales de la función y no se sacan con OP_POP al terminar", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() { var x = 1; print x; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_GET_LOCAL), 1, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("Al final del cuerpo de una función se emite OP_NIL antes de OP_RETURN", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() {}")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("Cada función tiene su propia tabla de constantes", func(t *testing.T) {
+		chunk := compileSource(t, "var a; fun f() { print a; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_NIL),
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_DEFINE_GLOBAL), 1,
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		function := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+		utils.AssertValue(t, function.Chunk.Constants[0], "a")
+	})
+
+	t.Run("Errores de sintaxis en la declaración", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			source   string
+			expected string
+		}{
+			{"falta el nombre", "fun () {}", "function name"},
+			{"falta el paréntesis que abre", "fun f {}", "'(' after function name"},
+			{"falta el paréntesis que cierra", "fun f(a {}", "')' after parameters"},
+			{"falta la llave que abre", "fun f() print 1;", "'{' before function body"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, test.expected)
+			})
+		}
+	})
+
+	t.Run("Un error dentro del cuerpo se suma a los demás y el compilador sigue", func(t *testing.T) {
+		errs := compileErrors(t, "fun f() { print 1 +; } print 2 +;")
+
+		utils.AssertValue(t, len(errs), 2)
+	})
+
+	t.Run("Una función no puede ser el cuerpo de un if sin bloque", func(t *testing.T) {
+		err := compileSourceError(t, "if (true) fun f() {}")
+
+		utils.AssertError(t, err)
+	})
+}
+
+func TestCompileFunctionParameters(t *testing.T) {
+	paramsSource := func(n int) string {
+		names := make([]string, n)
+		for i := range names {
+			names[i] = fmt.Sprintf("a%d", i)
+		}
+		return "fun f(" + strings.Join(names, ", ") + ") {}"
+	}
+
+	arityTests := []struct {
+		name   string
+		source string
+		arity  int
+	}{
+		{"sin parámetros", "fun f() {}", 0},
+		{"un parámetro", "fun f(a) {}", 1},
+		{"varios parámetros", "fun f(a, b) {}", 2},
+	}
+	for _, test := range arityTests {
+		t.Run("La aridad de la función es igual a la cantidad de parámetros: "+test.name, func(t *testing.T) {
+			chunk := compileSource(t, test.source)
+
+			function := chunk.Constants[1].(*c.Function)
+			utils.AssertValue(t, function.Arity, test.arity)
+		})
+	}
+
+	t.Run("Los parámetros son variables locales de la función a continuación del slot cero", func(t *testing.T) {
+		chunk := compileSource(t, "fun f(a, b) { print b; print a; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_GET_LOCAL), 2,
+			byte(c.OP_PRINT),
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Una función admite hasta 255 parámetros", func(t *testing.T) {
+		chunk := compileSource(t, paramsSource(255))
+
+		function := chunk.Constants[1].(*c.Function)
+		utils.AssertValue(t, function.Arity, 255)
+	})
+
+	t.Run("Error si una función tiene más de 255 parámetros", func(t *testing.T) {
+		err := compileSourceError(t, paramsSource(256))
+
+		utils.AssertErrorMessage(t, err, "cannot have more than 255 parameters")
+	})
+
+	t.Run("Errores de sintaxis en la lista de parámetros", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			source   string
+			expected string
+		}{
+			{"falta el nombre del parámetro", "fun f(1) {}", "parameter name"},
+			{"coma al final de la lista", "fun f(a,) {}", "parameter name"},
+			{"falta la coma entre parámetros", "fun f(a b) {}", "')' after parameters"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, test.expected)
+			})
+		}
+	})
+}
+
+func TestCompileFunctionName(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		index    int
+		expected string
+	}{
+		{"función global", "fun suma() {}", 1, "suma"},
+		{"función local de un bloque", "{ fun resta() {} }", 0, "resta"},
+		{"función con parámetros", "fun multiplicar(a, b) {}", 1, "multiplicar"},
+	}
+	for _, test := range tests {
+		t.Run("La función se llama como el identificador de su declaración: "+test.name, func(t *testing.T) {
+			chunk := compileSource(t, test.source)
+
+			function := chunk.Constants[test.index].(*c.Function)
+			utils.AssertValue(t, function.Name, test.expected)
+			utils.AssertValue(t, utils.Stringify(function), "<fn "+test.expected+">")
+		})
+	}
+
+	t.Run("Cada función anidada tiene su propio nombre", func(t *testing.T) {
+		chunk := compileSource(t, "fun outer() { fun inner() {} }")
+
+		outer := chunk.Constants[1].(*c.Function)
+		inner := outer.Chunk.Constants[0].(*c.Function)
+		utils.AssertValue(t, outer.Name, "outer")
+		utils.AssertValue(t, inner.Name, "inner")
+	})
+}
+
+func TestCompileReturn(t *testing.T) {
+	t.Run("Un return con valor compila la expresión y emite OP_RETURN", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() { return 5; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_RETURN),
+			byte(c.OP_NIL), byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Un return sin valor equivale a return nil", func(t *testing.T) {
+		chunk := compileSource(t, "fun f() { return; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_NIL), byte(c.OP_RETURN),
+			byte(c.OP_NIL), byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("El valor del return puede ser una expresión con los parámetros", func(t *testing.T) {
+		chunk := compileSource(t, "fun square(a) { return a * a; }")
+
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_MULTIPLY),
+			byte(c.OP_RETURN),
+			byte(c.OP_NIL), byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si hay un return en el nivel superior", func(t *testing.T) {
+		err := compileSourceError(t, "return 1;")
+
+		utils.AssertErrorMessage(t, err, "can't return from top-level code")
+	})
+
+	t.Run("Error si falta el punto y coma después del valor del return", func(t *testing.T) {
+		err := compileSourceError(t, "fun f() { return 1 }")
+
+		utils.AssertErrorMessage(t, err, "';' after return value")
+	})
+}
+
+func TestCompileCall(t *testing.T) {
+	argsSource := func(n int) string {
+		return "f(" + strings.Repeat("nil, ", n-1) + "nil);"
+	}
+
+	t.Run("Una llamada sin argumentos carga la función y emite OP_CALL con cero argumentos", func(t *testing.T) {
+		chunk := compileSource(t, "f();")
+
+		assertBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_CALL), 0, byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("OP_CALL lleva la cantidad de argumentos que se cargan en orden después de la función", func(t *testing.T) {
+		chunk := compileSource(t, "f(1, 2);")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_CALL), 2,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[1], 1.0)
+		utils.AssertValue(t, chunk.Constants[2], 2.0)
+	})
+
+	t.Run("Cada argumento es una expresión completa y la coma los separa", func(t *testing.T) {
+		chunk := compileSource(t, "f(1 + 2, 3 * 4);")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_ADD),
+			byte(c.OP_CONSTANT), 3,
+			byte(c.OP_CONSTANT), 4,
+			byte(c.OP_MULTIPLY),
+			byte(c.OP_CALL), 2,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("La llamada tiene más precedencia que el operador unario", func(t *testing.T) {
+		chunk := compileSource(t, "print -f();")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_NEGATE),
+			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Se puede llamar al resultado de otra llamada", func(t *testing.T) {
+		chunk := compileSource(t, "f()();")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Una llamada admite hasta 255 argumentos", func(t *testing.T) {
+		chunk := compileSource(t, argsSource(255))
+
+		expected := []byte{byte(c.OP_GET_GLOBAL), 0}
+		expected = append(expected, slices.Repeat([]byte{byte(c.OP_NIL)}, 255)...)
+		expected = append(expected, byte(c.OP_CALL), 255, byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, chunk, expected...)
+	})
+
+	t.Run("Error si una llamada tiene más de 255 argumentos", func(t *testing.T) {
+		err := compileSourceError(t, argsSource(256))
+		utils.AssertErrorMessage(t, err, "cannot have more than 255 arguments")
+	})
+
+	t.Run("Error si falta el paréntesis que cierra la lista de argumentos", func(t *testing.T) {
+		err := compileSourceError(t, "f(1;")
+		utils.AssertErrorMessage(t, err, "')' after arguments")
+	})
+
+	t.Run("Error si hay una coma al final de la lista de argumentos", func(t *testing.T) {
+		err := compileSourceError(t, "f(1,);")
+		utils.AssertErrorMessage(t, err, "expected expression")
+	})
+}
+
+func TestCompileEnclosingFunction(t *testing.T) {
+	t.Run("Al terminar una función anidada el compilador sigue escribiendo en la de afuera", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() { fun b() {} print 1; }")
+
+		outer := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &outer.Chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		inner := outer.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &inner.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("Al terminar una función el compilador sigue escribiendo en el script", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() {} print 2;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		function := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &function.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("Las funciones se pueden anidar en más de un nivel", func(t *testing.T) {
+		chunk := compileSource(t, "fun a() { fun b() { fun c() {} } }")
+
+		a := chunk.Constants[1].(*c.Function)
+		assertBytes(t, &a.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		b := a.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &b.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		innermost := b.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &innermost.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
 }
 
 func TestCompileLiterals(t *testing.T) {
@@ -287,6 +695,7 @@ func TestCompileVariableNameConstants(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_GET_GLOBAL), 0,
 			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 		utils.AssertValue(t, len(chunk.Constants), 1)
@@ -301,6 +710,7 @@ func TestCompileVariableNameConstants(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_GET_GLOBAL), 1,
 			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 		utils.AssertValue(t, len(chunk.Constants), 2)
@@ -330,10 +740,10 @@ func TestCompileConstantLimit(t *testing.T) {
 }
 
 func TestCompileProgram(t *testing.T) {
-	t.Run("Un programa vacío solo tiene OP_RETURN", func(t *testing.T) {
+	t.Run("Un programa vacío solo tiene OP_NIL y OP_RETURN", func(t *testing.T) {
 		chunk := compileSource(t, "")
 
-		assertBytes(t, chunk, byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
 	})
 
 	t.Run("Compila varias declaraciones en orden", func(t *testing.T) {
@@ -344,6 +754,7 @@ func TestCompileProgram(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -357,7 +768,7 @@ func TestCompileProgram(t *testing.T) {
 	t.Run("Una expresión como statement se descarta con OP_POP", func(t *testing.T) {
 		chunk := compileSource(t, "1;")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
 	})
 
 	t.Run("Error si falta el punto y coma en una expresión", func(t *testing.T) {
@@ -394,10 +805,10 @@ func TestCompileErrorSynchronization(t *testing.T) {
 		tokens, err := scanner.NewScanner("print 1 +; print 2;").Scan()
 		utils.AssertNoError(t, err)
 
-		chunk, err := NewCompiler(tokens).Compile()
+		function, err := NewCompiler(tokens).Compile()
 
 		utils.AssertError(t, err)
-		utils.AssertValue(t, chunk == nil, true)
+		utils.AssertValue(t, function == nil, true)
 	})
 
 	t.Run("Un error dentro de un bloque anidado se muestra una sola vez", func(t *testing.T) {
@@ -434,7 +845,7 @@ func TestCompileGlobalVarDeclaration(t *testing.T) {
 	t.Run("Una variable global declarada sin valor vale nil", func(t *testing.T) {
 		chunk := compileSource(t, "var a;")
 
-		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
 		utils.AssertValue(t, len(chunk.Constants), 1)
 		utils.AssertValue(t, chunk.Constants[0], "a")
 	})
@@ -442,7 +853,7 @@ func TestCompileGlobalVarDeclaration(t *testing.T) {
 	t.Run("Una variable global declarada con un valor guarda ese valor", func(t *testing.T) {
 		chunk := compileSource(t, "var a = 1;")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
 		utils.AssertValue(t, len(chunk.Constants), 2)
 		utils.AssertValue(t, chunk.Constants[0], "a")
 		utils.AssertValue(t, chunk.Constants[1], 1.0)
@@ -465,7 +876,7 @@ func TestCompileGlobalVariableRead(t *testing.T) {
 	t.Run("Leer una variable global se compila a OP_GET_GLOBAL con su nombre", func(t *testing.T) {
 		chunk := compileSource(t, "print a;")
 
-		assertBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
 		utils.AssertValue(t, len(chunk.Constants), 1)
 		utils.AssertValue(t, chunk.Constants[0], "a")
 	})
@@ -475,7 +886,7 @@ func TestCompileGlobalAssignment(t *testing.T) {
 	t.Run("Asignar una variable global se compila a OP_SET_GLOBAL con su nombre", func(t *testing.T) {
 		chunk := compileSource(t, "a = 1;")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_SET_GLOBAL), 0, byte(c.OP_POP), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_SET_GLOBAL), 0, byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
 		utils.AssertValue(t, len(chunk.Constants), 2)
 		utils.AssertValue(t, chunk.Constants[0], "a")
 		utils.AssertValue(t, chunk.Constants[1], 1.0)
@@ -484,7 +895,7 @@ func TestCompileGlobalAssignment(t *testing.T) {
 	t.Run("Una asignación es una expresión y su valor se puede usar", func(t *testing.T) {
 		chunk := compileSource(t, "print a = 2;")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_SET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_SET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
 	})
 
 	t.Run("La asignación asocia a derecha", func(t *testing.T) {
@@ -495,6 +906,7 @@ func TestCompileGlobalAssignment(t *testing.T) {
 			byte(c.OP_SET_GLOBAL), 1,
 			byte(c.OP_SET_GLOBAL), 0,
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 		utils.AssertValue(t, chunk.Constants[0], "a")
@@ -516,6 +928,7 @@ func TestCompileGlobalAssignment(t *testing.T) {
 			byte(c.OP_ADD),
 			byte(c.OP_SET_GLOBAL), 0,
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 		utils.AssertValue(t, chunk.Constants[0], "saludo")
@@ -545,7 +958,7 @@ func TestCompileBlock(t *testing.T) {
 	t.Run("Los bloques se compilan correctamente", func(t *testing.T) {
 		chunk := compileSource(t, "var a = 1; { print a; }")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
 		utils.AssertValue(t, len(chunk.Constants), 2)
 		utils.AssertValue(t, chunk.Constants[0], "a")
 		utils.AssertValue(t, chunk.Constants[1], 1.0)
@@ -562,7 +975,7 @@ func TestCompileLocalVarDeclaration(t *testing.T) {
 	t.Run("Declarar una variable local no emite una instrucción especial", func(t *testing.T) {
 		chunk := compileSource(t, "{ var a = 1; }")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_RETURN)) // el pop es por el cierre del scope
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN)) // el pop es por el cierre del scope
 		utils.AssertValue(t, len(chunk.Constants), 1)
 		utils.AssertValue(t, chunk.Constants[0], 1.0)
 	})
@@ -570,7 +983,7 @@ func TestCompileLocalVarDeclaration(t *testing.T) {
 	t.Run("Declarar una variable local sin valor es nil", func(t *testing.T) {
 		chunk := compileSource(t, "{ var a; }")
 
-		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_POP), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_NIL), byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
 		utils.AssertValue(t, len(chunk.Constants), 0)
 	})
 
@@ -604,14 +1017,14 @@ func TestCompileLocalLimit(t *testing.T) {
 		return sb.String()
 	}
 
-	t.Run("Un scope admite hasta 256 variables locales", func(t *testing.T) {
-		chunk := compileSource(t, localsSource(256))
+	t.Run("Un scope admite hasta 255 variables locales, porque el slot cero está reservado", func(t *testing.T) {
+		chunk := compileSource(t, localsSource(255))
 
 		utils.AssertValue(t, len(chunk.Constants), 0)
 	})
 
-	t.Run("Error si un scope tiene más de 256 variables locales", func(t *testing.T) {
-		err := compileSourceError(t, localsSource(257))
+	t.Run("Error si un scope tiene más de 255 variables locales", func(t *testing.T) {
+		err := compileSourceError(t, localsSource(256))
 
 		utils.AssertErrorMessage(t, err, "too many local variables in scope")
 	})
@@ -621,7 +1034,7 @@ func TestCompileLocalVariableRead(t *testing.T) {
 	t.Run("Leer una variable local se compila a OP_GET_LOCAL con su indice, no con su nombre", func(t *testing.T) {
 		chunk := compileSource(t, "{ var a = 1; print a; }")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_GET_LOCAL), 0, byte(c.OP_PRINT), byte(c.OP_POP), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_GET_LOCAL), 1, byte(c.OP_PRINT), byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
 		utils.AssertValue(t, len(chunk.Constants), 1)
 		utils.AssertValue(t, chunk.Constants[0], 1.0)
 	})
@@ -630,14 +1043,15 @@ func TestCompileLocalVariableRead(t *testing.T) {
 		chunk := compileSource(t, "{ var a = 1; var b = 2; print b; print a; }")
 
 		assertBytes(t, chunk,
-			byte(c.OP_CONSTANT), 0, // a: indice 0
-			byte(c.OP_CONSTANT), 1, // b: indice 1
-			byte(c.OP_GET_LOCAL), 1, // print b
+			byte(c.OP_CONSTANT), 0, // a: indice 1
+			byte(c.OP_CONSTANT), 1, // b: indice 2
+			byte(c.OP_GET_LOCAL), 2, // print b
 			byte(c.OP_PRINT),
-			byte(c.OP_GET_LOCAL), 0, // print a
+			byte(c.OP_GET_LOCAL), 1, // print a
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -646,14 +1060,15 @@ func TestCompileLocalVariableRead(t *testing.T) {
 		chunk := compileSource(t, "{ var a = 1; { var a = 2; print a; } print a; }")
 
 		assertBytes(t, chunk,
-			byte(c.OP_CONSTANT), 0, // a externa, indice 0
-			byte(c.OP_CONSTANT), 1, // a interna, indice 1
-			byte(c.OP_GET_LOCAL), 1, // print a: lee la interna
+			byte(c.OP_CONSTANT), 0, // a externa, indice 1
+			byte(c.OP_CONSTANT), 1, // a interna, indice 2
+			byte(c.OP_GET_LOCAL), 2, // print a: lee la interna
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
-			byte(c.OP_GET_LOCAL), 0, // print a fuera del bloque interno: lee la externa
+			byte(c.OP_GET_LOCAL), 1, // print a fuera del bloque interno: lee la externa
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -671,9 +1086,10 @@ func TestCompileLocalAssignment(t *testing.T) {
 		assertBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0, // el 1
 			byte(c.OP_CONSTANT), 1, // el 2
-			byte(c.OP_SET_LOCAL), 0, // a esta en la posicion 0 de locals
+			byte(c.OP_SET_LOCAL), 1, // a esta en la posicion 1 de locals (la 0 es el slot reservado)
 			byte(c.OP_POP),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 		utils.AssertValue(t, len(chunk.Constants), 2) // en las constantes van los valores, no el nombre
@@ -685,9 +1101,10 @@ func TestCompileLocalAssignment(t *testing.T) {
 		assertBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0,
 			byte(c.OP_CONSTANT), 1,
-			byte(c.OP_SET_LOCAL), 0,
+			byte(c.OP_SET_LOCAL), 1,
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -699,11 +1116,12 @@ func TestCompileLocalAssignment(t *testing.T) {
 			byte(c.OP_NIL),
 			byte(c.OP_NIL),
 			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_SET_LOCAL), 2,
 			byte(c.OP_SET_LOCAL), 1,
-			byte(c.OP_SET_LOCAL), 0,
 			byte(c.OP_POP),
 			byte(c.OP_POP),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -713,12 +1131,13 @@ func TestCompileLocalAssignment(t *testing.T) {
 
 		assertBytes(t, chunk,
 			byte(c.OP_CONSTANT), 0,
-			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_GET_LOCAL), 1,
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_ADD),
-			byte(c.OP_SET_LOCAL), 0,
+			byte(c.OP_SET_LOCAL), 1,
 			byte(c.OP_POP),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -734,20 +1153,21 @@ func TestCompileLocalAndGlobalVariables(t *testing.T) {
 			byte(c.OP_CONSTANT), 2,
 			byte(c.OP_GET_GLOBAL), 0,
 			byte(c.OP_PRINT),
-			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_GET_LOCAL), 1,
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
 
-	t.Run("Al terminar no quedan locales ni scopes abiertos", func(t *testing.T) {
+	t.Run("Al terminar no quedan locales de usuario ni scopes abiertos", func(t *testing.T) {
 		tokens, _ := scanner.NewScanner("{ var a = 1; print 1 +; } print 2;").Scan()
 		compiler := NewCompiler(tokens)
 		_, err := compiler.Compile()
 
 		utils.AssertError(t, err)
-		utils.AssertValue(t, len(compiler.locals), 0)
+		utils.AssertValue(t, len(compiler.locals), 1)
 		utils.AssertValue(t, compiler.scopeDepth, 0)
 	})
 }
@@ -778,6 +1198,7 @@ func TestCompileIfWithoutElse(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_JUMP), 0, byte(popSize),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -800,6 +1221,7 @@ func TestCompileIfWithoutElse(t *testing.T) {
 			byte(c.OP_POP),
 			byte(c.OP_JUMP), 0, byte(popSize),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -835,6 +1257,7 @@ func TestCompileIfWithElse(t *testing.T) {
 			byte(c.OP_POP),
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -859,6 +1282,7 @@ func TestCompileIfWithElse(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_JUMP), 0, byte(popSize), // externo: no tiene else, solo saltea su POP
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -884,6 +1308,7 @@ func TestCompileIfWithElse(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_JUMP), 0, byte(popSize), // interno: saltea su POP
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -905,6 +1330,7 @@ func TestCompileAnd(t *testing.T) {
 			byte(c.OP_POP),
 			byte(c.OP_FALSE),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -932,6 +1358,7 @@ func TestCompileOr(t *testing.T) {
 			byte(c.OP_POP),
 			byte(c.OP_FALSE),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -961,6 +1388,7 @@ func TestCompileWhile(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_LOOP), 0, byte(backToCondition), // vuelve a evaluar la condición
 			byte(c.OP_POP), // salida: saca la condición
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -985,6 +1413,7 @@ func TestCompileFor(t *testing.T) {
 			byte(c.OP_CONSTANT), 0,
 			byte(c.OP_PRINT),
 			byte(c.OP_LOOP), 0, byte(backToStart),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1002,6 +1431,7 @@ func TestCompileFor(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1012,10 +1442,11 @@ func TestCompileFor(t *testing.T) {
 
 		assertBytes(t, compiled,
 			byte(c.OP_CONSTANT), 0, // var i = 0: se ejecuta una sola vez, antes del ciclo
-			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_GET_LOCAL), 1,
 			byte(c.OP_PRINT),
 			byte(c.OP_LOOP), 0, byte(backToStart),
 			byte(c.OP_POP), // endScope: saca i
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1041,6 +1472,7 @@ func TestCompileFor(t *testing.T) {
 			byte(c.OP_PRINT),
 			byte(c.OP_LOOP), 0, byte(backToIncrement), // después del cuerpo, vuelve al incremento
 			byte(c.OP_POP), // salida: saca la condición
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1098,6 +1530,7 @@ func TestCompileContinue(t *testing.T) {
 			byte(c.OP_LOOP), 0, byte(continueToCondition), // continue
 			byte(c.OP_LOOP), 0, byte(backToCondition), // fin del cuerpo
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1122,6 +1555,7 @@ func TestCompileContinue(t *testing.T) {
 			byte(c.OP_LOOP), 0, byte(continueToIncrement), // continue: vuelve al incremento
 			byte(c.OP_LOOP), 0, byte(backToIncrement), // fin del cuerpo también vuelve al incremento
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1142,6 +1576,7 @@ func TestCompileContinue(t *testing.T) {
 			byte(c.OP_POP), // endScope: saca a
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1161,6 +1596,7 @@ func TestCompileContinue(t *testing.T) {
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
 			byte(c.OP_POP), // endScope final saca a
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1180,6 +1616,7 @@ func TestCompileContinue(t *testing.T) {
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
 			byte(c.OP_POP), // endScope del for: saca i
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1205,6 +1642,7 @@ func TestCompileContinue(t *testing.T) {
 			byte(c.OP_POP), // salida del de adentro
 			byte(c.OP_LOOP), 0, byte(backToOuter),
 			byte(c.OP_POP), // salida del de afuera
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1256,6 +1694,7 @@ func TestCompileBreak(t *testing.T) {
 			byte(c.OP_JUMP), 0, byte(breakToEnd), // break
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1280,6 +1719,7 @@ func TestCompileBreak(t *testing.T) {
 			byte(c.OP_JUMP), 0, byte(breakToEnd), // break: no pasa por el incremento
 			byte(c.OP_LOOP), 0, byte(backToIncrement),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1292,6 +1732,7 @@ func TestCompileBreak(t *testing.T) {
 		assertBytes(t, compiled,
 			byte(c.OP_JUMP), 0, byte(breakToEnd), // break
 			byte(c.OP_LOOP), 0, byte(backToStart),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1312,6 +1753,7 @@ func TestCompileBreak(t *testing.T) {
 			byte(c.OP_POP),
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1331,6 +1773,7 @@ func TestCompileBreak(t *testing.T) {
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1350,6 +1793,7 @@ func TestCompileBreak(t *testing.T) {
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1375,6 +1819,7 @@ func TestCompileBreak(t *testing.T) {
 			byte(c.OP_POP),
 			byte(c.OP_LOOP), 0, byte(backToOuter),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})
@@ -1401,6 +1846,7 @@ func TestCompileBreak(t *testing.T) {
 			byte(c.OP_JUMP), 0, byte(secondBreakToEnd), // segundo break
 			byte(c.OP_LOOP), 0, byte(backToCondition),
 			byte(c.OP_POP),
+			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
 	})

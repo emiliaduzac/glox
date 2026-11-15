@@ -12,21 +12,35 @@ import (
 	"tp-lox/internal/utils"
 )
 
+const (
+	framesMax = 64
+	stackMax  = framesMax * (math.MaxUint8 + 1)
+)
+
+type callFrame struct {
+	function *c.Function
+	ip       int
+	slots    int
+}
+
 type VirtualMachine struct {
-	ip      int
+	frames  []callFrame
 	stack   []any
-	chunk   *c.Chunk
 	out     io.Writer
 	globals map[string]any
 	debug   bool
 }
 
 func NewVirtualMachine() *VirtualMachine {
+	globals := map[string]any{}
+	for name, function := range builtinNatives() {
+		globals[name] = function
+	}
 	return &VirtualMachine{
-		stack:   []any{},
+		frames:  make([]callFrame, 0, framesMax),
+		stack:   make([]any, 0, stackMax),
 		out:     os.Stdout,
-		globals: map[string]any{},
-		debug:   false,
+		globals: globals,
 	}
 }
 
@@ -34,21 +48,25 @@ func (vm *VirtualMachine) SetDebugMode() {
 	vm.debug = true
 }
 
-func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
-	vm.chunk = chunk
-	vm.ip = 0
+func (vm *VirtualMachine) Run(function *c.Function) (err error) {
+	vm.push(function)
 	defer func() {
 		if err != nil {
+			err = vm.withStackTrace(err)
 			vm.resetStack()
 		}
 	}()
+	if err := vm.call(function, 0); err != nil {
+		return err
+	}
 
 	if vm.debug {
 		_, _ = fmt.Fprintln(vm.out, "\n== RUNTIME ==")
 	}
 
-	for vm.ip < len(vm.chunk.Bytes) {
-		start := vm.ip
+	frame := vm.currentFrame()
+	for frame.ip < len(frame.function.Chunk.Bytes) {
+		start := frame.ip
 		b, err := vm.readByte()
 		if err != nil {
 			return err
@@ -57,13 +75,23 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 
 		switch op {
 		case c.OP_RETURN:
-			if len(vm.stack) > 0 {
+			result, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			if len(vm.frames) == 1 && len(vm.stack) > frame.slots+1 {
 				return errors.NewLoxError(vm.currentLine(), "inconsistent Stack Height: should be empty at exit")
 			}
-			if vm.debug {
-				_, _ = fmt.Fprintf(vm.out, "%04d| THE END\n", start)
+			vm.stack = vm.stack[:frame.slots]
+			vm.frames = vm.frames[:len(vm.frames)-1]
+			if len(vm.frames) == 0 {
+				if vm.debug {
+					_, _ = fmt.Fprintf(vm.out, "%04d| THE END\n", start)
+				}
+				return nil
 			}
-			return nil
+			vm.push(result)
+			frame = vm.currentFrame()
 
 		case c.OP_CONSTANT:
 			constant, err := vm.readConstant()
@@ -195,7 +223,7 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			if err != nil {
 				return err
 			}
-			vm.push(vm.stack[slot])
+			vm.push(vm.stack[frame.slots+int(slot)])
 		case c.OP_SET_LOCAL:
 			slot, err := vm.readByte()
 			if err != nil {
@@ -205,7 +233,21 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 			if err != nil {
 				return err
 			}
-			vm.stack[slot] = value
+			vm.stack[frame.slots+int(slot)] = value
+
+		case c.OP_CALL:
+			argCount, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			callee, err := vm.peek(int(argCount))
+			if err != nil {
+				return err
+			}
+			if err := vm.callValue(callee, int(argCount)); err != nil {
+				return err
+			}
+			frame = vm.currentFrame()
 
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
@@ -218,21 +260,21 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 				return err
 			}
 			if !utils.IsTruthy(value) {
-				vm.ip += offset
+				frame.ip += offset
 			}
 		case c.OP_JUMP:
 			offset, err := vm.readShort()
 			if err != nil {
 				return err
 			}
-			vm.ip += offset
+			frame.ip += offset
 
 		case c.OP_LOOP:
 			offset, err := vm.readShort()
 			if err != nil {
 				return err
 			}
-			vm.ip -= offset
+			frame.ip -= offset
 
 		default:
 			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("unknown opcode %s", op))
@@ -243,6 +285,55 @@ func (vm *VirtualMachine) Run(chunk *c.Chunk) (err error) {
 		}
 	}
 	return nil
+}
+
+func (vm *VirtualMachine) callValue(callee any, argCount int) error {
+	switch function := callee.(type) {
+	case *c.Function:
+		return vm.call(function, argCount)
+	case *native:
+		return vm.callNative(function, argCount)
+	default:
+		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
+	}
+}
+
+func (vm *VirtualMachine) call(function *c.Function, argCount int) error {
+	if argCount != function.Arity {
+		return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("expected %d arguments but got %d", function.Arity, argCount))
+	}
+	if len(vm.frames) == framesMax {
+		return errors.NewLoxError(vm.currentLine(), "stack overflow")
+	}
+	vm.frames = append(vm.frames, callFrame{function: function, slots: len(vm.stack) - argCount - 1})
+	return nil
+}
+
+func (vm *VirtualMachine) callNative(function *native, argCount int) error {
+	if argCount != function.arity {
+		return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("expected %d arguments but got %d", function.arity, argCount))
+	}
+	args := vm.stack[len(vm.stack)-argCount:]
+	result := function.fn(args)
+	vm.stack = vm.stack[:len(vm.stack)-argCount-1]
+	vm.push(result)
+	return nil
+}
+
+func (vm *VirtualMachine) withStackTrace(err error) error {
+	if len(vm.frames) == 0 {
+		return err
+	}
+	var trace strings.Builder
+	for i := len(vm.frames) - 1; i >= 0; i-- {
+		frame := vm.frames[i]
+		name := "script"
+		if frame.function.Name != "" {
+			name = frame.function.Name + "()"
+		}
+		fmt.Fprintf(&trace, "\n[line %d] in %s", frame.function.Chunk.Lines[frame.ip-1], name)
+	}
+	return fmt.Errorf("%w%s", err, trace.String())
 }
 
 func (vm *VirtualMachine) printStackAndGlobal(offset int) {
@@ -270,15 +361,25 @@ func (vm *VirtualMachine) printStackAndGlobal(offset int) {
 // resetStack descarta todos los valores del stack
 func (vm *VirtualMachine) resetStack() {
 	vm.stack = vm.stack[:0]
+	vm.frames = vm.frames[:0]
+}
+
+func (vm *VirtualMachine) stackBase() int {
+	return vm.currentFrame().slots + 1
+}
+
+func (vm *VirtualMachine) currentFrame() *callFrame {
+	return &vm.frames[len(vm.frames)-1]
 }
 
 // readByte devuelve el byte al que apunta el instruction pointer y lo avanza al siguiente
 func (vm *VirtualMachine) readByte() (byte, error) {
-	if vm.ip >= len(vm.chunk.Bytes) {
+	frame := vm.currentFrame()
+	if frame.ip >= len(frame.function.Chunk.Bytes) {
 		return 0, errors.NewLoxError(vm.currentLine(), "unexpected end of bytecode")
 	}
-	b := vm.chunk.Bytes[vm.ip]
-	vm.ip++
+	b := frame.function.Chunk.Bytes[frame.ip]
+	frame.ip++
 	return b, nil
 }
 
@@ -288,10 +389,11 @@ func (vm *VirtualMachine) readConstant() (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if int(index) >= len(vm.chunk.Constants) {
+	constants := vm.currentFrame().function.Chunk.Constants
+	if int(index) >= len(constants) {
 		return nil, errors.NewLoxError(vm.currentLine(), "constant index out of range")
 	}
-	return vm.chunk.Constants[index], nil
+	return constants[index], nil
 }
 
 func (vm *VirtualMachine) readString() (string, error) {
@@ -325,7 +427,7 @@ func (vm *VirtualMachine) push(value any) {
 
 // pop saca el elemento del tope del stack y lo devuelve
 func (vm *VirtualMachine) pop() (any, error) {
-	if len(vm.stack) == 0 {
+	if len(vm.stack) <= vm.stackBase() {
 		return nil, errors.NewLoxError(vm.currentLine(), "stack underflow")
 	}
 
@@ -336,7 +438,7 @@ func (vm *VirtualMachine) pop() (any, error) {
 
 // peek devuelve el valor a distance posiciones del tope del stack, sin sacarlo
 func (vm *VirtualMachine) peek(distance int) (any, error) {
-	if len(vm.stack) <= distance {
+	if len(vm.stack)-vm.stackBase() <= distance {
 		return nil, errors.NewLoxError(vm.currentLine(), "stack underflow")
 	}
 	return vm.stack[len(vm.stack)-1-distance], nil
@@ -436,5 +538,6 @@ func (vm *VirtualMachine) binaryOp(op func(left, right float64) any) error {
 }
 
 func (vm *VirtualMachine) currentLine() int {
-	return vm.chunk.Lines[vm.ip-1]
+	frame := vm.currentFrame()
+	return frame.function.Chunk.Lines[frame.ip-1]
 }

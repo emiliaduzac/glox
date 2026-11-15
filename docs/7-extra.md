@@ -69,6 +69,20 @@ Luego, al terminar cada ciclo, llamamos a `patchBreakJumps()`, que completa todo
 
 Igual que con el `continue`, en la VM no hace falta ningún cambio: el `break` se arma con `OP_POP` y `OP_JUMP`.
 
+### Dentro de funciones
+
+Al incorporar las funciones nos surgió una duda: qué pasa si un `break` o un `continue` está dentro de una función que se declara adentro de un ciclo? ve el ciclo de afuera? y adónde saltaría?
+
+Entonces, respondiendo nuestras dudas:
+
+- sabemos que cada función se compila con su propio `Compiler`, que arranca con el `loops` vacío igual que arranca con sus propios `locals`. Por eso ese `break` no ve el ciclo de afuera: `len(loops) == 0`, y da el mismo error que fuera de un ciclo. Ahora "no estamos en un ciclo" quiere decir que no hay ninguno en la función actual
+- tiene sentido porque una función se ejecuta cuando la llaman y no dentro del ciclo donde se declaró, y además el salto tendría que ir a otro chunk, cosa que no se puede
+- el resto sigue igual, ya que `loopStart` y los saltos de `breakJumps` son posiciones dentro del chunk de la función que se está compilando, y las variables locales que se sacan antes de saltar son las de esa función
+
+Algo parecido pasa con un `return` dentro de un ciclo. No hace falta sacar las variables locales antes de salir, ya que `OP_RETURN` descarta todo lo de la llamada.
+
+En la VM tampoco hace falta ningún cambio.
+
 ### Limitaciones y posibles mejoras
 
 - **Es una extensión de Lox.** Lox no tiene `break` ni `continue`, así que un programa que los use puede no funcionar en otras implementaciones del lenguaje.
@@ -111,5 +125,3 @@ go test ./internal/compiler -run '^TestCompile(Continue|Break|LoopsAreClosed)$'
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm" 5-break-continue
 ```
-
-TO DO: ver de agregar funciones + break / continue

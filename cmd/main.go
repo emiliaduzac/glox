@@ -18,17 +18,17 @@ import (
 
 type Lox struct {
 	mode        int
+	debug       bool
 	interpreter *interpreter.Interpreter
 	vm          *virtualmachine.VirtualMachine
-	debug       bool
 }
 
 func newLox(mode int, debug bool) *Lox {
 	return &Lox{
 		mode:        mode,
+		debug:       debug,
 		interpreter: interpreter.NewInterpreter(),
 		vm:          virtualmachine.NewVirtualMachine(),
-		debug:       debug,
 	}
 }
 
@@ -125,16 +125,16 @@ func (l *Lox) run(source string) error {
 }
 
 func (l *Lox) runVM(tokens []token.Token) error {
-	chunk, err := compiler.NewCompiler(tokens).Compile()
+	function, err := compiler.NewCompiler(tokens).Compile()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return err
 	}
 	if l.debug {
-		chunk.Disassemble()
+		function.Chunk.Disassemble(function.String())
 		l.vm.SetDebugMode()
 	}
-	if err := l.vm.Run(chunk); err != nil {
+	if err := l.vm.Run(function); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return err
 	}

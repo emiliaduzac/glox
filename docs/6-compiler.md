@@ -62,7 +62,7 @@ Es importante ver el efecto que tiene cada statement sobre el stack de la VM (su
 
 Esto es importante porque, si cada statement dejara algo en el stack, con muchos statements seguidos el stack crecería constantemente. Además, es lo que permite que los índices de las variables locales coincidan con su posición en el stack (ver [variables locales y scopes](#variables-locales-y-scopes)). La única excepción es la declaración de una variable local, que deja su valor en el stack a propósito, porque ese valor es la variable, y se saca recién al cerrar su bloque.
 
-Para asegurarnos de que esto se cumpla, cuando la VM llega a `OP_RETURN` verifica que el stack esté vacío. Si no lo está, levanta un error, porque significa que el compilador dejó algo de más.
+Para asegurarnos de que esto se cumpla, cuando termina el script la VM verifica que el stack haya quedado vacío y si no levanta un error, porque significa que el compilador dejó algo de más.
 
 ### Manejo de errores
 
@@ -109,7 +109,7 @@ De esta forma, no necesita generar una instrucción como `OP_DEFINE_GLOBAL`, ya 
 
 Al finalizar el bloque, resta uno a la profundidad y elimina de su stack falso las variables locales de ese bloque. Además, emite un `OP_POP` por cada una, para asegurarnos de que al terminar un bloque, el stack de la VM quede sin sus variables.
 
-Un detalle más sobre las variables locales es que puede haber como máximo 256 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255.
+Un detalle más sobre las variables locales es que puede haber como máximo 255 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255, y el slot 0 queda reservado para la función.
 
 ### Control de flujo
 
@@ -161,6 +161,42 @@ Para los ciclos necesitamos saltar hacia **atrás**, para volver a ejecutar una 
   - Al final del cuerpo, un `OP_LOOP` vuelve al incremento.
   - Al final del incremento, otro `OP_LOOP` vuelve a la condición.
   Si no hay incremento, el cuerpo vuelve directamente a la condición, como en el `while`. Por último, se completa el salto de salida de la condición.
+
+### Funciones
+
+#### El script como función
+
+Un salto que se da importante al momento de llegar a funciones es que el compilador ya no escribe un chunk ahí suelto, sino que ahora lo hace en una función. Por lo que por este motivo ahora compile pasa a devolver una función. Un detalle es que ahora el programa completo sería como una función implícita. Es por esto que el compilador siempre está dentro de una función y la VM se ejecuta en una. Pero sí que tenemos la observación que esto no es para las globales que tienen un alcance propio. Otro punto a tener en cuenta es que ahora sí distingue entre una función y el script.
+
+Algo importante que se agrega con todo esto es lo del slot 0 en el stack, reservado para que la VM ponga la función que está ejecutando, y por ende, como el operando es de un byte hay 256 lugares y el slot 0 ocupa uno, ahora pasa a soportar hasta 255 variables locales, a diferencia del tree-walk, por lo que esto pasa a ser una **limitación conocida que tenemos en esta versión**.
+
+#### Una funcion con su propio chunk
+Agregar funciones hizo que pasemos de que el compilador escriba todo en un único chunk, a que teniendo funciones cada una tiene su propio código entonces la VM tiene que poder pasar de uno a otro cuando se llama a una función. En el libro marca que una función en lox es un valor como un número o string, así que tiene que poder guardarse como una variable. Además tiene un nombre para identificarla, su propio chunk y los parámetros, los cuales chequeamos para saber si recibe los esperados.
+
+En cuanto a una diferencia importante en general con el libro es que en estos capítulos usa C para implementar clox, por lo que tiene que hacer manejo de memoria, pero nosotros en glox lo usamos como un struct común que luego se libera por el garbage collector propio de Go cuando no tiene más referencias.
+
+#### Declaracion de fucniones
+Cuando el compilador esta compilando el script y se topa con una funcoin tiene que dejar ahi y pasar a compialr el cuempo de esa funcion porqu eva a tener su chunk, su variables locales yc uando termine tiene que vovler al scrip donde habia quedado. Pra resolver esto el libro plantea tener un compilador neuvo por cad afuncion y cad auno cuarda una referecia al compilador de la funcion que lo continee que eso es el enclosing., asi soabe donde vovler. 
+
+Aca suge una diferencia con el libro, porque ahhi propone guardar lo que comparten todos los compiladores en dos variables globales, parser (por dónde va leyendo los tokens, los errores que encontró y si está en modo pánico) y current (el compilador de la función que se está compilando, que se cambia al entrar a una función y se vuelve a poner al salir).
+
+Nosotros lo hicimos distinto al libro donde current es un puntero que hay que ir cambiando a mano, apunta al compilador de la función hasta que la termina y después hay que volver a ponerlo en el de afuera. Es algo fácil de olvidarse y que después rompe todo. En Go no hace falta, porque cada compilador es un objeto con sus propios métodos, y cuando llamamos a un método, ese método ya trabaja sobre el compilador con el que lo llamamos. Por ejemplo para compilar el cuerpo de una función se llama a fc.block(), y ahí adentro todo lo que se haga es sobre fc, que es el compilador de esa función. Y cuando termina seguimos con el compilador de afuera sin haber cambiado nada. Así nunca hay que acordarse de volver para atrás. Con el parser es algo parecido, porque como cada linea del REPL es una compialcion neuva una variable global habrai que reiniciarla cada vez.
+
+Entonces lo que se comparte lo juntamos en parserState, que usan todos los compiladores por puntero, y lo propio de cada función queda en su Compiler. Se comparte por puntero porque tiene que haber un solo cursor, una sola lista de errores y un solo modo pánico. Si cada función tuviera una copia, cuando termina el cuerpo de una función el compilador de afuera no sabría por dónde seguir leyendo.
+
+#### Parametros
+
+Los parametros de una funcion para nosotros son varibles locales de la funcion, y cada uno suma a la aridad de la misma. Asi que los aprametros ocupan las primeras posiciones que siguen depues de la funcion misma que es donde la vm deja los agumento cuando se llma asi que no hace falta copiar anda ahi. El maximo sigue siendo de 255 parametro igual que la primera parte del tree-walk.
+
+#### Llamadas
+Una llamada a la funcion como por ejemplo add(1,2) para compilarla, primero se compila lo que se queire llamar que es add en este caso, despues los argumentos de izquierda a derecha y al final se emite un OP_CALL que lleva al cantidad de argumentos. Como esa cantidad va en un byte enteonces la maxima cantidad es de 255 igual que en el tree walk. 
+Para qu el compilador puede reconocer la llmada , el '(' pasa a ser un operador infijo en el pratt parser con la precedencia de llamada.  
+
+#### Return
+
+El return es un statement que si tiene una expresión la compila y emite un OP_RETURN, y si no tiene devuelve nil, es decir que emite un OP_NIL y un OP_RETURN igual que lo que se agrega al final de cada función. Acá hay una diferencia importante con el tree-walk, porque allá el recorrido era recursivo y para salir de varias llamadas anidadas usamos como un truco que era que el ReturnValue sube como si fuera un error. En la VM eso no hace falta porque el bytecode es una secuencia plana y el return es una instrucción más, que corta la llamada y vuelve al frame anterior como vimos en return de la VM.
+
+Un return fuera de una función no tiene sentido porque no hay nada de donde salir. Para detectarlo el compilador se fija si lo que está compilando es el script y si es así da un error. Ese error no corta la compilación si no que sigue leyendo para avisar si hay más errores porque el código está bien escrito y solo rompe una regla del lenguaje. Con esto nos acomplamso a lo que dice el libro que se podria permitir esto pero elige que sea un error. 
 
 ### Tests
 

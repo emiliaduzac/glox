@@ -117,3 +117,116 @@ if (seen == 1 and m == 3) {
 } else {
     print "ERROR";
 }
+
+print "--- BREAK Y CONTINUE DENTRO DE UNA FUNCION ---";
+fun sumUntil(n) {
+    var s = 0;
+    var i = 0;
+    while (true) {
+        i = i + 1;
+        if (i > n) break;
+        if (i == 3) continue;
+        s = s + i;
+    }
+    return s;
+}
+if (sumUntil(5) == 12) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- CONTINUE EN UN FOR DENTRO DE UNA FUNCION (con variable local) ---";
+fun sumSkipping(skip, n) {
+    var s = 0;
+    for (var i = 0; i < n; i = i + 1) {
+        var x = i * 2;
+        if (i == skip) continue;
+        s = s + x;
+    }
+    return s;
+}
+if (sumSkipping(2, 5) == 16) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- LOS PARAMETROS SIGUEN INTACTOS DESPUES DE UN BREAK ---";
+fun keepsParams(a, b) {
+    while (true) {
+        var t = a + b;
+        if (t > 0) break;
+    }
+    return a * 10 + b;
+}
+if (keepsParams(1, 2) == 12) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- CICLOS ANIDADOS DENTRO DE UNA FUNCION ---";
+fun nestedLoops() {
+    var c = 0;
+    for (var i = 0; i < 3; i = i + 1) {
+        for (var j = 0; j < 3; j = j + 1) {
+            if (j == 1) continue;
+            if (i == 2) break;
+            c = c + 1;
+        }
+    }
+    return c;
+}
+if (nestedLoops() == 4) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- RETURN DENTRO DE UN CICLO CON VARIABLE LOCAL ---";
+fun returnInLoop() {
+    for (var i = 0; i < 10; i = i + 1) {
+        var x = i * 2;
+        if (i == 3) return x;
+    }
+}
+if (returnInLoop() == 6) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- CADA LLAMADA RECURSIVA TIENE SU PROPIO CICLO ---";
+fun depth(n) {
+    for (var i = 0; i < 10; i = i + 1) {
+        if (i == 1) break;
+    }
+    if (n == 0) return 0;
+    return 1 + depth(n - 1);
+}
+if (depth(5) == 5) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- FUNCION DECLARADA DENTRO DE UN CICLO, CON SU PROPIO BREAK ---";
+var total = 0;
+for (var k = 0; k < 3; k = k + 1) {
+    fun count() {
+        var c = 0;
+        while (true) {
+            c = c + 1;
+            if (c == 4) break;
+        }
+        return c;
+    }
+    total = total + count();
+}
+
+if (total == 12) {
+    print "OK";
+} else {
+    print "ERROR";
+}

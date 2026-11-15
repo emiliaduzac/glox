@@ -13,6 +13,19 @@ type Local struct {
 	Depth int
 }
 
+type FunctionType int
+
+const (
+	TYPE_FUNCTION FunctionType = iota
+	TYPE_SCRIPT
+)
+
+type parserState struct {
+	cursor    *token.TokenCursor
+	errs      []error
+	panicMode bool
+}
+
 type Loop struct {
 	loopStart  int
 	scopeDepth int
@@ -20,36 +33,55 @@ type Loop struct {
 }
 
 type Compiler struct {
-	cursor      *token.TokenCursor
-	chunk       *chunk.Chunk
+	*parserState
+	enclosing   *Compiler
+	function    *chunk.Function
+	funcType    FunctionType
 	locals      []Local
 	scopeDepth  int
-	errs        []error
-	panicMode   bool
 	identifiers map[string]byte
 	loops       []Loop
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
 func NewCompiler(tokens []token.Token) *Compiler {
+	state := &parserState{cursor: token.NewTokenCursor(tokens)}
+	return newFunctionCompiler(state, nil, TYPE_SCRIPT)
+}
+
+func newFunctionCompiler(state *parserState, enclosing *Compiler, funcType FunctionType) *Compiler {
+	function := chunk.NewFunction()
+	if funcType != TYPE_SCRIPT {
+		function.Name = state.cursor.GetPreviousLexeme()
+	}
 	return &Compiler{
-		cursor:      token.NewTokenCursor(tokens),
-		chunk:       chunk.NewChunk(),
-		locals:      []Local{},
-		scopeDepth:  0,
+		parserState: state,
+		enclosing:   enclosing,
+		function:    function,
+		funcType:    funcType,
+		locals:      []Local{{Depth: 0}},
 		identifiers: map[string]byte{},
 	}
 }
 
-func (c *Compiler) Compile() (*chunk.Chunk, error) {
+func (c *Compiler) currentChunk() *chunk.Chunk {
+	return &c.function.Chunk
+}
+
+func (c *Compiler) Compile() (*chunk.Function, error) {
 	for !c.cursor.Match(token.EOF) {
 		c.declaration()
 	}
+	function := c.endCompiler()
 	if len(c.errs) > 0 {
 		return nil, stderrors.Join(c.errs...)
 	}
+	return function, nil
+}
+
+func (c *Compiler) endCompiler() *chunk.Function {
 	c.emitReturn()
-	return c.chunk, nil
+	return c.function
 }
 
 func (c *Compiler) expression() error {
@@ -58,7 +90,9 @@ func (c *Compiler) expression() error {
 
 func (c *Compiler) declaration() {
 	var err error
-	if c.cursor.Match(token.VAR) {
+	if c.cursor.Match(token.FUN) {
+		err = c.funDeclaration()
+	} else if c.cursor.Match(token.VAR) {
 		err = c.varDeclaration()
 	} else {
 		err = c.statement()
@@ -157,6 +191,9 @@ func (c *Compiler) addLocal(name token.Token) {
 }
 
 func (c *Compiler) markInitialized() {
+	if c.scopeDepth == 0 {
+		return
+	}
 	c.locals[len(c.locals)-1].Depth = c.scopeDepth
 }
 
@@ -183,6 +220,8 @@ func (c *Compiler) statement() error {
 		return c.whileStatement()
 	} else if c.cursor.Match(token.FOR) {
 		return c.forStatement()
+	} else if c.cursor.Match(token.RETURN) {
+		return c.returnStatement()
 	} else if c.cursor.Match(token.LEFT_BRACE) {
 		c.beginScope()
 		defer c.endScope()
@@ -231,6 +270,73 @@ func (c *Compiler) printStatement() error {
 	return nil
 }
 
+func (c *Compiler) returnStatement() error {
+	if c.funcType == TYPE_SCRIPT {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't return from top-level code"))
+	}
+	if c.cursor.Match(token.SEMICOLON) {
+		c.emitReturn()
+		return nil
+	}
+	if err := c.expression(); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.SEMICOLON, "';' after return value"); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_RETURN))
+	return nil
+}
+
+func (c *Compiler) funDeclaration() error {
+	global, err := c.parseVariable("function name")
+	if err != nil {
+		return err
+	}
+	c.markInitialized()
+	if err := c.compileFunction(TYPE_FUNCTION); err != nil {
+		return err
+	}
+	c.defineVariable(global)
+	return nil
+}
+
+func (c *Compiler) compileFunction(funcType FunctionType) error {
+	fc := newFunctionCompiler(c.parserState, c, funcType)
+	fc.beginScope()
+
+	if err := c.cursor.Consume(token.LEFT_PAREN, "'(' after function name"); err != nil {
+		return err
+	}
+	if !c.cursor.Check(token.RIGHT_PAREN) {
+		for {
+			fc.function.Arity++
+			if fc.function.Arity > math.MaxUint8 {
+				c.report(errors.NewLoxError(c.cursor.GetLine(), "cannot have more than 255 parameters"))
+			}
+			param, err := fc.parseVariable("parameter name")
+			if err != nil {
+				return err
+			}
+			fc.defineVariable(param)
+			if !c.cursor.Match(token.COMMA) {
+				break
+			}
+		}
+	}
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after parameters"); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.LEFT_BRACE, "'{' before function body"); err != nil {
+		return err
+	}
+	if err := fc.block(); err != nil {
+		return err
+	}
+
+	return c.emitConstant(fc.endCompiler())
+}
+
 func (c *Compiler) block() error {
 	for !c.cursor.Check(token.RIGHT_BRACE) && !c.cursor.Check(token.EOF) {
 		c.declaration()
@@ -271,7 +377,7 @@ func (c *Compiler) ifStatement() error {
 }
 
 func (c *Compiler) whileStatement() error {
-	loopStart := len(c.chunk.Bytes)
+	loopStart := len(c.currentChunk().Bytes)
 	c.beginLoop(loopStart)
 	defer c.endLoop()
 
@@ -312,7 +418,7 @@ func (c *Compiler) forStatement() error {
 		return err
 	}
 
-	loopStart := len(c.chunk.Bytes)
+	loopStart := len(c.currentChunk().Bytes)
 	exitJump, err := c.forCondition()
 	if err != nil {
 		return err
@@ -372,7 +478,7 @@ func (c *Compiler) forIncrement(loopStart int) (int, error) {
 	}
 
 	bodyJump := c.emitJump(chunk.OP_JUMP)
-	incrementStart := len(c.chunk.Bytes)
+	incrementStart := len(c.currentChunk().Bytes)
 	if err := c.expression(); err != nil {
 		return loopStart, err
 	}
@@ -433,11 +539,12 @@ func (c *Compiler) expressionStatement() error {
 // emit escribe uno o más bytes en el chunk, con la línea del último token consumido
 func (c *Compiler) emit(bytes ...byte) {
 	for _, b := range bytes {
-		c.chunk.Write(b, c.cursor.GetPreviousLine())
+		c.currentChunk().Write(b, c.cursor.GetPreviousLine())
 	}
 }
 
 func (c *Compiler) emitReturn() {
+	c.emit(byte(chunk.OP_NIL))
 	c.emit(byte(chunk.OP_RETURN))
 }
 
@@ -452,13 +559,13 @@ func (c *Compiler) emitConstant(value any) error {
 
 func (c *Compiler) emitJump(instruction chunk.OpCode) int {
 	c.emit(byte(instruction), 0xff, 0xff)
-	return len(c.chunk.Bytes) - 2
+	return len(c.currentChunk().Bytes) - 2
 }
 
 func (c *Compiler) emitLoop(loopStart int) error {
 	c.emit(byte(chunk.OP_LOOP))
 
-	offset := len(c.chunk.Bytes) - loopStart + 2
+	offset := len(c.currentChunk().Bytes) - loopStart + 2
 	if offset > math.MaxUint16 {
 		return errors.NewLoxError(c.cursor.GetPreviousLine(), "loop body too large")
 	}
@@ -468,12 +575,12 @@ func (c *Compiler) emitLoop(loopStart int) error {
 }
 
 func (c *Compiler) patchJump(offset int) error {
-	jump := len(c.chunk.Bytes) - offset - 2
+	jump := len(c.currentChunk().Bytes) - offset - 2
 	if jump > math.MaxUint16 {
 		return errors.NewLoxError(c.cursor.GetPreviousLine(), "too much code to jump over")
 	}
-	c.chunk.Bytes[offset] = byte(jump >> 8)
-	c.chunk.Bytes[offset+1] = byte(jump)
+	c.currentChunk().Bytes[offset] = byte(jump >> 8)
+	c.currentChunk().Bytes[offset+1] = byte(jump)
 	return nil
 }
 
@@ -493,7 +600,7 @@ func (c *Compiler) popLoopLocals(currentLoop *Loop) {
 }
 
 func (c *Compiler) makeConstant(value any) (byte, error) {
-	index := c.chunk.AddConstant(value)
+	index := c.currentChunk().AddConstant(value)
 	if index > math.MaxUint8 {
 		return 0, errors.NewLoxError(c.cursor.GetPreviousLine(), "too many constants in one chunk")
 	}
@@ -540,6 +647,37 @@ func (c *Compiler) grouping(_ bool) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Compiler) call(_ bool) error {
+	argCount, err := c.argumentList()
+	if err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_CALL), argCount)
+	return nil
+}
+
+func (c *Compiler) argumentList() (byte, error) {
+	argCount := 0
+	if !c.cursor.Check(token.RIGHT_PAREN) {
+		for {
+			if err := c.expression(); err != nil {
+				return 0, err
+			}
+			if argCount == math.MaxUint8 {
+				c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "cannot have more than 255 arguments"))
+			}
+			argCount++
+			if !c.cursor.Match(token.COMMA) {
+				break
+			}
+		}
+	}
+	if err := c.cursor.Consume(token.RIGHT_PAREN, "')' after arguments"); err != nil {
+		return 0, err
+	}
+	return byte(argCount), nil
 }
 
 func (c *Compiler) unary(_ bool) error {
