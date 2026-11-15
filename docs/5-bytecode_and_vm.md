@@ -1,4 +1,4 @@
-## Bytecode y Virtual Machine
+# Bytecode y Virtual Machine
 
 En nuestra versión anterior, teníamos un **tree walking interpreter**, pero vimos que esto hacía que no fuera veloz. Para mejorar nuestro lenguaje, implementaremos un **bytecode compiler**.
 
@@ -11,7 +11,7 @@ Como _IR_ (Representación Intermedia), utilizamos _bytecode_, con la intención
 
 Estos bytecodes formarán un _instruction set ficticio_, un conjunto secuencial de instrucciones. Nos alcanza con un único conjunto, ya que funcionará donde sea que funcione nuestra VM, sin importar la arquitectura.
 
-### Chunks
+## Chunks
 
 Una instrucción tiene:
 
@@ -20,18 +20,18 @@ Una instrucción tiene:
 
 Los valores que usa el programa se guardan aparte, en un **pool de constantes**, y algunas instrucciones (como `OP_CONSTANT`) usan su operando como índice de ese pool. Por lo que finalmente un **chunk** se compone de este pool y del set de instrucciones.
 
-## Virtual Machine
+# Virtual Machine
 
 La VM simula el comportamiento de una CPU, y será la encargada de ejecutar nuestro código. Se compone de:
 
 - **instruction pointer**: indica la siguiente instrucción a ejecutar. Como es una secuencia lineal, simplemente va avanzando, salvo cuando una instrucción de salto lo mueve. Con las funciones cada llamada tiene el suyo, y la VM usa el de la llamada que se está ejecutando.
-- **stack**: guarda los valores con los que trabaja la VM. Inicialmente eran los valores temporales que producen las instrucciones en runtime, como el resultado de `1 + 2`. Esos valores son usados por instrucciones que trabajan siempre sobre el tope del stack (por ejemplo `OP_ADD` o `OP_PRINT`). Luego, incorporamos las variables locales, cuyos valores también viven en el stack. A diferencia de los anteriores, no se acceden desde el tope, sino por su índice (con `OP_GET_LOCAL` y `OP_SET_LOCAL`). El compilador conoce ese índice porque lleva la cuenta de en qué posición queda cada variable, y lo emite como operando de esas instrucciones. Con las funciones, en el stack también viven la función que se está ejecutando y sus argumentos.
+- **stack**: guarda los valores con los que trabaja la VM. Inicialmente eran los valores temporales que producen las instrucciones en runtime, como el resultado de `1 + 2`. Esos valores son usados por instrucciones que trabajan siempre sobre el tope del stack (por ejemplo `OP_ADD` o `OP_PRINT`). Luego, incorporamos las variables locales, cuyos valores también viven en el stack. A diferencia de los anteriores, no se acceden desde el tope, sino por su índice (con `OP_GET_LOCAL` y `OP_SET_LOCAL`). El compilador conoce ese índice porque lleva la cuenta de en qué posición queda cada variable, y lo emite como operando de esas instrucciones. Con las funciones, en el stack también viven la función que se está ejecutando (desde closures, el closure que la envuelve) y sus argumentos. Y si una función interna usa una variable local de la función que la envuelve, esa variable sigue viviendo en el stack mientras la función de afuera está activa, y recién cuando sale de él se mueve al heap (ver [Closures](#closures)).
 
 Al igual que el intérprete, la VM es la que ejecuta el programa. La diferencia está en cómo lo recorre: el intérprete recorría el árbol de forma recursiva, mientras que la VM ejecuta las instrucciones en un único ciclo, ya que son un array lineal.
 
-Si la vm detecta un error de runtime, como puede ser que se recibe un tipo incorrecto, entonces corta y devuelve el error con la linea. Pero como la vm mira con `peek()` antes de sacar del stack, si falla quedaría basura en el stack. Entonces es por este motivo que cuando el `run()` de la vm falla, invocamos a `resetStack()`, que ahora también saca los frames, utilizando el defer propio de Go.
+Si la vm detecta un error de runtime, como puede ser que se recibe un tipo incorrecto, entonces corta y devuelve el error con la linea. Pero como la vm mira con `peek()` antes de sacar del stack, si falla quedaría basura en el stack. Por este motivo, cuando el `run()` de la VM falla, invocamos a `resetStack()` usando el `defer` de Go. Además de vaciar el stack, ahora también saca los frames y vacía la lista de upvalues abiertos, para que en el REPL la próxima línea no reutilice upvalues que apuntaban a posiciones del stack que ya no existen.
 
-#### Instrucciones de statements y variables globales
+### Instrucciones de statements y variables globales
 
 Con los statements aparecen dos instrucciones. `OP_PRINT` saca el valor del tope del stack y lo imprime, usando el mismo `Stringify` que el tree-walk así los dos motores imprimen igual, por ejemplo un `nil` se muestra como `nil`. `OP_POP` simplemente saca el valor del tope y lo tira.
 
@@ -41,7 +41,7 @@ Para las globales hay tres:
 2. `OP_GET_GLOBAL` busca el nombre en esa tabla y apila el valor, y si no está levanta un error de runtime. Es importante ver que, para saber si está en la tabla usamos `valor, bool`, porque el `map` de Go devuelve `nil` tanto si la variable _no existe_ como si _existe y vale `nil`_, por ejemplo con `var a;`. Queremos esos casos porque uno es un error de que no existe la variable, y el otro no, porque Lox tolera que una variable sea `nil`.
 3. `OP_SET_GLOBAL` primero se fija si la variable existe, y si no existe levanta el error y no la crea, porque en Lox una variable no se puede declarar asignándola, tiene que estar declarada antes con `var`. Si existe le guarda el valor del tope, pero sin sacarlo del stack, porque la asignación es una expresión y su valor se puede seguir usando, como por ejemplo en `a = b = 5`.
 
-#### Variables globales vs locales
+### Variables globales vs locales
 
 La diferencia principal es que las globales son _late bound_: se resuelven en tiempo de ejecución, buscándolas por nombre en una tabla de globales, lo que permite que el código compile aunque se use una variable antes de ser declarada, lo único que importa es que exista cuando se ejecute.
 
@@ -49,7 +49,7 @@ En cambio las locales se resuelven en tiempo de compilación: el compilador ya s
 
 Otra diferencia es lo que sucede al declarar de nuevo una variable. Una global se puede redeclarar y solo se pisa el valor, pero una local en el mismo scope no, eso es un error de compilación. En cambio, con una local de un scope distinto sí se puede, y ahí lo que pasa es el _shadowing_.
 
-#### Control de flujo
+### Control de flujo
 
 Con el control de flujo, la VM deja de ejecutar siempre la instrucción siguiente. Las instrucciones de salto (`OP_JUMP_*`) mueven el instruction pointer hacia **adelante**, salteando instrucciones que no se tienen que ejecutar. En los condicionales, como `if-else`:
 
@@ -60,49 +60,67 @@ La cantidad de bytes a saltear viene en el operando, que ocupa dos bytes, así q
 
 El caso de los ciclos es parecido, pero al revés: el `OP_LOOP` **resta** un offset en vez de sumarlo, para volver al inicio del ciclo.
 
-#### Funciones y call frames
+### Funciones y call frames
 
-Con el agregado de funciones la VM deja de tener un único chunk e ip para todo porque cuando el programa llama a una función, la VM tiene que dejar lo que estaba haciendo en ese momento y pasarse al código de esa función, y cuando termina la función tiene que volver a donde estaba, y esto es lo que motiva por qué tiene que acordarse de donde estaba para al volver seguir ejecutando desde ahí. Un detalle acá es que no alcanza con uno por función porque eso no soportaría la recursión, en un ejemplo de Fibonacci recursivo se llama a sí mismo y se pisaria entre las propias llamadas. Entonces la solución ahí es guardar uno por llamada, no por función. Ahí es que llega el call frame que el libro propone, que en sí para nosotros representa una llamada a una función y guarda tres cosas, primero la función que se está ejecutando, su propio ip para saber por dónde va la llamada a la función y el lugar del stack donde empiezan sus variables.
+Con el agregado de funciones, la VM deja de tener un único chunk e ip para todo el programa, porque cada función tiene su propio chunk. Cuando se llama a una función, la VM tiene que pausar el chunk que estaba ejecutando, guardar por qué instrucción iba (su `ip`) y empezar a ejecutar el chunk de la función llamada. Cuando esa función termina, tiene que poder volver al chunk anterior y seguir desde la instrucción que había guardado.
 
-El tema de ver donde empiezan sus variables lo necesitamos y el libro propone dejarlo en el propio stack de la VM y la razón de esto es porque las variables locales funcionan como una pila, es decir son LIFO, la última que llega es la primera que sale, y esto tiene sentido porque ponele que tenés las de la función f y luego dentro la de g, primero se consumen las de g, y luego las de f. Esto trae la situación de que la posición de una variable local no es siempre la misma porque depende de qué momento se llamó a la función y cómo estaba el stack ahí. Entonces el compilador emite la posición de cada variable local relativa a la función, mientras que la VM tiene en slots donde arranca la llamada en el stack entonces al sumar esas dos sabe donde está la variable. Acá surge una diferencia con el libro que lo trabaja como un puntero a esa posición, mientras que en glox lo tenemos como un índice, y esto lo hicimos así porque el stack en Go es un slice y al crecer se podría mover a otro lugar de la memoria y queda viejo, por eso fuimos con el índice que siempre nos sirve.
+Un detalle acá es que no alcanza con guardar el `ip` y la ventana en la propia función, porque no soportaría la recursión. Por ejemplo, en un Fibonacci recursivo, la función se llama a sí misma, y la llamada de adentro usaría el mismo lugar que la de afuera, pisando por dónde iba. Al volver, la de afuera ya no sabría desde dónde seguir. Entonces la solución es guardar uno por **llamada**, no por función. Ahí es que llega el `call frame` que el libro propone, que en sí para nosotros representa una llamada a una función y guarda tres cosas:
 
-Un detalle es que los frames se guardan en su propia pila y el de arriba de todo es el de la llamada que se está ejecutando. En el libro se limita a un máximo de 64, es decir que como mucho puede haber ese número de llamadas activas al mismo tiempo. Si bien el libro lo hace con un array y nosotros en Go con un slice que le reservamos capacidad al crear la VM, nosotros decidimos pegarnos a ese mismo valor y eso trae un detalle particular, que es que como el script ya ocupa un frame, por lo que como mucho puede haber 63 llmadas anidadas y si se pasa de ahí la VM corta con el error de stack overflow. Esto es una limitación conocida e importante porque el tree-walk de la primera parte no lo tiene, entonces una recursión profunda de más de 63 llamadas antes funcionaba pero en esta implementación ya corta con el error de stack overflow.
+- la función que se está ejecutando (al agregar closures, el closure que se está ejecutando)
+- su propio ip para saber por dónde va la llamada a la función
+- el lugar del stack donde empiezan sus variables
 
-Todo lo que usaba el ip y el chunk de la vm antes, ahora lo lee desde el frame actual. Esto lo hicimos en la VM con el currentFrame() que nos devuelve el de arriba. Y un detalle sobre el run es que se guarda el frame actual de una varible y lo va actualizando cuando entra o sale de una llamada así ya lo tiene actualizado al querer usarlo.
+Esto último es importante, y el libro propone guardar las variables locales de todas las funciones en el propio stack de la VM, y esto funciona porque las llamadas siguen el mismo orden que una pila (**LIFO**). Si `f` llama a `g`, las locales de `g` quedan arriba de las de `f`, y como `g` siempre termina antes que `f`, sus locales se sacan primero. Así cada llamada tiene su _ventana en el stack_, arriba de la anterior, sin pisarse.
+
+Esto implica que la posición de una variable local no es siempre la misma: depende en que momento se llama a una función, y el estado del stack en ese momento. Para eso, el compilador emite la posición de las variables locales como _relativas_ a la función, mientras que la VM tiene por cada `CallFrame`, su `slots`, que indica donde arranca la llamada de esa función en el stack de la VM. Al sumar ambos, se obtiene la posición real de la variable local en el stack.
+
+Acá surge una diferencia con el libro: trabaja `slots` como un puntero a la posición del stack, mientras que en glox lo tenemos como un índice, y esto lo hicimos así porque el stack en Go es un slice dinámico y al crecer se podría mover a otro lugar de la memoria y el puntero quedaría viejo, por eso fuimos con el índice que siempre nos sirve.
+
+Otro detalle es que los frames se guardan en su propia pila `frames`, donde el del tope es el de la llamada que se está ejecutando. En el libro se limita a un máximo de 64, es decir que como mucho puede haber ese número de llamadas activas al mismo tiempo. Si bien el libro lo hace con un array y nosotros en Go con un slice que le reservamos capacidad al crear la VM, decidimos pegarnos a ese mismo valor y eso trae un detalle particular: como el script ya ocupa un frame, como mucho puede haber 63 llamadas anidadas y si se pasa de ahí la VM corta con el error de `stack overflow`. Esto es una limitación conocida e importante porque el tree-walk de la primera parte no lo tiene, entonces una recursión profunda de más de 63 llamadas antes funcionaba pero en esta implementación ya corta con el error de `stack overflow` (se rompe la regla de oro donde todas las implementaciones de Lox deberían tener el mismo resultado).
+
+Todo lo que usaba el ip y el chunk de la vm antes, ahora lo lee desde el frame actual. Esto lo hicimos en la VM con el `currentFrame()` que nos devuelve el de arriba. Además, `run` guarda el frame actual en una variable y la actualiza cada vez que entra o sale de una llamada, así no tiene que buscarlo en cada instrucción.
 
 #### Llamar a una funcion
 
-Cuando la VM ejecuta un OP_CALL ya sabe cuántos argumentos son, y con eso sabe que la función está esa cantidad de lugares antes del tope. Lo primero que hace es fijarse qué es lo que le piden llamar, y si no es una función corta con error. Acá hay una diferencia con el libro, que revisa el tipo del objeto, mientras que en Go como los valores de la VM son any, nos alcanza con un switch por tipo.
+Cuando la VM ejecuta un `OP_CALL` ya sabe cuántos argumentos son, y con eso sabe que la función está esa cantidad de lugares antes del tope. Lo primero que hace es fijarse qué es lo que le piden llamar, y si no es un closure (antes funciones) ni una función nativa, corta con error. Acá hay una diferencia con el libro, que revisa el tipo del objeto, mientras que en Go como los valores de la VM son `any`, nos alcanza con un switch por tipo.
 
-Si es una función, chequea dos cosas antes de abrir el frame. Primero que la aridad sea la esperada, y si no devuelve un error que avisa cuántos argumentos esperaba y cuántos recibió. Y después que no se haya llegado al máximo de frames y si es así falla con stack overflow. Los mensajes del tipo que no se puede llamar y de la aridad son los mismos que ya tenía el tree-walk pero el de stack overflow es nuevo porque el tree-walk no tiene ese límite, y es la limitación que ya contamos con los call frames.
+Si es un closure, chequea dos cosas antes de abrir el frame.
+   - Primero, que la aridad de la función sea la esperada, y si no devuelve un error que avisa cuántos argumentos esperaba y cuántos recibió. 
+   - Después, que no se haya llegado al máximo de frames y si es así falla con `stack overflow`. 
+   
+Los mensajes del tipo que no se puede llamar y de la aridad son los mismos que ya tenía el tree-walk pero el de `stack overflow` es nuevo porque el tree-walk no tiene ese límite, y es la limitación que ya mencionamos con los call frames.
 
-Si pasa todos los chequeos se abre el frame, y ahí está lo importante. El slots apunta a la función dentro del stack, y siguiendo están los argumentos. Como los parámetros son las primeras variables locales de la función, cada uno coincide con el argumento que le toca, así que no hace falta copiarlos porque el frame arranca desde ahí directamente.
+Si pasa todos los chequeos se abre el frame, y ahí está lo importante. El `slots` es la posición de la función (desde closures, del closure) dentro del stack, y siguiendo están los argumentos. Como los parámetros son las primeras variables locales de la función, cada uno coincide con el argumento que le toca, así que no hace falta copiarlos porque el frame arranca desde ahí directamente.
 
 #### Stack trace
 
-Cuando hay un error en tiempo de ejecución además del mensaje con la línea mostramos el stack trace, que es el camino de llamadas que llevó hasta el error, desde la función donde falló hasta el script con la línea de cada una. Por ejemplo [line 3] in inner(), [line 4] in outer() y [line 6] in script. Esto lo trae el libro y el tree-walk no lo tiene, ahí solo se ve la línea del error. Como en el libro, mostramos primero la función más interna.
+Cuando hay un error en tiempo de ejecución, además del mensaje con la línea, mostramos el **stack trace**, que es el camino de llamadas que llevó hasta el error, desde la función donde falló hasta el script, con la línea de cada una. Por ejemplo `[line 3] in inner(), [line 4] in outer() y [line 6] in script.` Esto lo trae el libro y el tree-walk no lo tiene, ahí solo se ve la línea del error. Como en el libro, mostramos primero la función más interna.
 
-Acá hay una diferencia con el libro, que lo imprime en el momento en que ocurre el error. En glox la VM devuelve los errores y no los imprime, entonces el trace se arma en el defer de Run, que se ejecuta cuando falla cualquier instrucción, y se lo agrega al error antes de reiniciar el stack porque después de eso ya no quedarían los frames para recorrer.
+Acá hay una diferencia con el libro, que lo imprime en el momento en que ocurre el error. En glox la VM devuelve los errores y no los imprime, entonces el trace se arma en el `defer` de `Run`, que se ejecuta cuando falla cualquier instrucción, y se lo agrega al error antes de reiniciar el stack porque después de eso ya no quedarían los frames para recorrer.
 
 #### Return
 
-Cuando una función termina la VM ejecuta un OP_RETURN, que lo primero que hace es sacar el valor que se devuelve así no se pierde y después descarta todo lo que era de esa llamada, que es la función, sus argumentos y sus variables locales. Para eso corta el stack en el slots del frame y saca el frame de la pila. Si era el último el programa terminó y si no vuelve a poner el valor devuelto en el stack, que es donde lo espera el que lo llamó, y sigue con el frame anterior desde donde había quedado.
+Cuando una función termina, la VM ejecuta un `OP_RETURN`, que lo primero que hace es sacar el valor que se devuelve, así no se pierde, y después descarta todo lo que era de esa llamada: la función (desde closures, el closure), sus argumentos y sus variables locales. Para eso corta el stack en el `slots` del frame y saca el frame de la pila. Antes de cortar, cierra los upvalues que apuntan a esa parte del stack (ver [Closures](#closures)). Si era el último frame, el programa terminó, y si no, vuelve a poner el valor devuelto en el stack, que es donde lo espera el que lo llamó, y sigue con el frame anterior desde donde había quedado.
 
-Para que todas las funciones devuelvan algo el compilador agrega al final de cada una un OP_NIL y un OP_RETURN así que si no hay un return explícito se devuelve nil. Esto lo hace el libro también y es por lo que el programa termina cuando vuelve el frame del script.
+Para que todas las funciones devuelvan algo, el compilador agrega al final de cada una un `OP_NIL` y un `OP_RETURN` así que si no hay un return explícito se devuelve nil. Esto lo hace el libro también y es por lo que el programa termina cuando vuelve el frame del script.
 
-Acá hay un par de diferencias con el libro como cuando termina el script que hace un pop para sacar la función del script antes de salir. Nosotros no lo necesitamos porque cortar el stack en el slots del script ya lo deja todo vacío. Y el chequeo de que el stack quede vacío cuando termina el script, que si no se cumple avisa con un error, no es del libro pero sí nos basamos en ploxb y lo hacemos solo en el script porque en las funciones el corte ya lo limpia todo.
+Acá hay un par de diferencias con el libro:
+   - El libro, cuando termina el script, hace un `pop` para sacar la función del script antes de salir. Nosotros no lo necesitamos porque cortar el stack en el `slots` del script ya lo deja todo vacío.
+   - Chequeo de que el stack quede vacío cuando termina el script: si no se cumple avisa con un error. No es del libro, pero sí nos basamos en ploxb y lo hacemos solo en el script porque en las funciones el corte ya lo limpia todo.
 
-Como OP_RETURN descarta todo lo de la llamada, al terminar el cuerpo de una función no hace falta sacar uno por uno los parámetros y las locales con OP_POP.
+Como `OP_RETURN` descarta todo lo de la llamada, al terminar el cuerpo de una función no hace falta sacar uno por uno los parámetros y las locales con `OP_POP`.
 
 #### Funciones nativas
 
-Las funciones nativas no están escritas en Lox sino en Go que es el lenguaje con el que hicimos la implementación, y sirven para que un programa pueda hacer cosas que Lox solo no puede, como saber el tiempo. La primera que trae el libro es clock y nosotros hicimos la misma, que aprovechamos para usarla para el benchmark mas adelante como ya hicimos en el tree-walk.
+Las funciones nativas no están escritas en Lox sino en Go que es el lenguaje con el que hicimos la implementación, y sirven para que un programa pueda hacer cosas que Lox solo no puede, como saber el tiempo. La primera que trae el libro es `clock` y nosotros hicimos la misma, que aprovechamos para usarla para el benchmark mas adelante como ya hicimos en el tree-walk.
 
-Una nativa no tiene bytecode ni chunk solo la cantidad de argumentos que espera y una función de Go que recibe los argumentos y devuelve un valor. Por eso cuando la VM llama a una nativa no abre un frame como con una función de Lox si no que directamente chequea la aridad y ejecuta la función de Go con los argumentos que están en el stack y deja el resultado en lugar de la función y sus argumentos.
+Una nativa no tiene bytecode ni chunk solo la cantidad de argumentos que espera y una función de Go que recibe los argumentos y devuelve un valor. Por eso cuando la VM llama a una nativa no abre un frame, como con una función de Lox, sino que directamente chequea la aridad y ejecuta la función de Go con los argumentos que están en el stack y deja el resultado en lugar de la función y sus argumentos.
 
-Una difernecia con el libro que tenemos es qye para agregar una nativa el libro usa defineNative que además apila y desapila valores para protegerlos de su garbage collector. En glox eso no hace falta así que tenemos una tabla con las nativas que la VM instala como globales al crearse y agregar otra es sumar una entrada a esa tabla. Otra diferencia es el clock porque el de clox mide el tiempo de CPU y el nuestro devuelve el tiempo del reloj igual que el del tree-walk así los dos caminos miden lo mismo y los benchmarks se pueden comparar. 
+Una diferencia con el libro que tenemos es que para agregar una nativa, el libro usa `defineNative` que además apila y desapila valores para protegerlos de su garbage collector. En glox eso no hace falta, así que tenemos una tabla con las nativas que la VM instala como globales al crearse y agregar otra es sumar una entrada a esa tabla. Otra diferencia es el `clock`: el de clox mide el tiempo de CPU y el nuestro devuelve el tiempo del reloj igual que el del tree-walk, así los dos caminos miden lo mismo y los benchmarks se pueden comparar.
 
-#### Closures
+Además, incorporamos uno de los desafíos de este capítulo: agregarles aridad a las funciones nativas. El libro no la chequea para que llamarlas sea más rápido, así que en clox una llamada como `clock(1)` simplemente ignora el argumento. En glox cada nativa guarda la cantidad de argumentos que espera, y si no coincide, la VM devuelve el mismo error que con una función de Lox. Así se comportan igual que en el tree-walk, donde las nativas también chequean la aridad. Algo positivo de la versión del libro es que permite nativas con una cantidad variable de argumentos, como una `max` que acepte `max(1, 2)` y también `max(1, 2, 3)`. Con nuestro chequeo eso no se puede, pero no le delega a cada función nativa chequear los argumentos que le llegan.
+
+### Closures
 
 Antes las funciones se cargaban con `OP_CONSTANT` como cualquier otra constante. Ahora la VM las carga con `OP_CLOSURE`, que crea un closure con un puntero a la `Function` y sus propios **upvalues**, y pushea el closure a su stack.
 
@@ -114,7 +132,7 @@ El script es el único que no se crea con `OP_CLOSURE`, porque no está declarad
 
 Los upvalues son punteros a variables que declara otra función, una más externa. Los necesitamos para que cuando la interna se ejecute pueda usar esas variables, aunque no estén entre sus locales ni entre las globales. Que sea un puntero nos permite que, al modificar la variable, el cambio quede aplicado para todas las llamadas y también se vea desde los niveles de anidamiento más afuera.
 
-En los call frames habíamos mencionado que, a diferencia del libro, usábamos un índice y no un puntero para marcar dónde empieza la ventana del stack de una función, porque si el stack crecía, Go podía moverlo y el puntero quedaba viejo. Acá sí usamos un puntero al stack, y es seguro porque el stack de la VM se crea con una capacidad fija y nunca crece, así que Go no lo mueve.
+En los call frames habíamos mencionado que, a diferencia del libro, usábamos un índice y no un puntero para marcar dónde empieza la ventana del stack de una función, porque si el stack crecía, Go podía moverlo y el puntero quedaba viejo. Acá sí usamos un puntero al stack, y es seguro porque el stack de la VM se crea con una capacidad fija y mientras no se pase de ese tamaño, Go no lo mueve.
 
 Cuando una variable sale del stack (terminó un bloque o una función retornó), el puntero quedaría apuntando a un lugar inválido. Como contamos en el compilador, justo antes de que esto pase movemos la variable al heap, así luego puede seguir usándose. Para eso, se suma al `upvalue` un campo llamado `closed`. Al sacarla del stack, copiamos el valor directamente a este campo y el puntero pasa a apuntar ahí. A esto se le dice **cerrar** el upvalue: mientras apunta al stack está abierto, y cuando ya tiene su propia copia, está cerrado.
 
@@ -134,29 +152,35 @@ Cuando una variable sale del stack (terminó un bloque o una función retornó),
 
 La lista enlazada está ordenada por posición en el stack, empezando por la más alta (porque el stack siempre se va liberando desde su tope). El libro elige esta estructura porque para mantener el orden a veces hay que insertar en el medio, y al cerrar se sacan los primeros: en un array habría que mover los demás elementos, y en una lista enlazada alcanza con cambiar punteros. Como cada elemento es un upvalue, a estos les agregamos un campo `next` con el siguiente elemento. Por último, el libro compara punteros para mantener la lista ordenada. Como en Go no se pueden comparar punteros con `>`, guardamos también la posición del stack (`stackIndex`) y comparamos eso.
 
-#### Clases e instancias
+### Clases e instancias
 
-Creamos una clase que por ahora solo tiene como dato su nombre. Además de eso el método string para que el Stringify pueda llamarlo e imprimirlo. Si bien el libro habla de que no es estrictamente necesario para el programador que lo use, está bueno para mostrar el nombre en runtime como por ejemplo para el stack trace. 
+**Clases**
 
-Como viene pasando en el resto de la implementación de esta segunda parte no necesitamos el header de Obj ni tampoco el tipo ni las macros que propone el libro, al usar Go alcanza con any y luego pregunta con v.(*class). Siguiendo un poco con esta diferencia con el libro tampoco nos tenemos que hacer cargo de liberar la memoria para las clases.
+Creamos una clase que, por ahora, solo guarda su nombre. Además le agregamos el método `String()`, para que `Stringify` pueda imprimirla. El libro dice que el nombre no es estrictamente necesario para el programador, pero sirve para mostrarlo en runtime, por ejemplo en el **stack trace**.
 
-Llega el momento de las instancias que acá tienen que guardar a qué clase pertenecen para después poder encontrar sus métodos, y además sus propios campos. Sobre estos últimos es que tenemos una diferencia con el libro, porque también como ha pasado a lo largo de esta segunda parte más que nada se refiere a cómo se guarda esto en memoria. En Lox los campos no es que se declaran sino que se agregan en el runtime y se terminan buscando por nombre, ahí es donde el libro usa su tabla de hash y nosotros volvemos a un map[string]any que en el fondo es la misma idea pero difiere porque nosotros usamos Go. Un detalle acá es que como los campos se agregan en el runtime hay que hashear y buscar, frente a ya tenerlo fijo si el compilador los tiene declarados con cada tamaño, que es más rápido porque eso es solo sumar y desplazarse, eso sería una diferencia frente a un lenguaje estático.
+Como viene pasando en el resto de la implementación de esta segunda parte, no necesitamos el header de `Obj` ni tampoco el tipo `OBJ_CLASS` ni las macros que propone el libro: al usar Go alcanza con `any` y luego pregunta con `v.(*class)` para saber si un valor es una clase. Tampoco tenemos que liberar la memoria de las clases, porque lo hace el garbage collector de Go.
 
-Un detalle que también habla el libro y nos parece importante comentarlo es esto, que para el que programa una instancia de algo como un Auto y otra como un Perro son de tipos distintos y tiene toda la lógica que así sea, pero para nosotros en la vm es el mismo instance, digamos que lo único que cambia es a qué clase apuntan.
+**Instancias**
 
-Para crear la instancia se llama a la clase como si fuera una función, como por ejemplo Auto(), por lo que no hace falta una instrucción nueva ya que se usa el OP_CALL y lo que sí cambia es el caso en el callValue para detectarlo. Al crear la instancia la vm la pone en el lugar del stack donde estaba la clase y listo, no es necesario meterse con el frame porque no hay código Lox ahí para ejecutar.
+Una instancia guarda a qué clase pertenece, para después poder encontrar sus métodos, y sus propios campos.
+
+En Lox los campos no se declaran, sino que se agregan en runtime y se buscan por nombre. Para guardarlos, el libro usa su tabla de hash y nosotros un `map[string]any`, que es la misma idea, igual que con las variables globales. Un detalle es que, como los campos se agregan en runtime, cada acceso implica hashear el nombre y buscarlo. Esto es más lento que en un lenguaje estático, donde el compilador ya conoce los campos de cada clase y su tamaño, y acceder a uno es solo sumar un desplazamiento fijo.
+
+Además, un detalle importante que menciona el libro es que para el que programa, una instancia de algo como un `Auto` y otra de un `Perro` son de tipos distintos, y tiene sentido que así sea. Pero para la VM son el mismo tipo, `instance`: lo único que cambia es a qué clase apuntan.
+
+Para crear la instancia se llama a la clase como si fuera una función, por ejemplo `Auto()`, así que no hace falta una instrucción nueva: se usa `OP_CALL`. Lo que sí se agrega es un caso en `callValue` para detectarlo. Al crear la instancia, la vm la pone en el lugar del stack donde estaba la clase y listo: no hace falta abrir un frame porque no hay código Lox para ejecutar.
 
 #### Get y set para los campos
 
-Para cuando la VM ejecuta el OP_GET_PROPERTY la instancia ya está en el tope del stack porque lo que estaba a la izquierda se compiló antes, que eso cambia para el OP_SET_PROPERTY porque abajo queda la instancia y arriba el valor que se le quiere asignar y eso trae la diferencia entre las dos que para la última necesitamos mirar un lugar más abajo del tope para encontrar la instancia.
+Para cuando la VM ejecuta `OP_GET_PROPERTY`, la instancia ya está en el tope del stack, porque lo que estaba a la izquierda del punto se compiló antes. En `OP_SET_PROPERTY` cambia: abajo queda la instancia y arriba el valor que se quiere asignar, así que para encontrar la instancia hay que mirar un lugar más abajo del tope.
 
-En el get, una vez que ya ve que es una instancia busca el campo en el map de la misma y deja el valor en el lugar del stack que ocupaba la instancia, básicamente saca la instancia y mete el valor en el stack. En el set guarda el valor en el campo, saca el valor y la instancia y vuelve a meter el valor. Con esto se logra que la asignación sea una expresión entonces cuando haces, por ejemplo, print auto.velocidad = 5; se termina devolviendo el 5 que se usa después para imprimir.
+En el **get**, una vez que ya ve que es una instancia, busca el campo en el map de la misma y deja el valor en el lugar del stack que ocupaba la instancia, básicamente saca la instancia y mete el valor en el stack. En el **set** guarda el valor en el campo, saca el valor y la instancia y vuelve a meter el valor. Con esto se logra que la asignación sea una expresión entonces cuando haces, por ejemplo, `print auto.velocidad = 5;` se termina devolviendo el 5 que se usa después para imprimir.
 
-Un detalle de los campos para Lox es que no se declaran entonces si se asigna uno que no existía simplemente lo crea y guarda el valor, pero si existía lo pisa, con eso ya tenemos el crear y el modificar, pero si a la hora de querer leerlo no existe ahí sí levantamos un error.
+En Lox los campos no se declaran: si se asigna uno que no existía, se crea, y si ya existía, se pisa. Con eso ya tenemos crear y modificar. En cambio, leer un campo que no existe es un error.
 
-Los errores en runtime que tenemos acá son el que recién mencionamos de que no existe el campo en la instancia, el de tratar de leer el valor de algo que no es una instancia y también tratar de asignar a algo que no es una instancia, básicamente antes de leer o asignar la vm se fija que sea una instancia y si no lo es da error, y esto incluye a las clases, así que algo como A.x = 1 también es un error. Pero con un detalle y es que un campo puede ser nil y existir claramente, y como usamos un map que devuelve nil tanto si es el valor como si no lo encontró ahí tenemos que estar atentos para diferenciar los dos casos, esto es particular de Go y de que usamos un map.
+Antes de leer o asignar, la VM se fija que el valor sea una instancia, y si no lo es, da error. Esto incluye a las clases, así que algo como `A.x = 1` también es un error. Los errores de runtime de esta parte son entonces tres: leer un campo que no existe, leer de algo que no es una instancia y asignar a algo que no es una instancia. Un detalle propio de Go es que un campo puede existir y valer `nil`, y el map de Go también devuelve `nil` cuando no encuentra la clave. Para distinguir los dos casos usamos la forma `valor, ok := fields[nombre]`, donde `ok` indica si el campo existe.
 
-Sobre limitaciones conocidas para esta parte tenemos que no se puede borrar un campo porque si le asignas nil dijimos que es válido y sigue existiendo. Tampoco tenemos forma de preguntar si existe el campo sin que nos de error. 
+Sobre limitaciones conocidas para esta parte, tenemos que no se puede borrar un campo porque si le asignas `nil`, dijimos que era válido y por lo tanto seguiróa existiendo. Tampoco tenemos forma de preguntar si existe el campo sin que nos de error.
 
 ### Diferencias con el libro
 
@@ -172,17 +196,19 @@ Sobre limitaciones conocidas para esta parte tenemos que no se puede borrar un c
 8. **OP_SET_GLOBAL**: en el libro se guarda el valor en la tabla y si la variable no existía se borra y se levanta el error. Nosotros hacemos la pregunta antes, nos fijamos si la variable existe en el `map`, y si no existe levantamos el error sin haber guardado nada, así nunca hay que borrar. El resultado es el mismo, una variable que no se declaró no se crea por asignarla.
 9. **Leer el nombre de una variable**: en el libro el `READ_STRING` no chequea que la constante sea un string, y en glox el `readString()` sí lo chequea y devuelve un error si no lo es.
 10. **Orden de los upvalues abiertos**: el libro ordena la lista comparando punteros, y en Go no se puede, así que cada upvalue guarda su posición en el stack (`stackIndex`) y comparamos eso.
+11. Aridad de las nativas: el libro no la chequea pero nosotros sí, con el mismo error que las funciones de Lox.
 
 ### Limitaciones conocidas
 
-Si bien estas limitaciones las fuimos contando en cada sección donde aparecen, para dejarlo más claro las enumeramos acá. Son límites que la VM tiene y el tree-walk no y como son comportamientos que dependen de la implementación y no del lenguaje, los documentamos y un programa en Lox no debería depender de ellos.
+Si bien estas limitaciones las fuimos contando en cada sección donde aparecen, para dejarlo más claro las enumeramos acá. Son límites que el **bytecode compiler** tiene y el **tree-walk interpreter** no y como son comportamientos que dependen de la implementación y no del lenguaje, los documentamos y un programa en Lox no debería depender de ellos.
 
-- **Llamadas anidadas**: puede haber como mucho 63 llamadas anidadas, porque la VM tiene un máximo de 64 frames y el script ocupa uno. Si se pasa corta con un error de stack overflow mientras que el tree-walk aguanta una recursión mucho más profunda. Si bien esto es un numero que sigue el libro decidimos tomar ese mismo.
+- **Llamadas anidadas**: puede haber como mucho 63 llamadas anidadas, porque la VM tiene un máximo de 64 frames y el script ocupa uno. Si se pasa corta con un error de `stack overflow` mientras que el tree-walk aguanta una recursión mucho más profunda. Si bien esto es un numero que sigue el libro, decidimos tomar ese mismo.
 - **Variables locales**: una función puede tener como mucho 255, contando sus parámetros, porque el operando de una local ocupa un byte y el slot 0 queda reservado para la función. El tree-walk no tiene este límite.
 - **Constantes**: cada función puede tener como mucho 256 constantes, porque su posición también ocupa un byte. Como cada función tiene su propio chunk el límite es por función, y en el tree-walk no existe. Con las clases, los nombres de las clases y de los campos también ocupan lugar entre esas constantes.
-- **Tamaño de un salto**: el cuerpo de un if o de un while o for no puede pasar de los 65.535 bytes porque el salto se guarda en dos bytes, y esto también limita a break y continue. En el tree-walk no hay límite.
+- **Tamaño de un salto**: el cuerpo de un `if`, de un `while` o `for` no puede pasar de los 65.535 bytes porque el salto se guarda en dos bytes, y esto también limita a `break` y `continue`. En el tree-walk no hay límite.
+- **Upvalues**: una función puede capturar como mucho 256 variables de funciones que la envuelven, porque la posición de cada upvalue se emite en un byte. El tree-walk no tiene este límite.
 
-### Tests
+## Tests
 
 Para la VM implementamos una serie de tests unitarios, validando que la ejecución de cada instrucción tenga su efecto esperado. Para correrlos:
 
