@@ -136,10 +136,6 @@ fun merge(izquierda, derecha) {
     return resultado;
 }
 
-// MERGESORT TESTS
-
-print "--- MERGESORT ORDENA [0, 7, 4, 1, 8, 5, 2, 9, 6, 3] ---";
-
 var desordenada = crearLista();
 var esperada = crearLista();
 
@@ -147,17 +143,6 @@ for (var i = 0; i < 10; i = i + 1) {
     insertarUltimo(desordenada, (i * 7) % 10);
     insertarUltimo(esperada, i);
 }
-
-var res = mergeSort(desordenada);
-verificar(sonIguales(res, esperada));
-
-
-print "--- MERGESORT CON UNA LISTA VACIA [] ---";
-
-verificar(estaVacia(mergeSort(crearLista())));
-
-
-print "--- MERGESORT CON REPETIDOS [3, 1, 3] ---";
 
 var conRepetidos = crearLista();
 insertarUltimo(conRepetidos, 3);
@@ -169,19 +154,34 @@ insertarUltimo(esperadaConRepetidos, 1);
 insertarUltimo(esperadaConRepetidos, 3);
 insertarUltimo(esperadaConRepetidos, 3);
 
+var ordenada1 = crearLista();
+var ordenada2 = crearLista();
+for (var i = 0; i < 10; i = i + 1) {
+    insertarUltimo(ordenada1, i);
+    insertarUltimo(ordenada2, i);
+}
+
+// MERGESORT TESTS
+
+print "********** MERGSORT **********";
+print " ";
+
+print "--- MERGESORT CON LISTA DESORDENADA [0, 7, 4, 1, 8, 5, 2, 9, 6, 3] ---";
+var res = mergeSort(desordenada);
+verificar(sonIguales(res, esperada));
+
+print "--- MERGESORT CON UNA LISTA VACIA [] ---";
+verificar(estaVacia(mergeSort(crearLista())));
+
+print "--- MERGESORT CON REPETIDOS [3, 1, 3] ---";
 var res = mergeSort(conRepetidos);
 verificar(sonIguales(res, esperadaConRepetidos));
 
+print "--- MERGESORT LISTA YA ORDENADA [1, 2, 3, 4, 5, 6, 7, 8, 9] ---";
+var res = mergeSort(ordenada1);
+verificar(sonIguales(res, ordenada2));
 
-print "--- MERGESORT LISTA YA ORDENADA [1, 2, 3, 4, 5, 6] ---";
-
-var ordenada = crearLista();
-insertarUltimo(conRepetidos, 1);
-insertarUltimo(conRepetidos, 2);
-insertarUltimo(conRepetidos, 3);
-insertarUltimo(conRepetidos, 4);
-insertarUltimo(conRepetidos, 5);
-insertarUltimo(conRepetidos, 6);
-
-var res = mergeSort(ordenada);
-verificar(sonIguales(res, ordenada));
+// QUICKSORT
+print " ";
+print "********** QUICKSORT **********";
+print " ";
