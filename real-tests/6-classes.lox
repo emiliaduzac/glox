@@ -1,0 +1,116 @@
+print "--- UNA INSTANCIA NO ES SU CLASE ---";
+class Dog {}
+var dog = Dog();
+
+if (dog != Dog) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- CAMPOS DE UN PAR FUNCIONA BIEN ---";
+class Pair {}
+var pair = Pair();
+pair.first = 1;
+pair.second = 2;
+
+if (pair.first + pair.second == 3) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- LA ASIGNACION DE UN CAMPO DEVUELVE EL VALOR ---";
+class Toast {}
+var toast = Toast();
+
+if ((toast.jam = "grape") == "grape") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- ASIGNAR DE NUEVO PISA EL VALOR DEL CAMPO ---";
+var car = Pair();
+car.speed = 10;
+car.speed = car.speed + 5;
+
+if (car.speed == 15) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- DOS INSTANCIAS CON LOS MISMOS CAMPOS SON DISTINTAS ---";
+var cat = Pair();
+cat.name = "Michi";
+var otherCat = Pair();
+otherCat.name = "Michi";
+
+if (cat != otherCat) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UNA VARIABLE QUE APUNTA A LA MISMA INSTANCIA ES IGUAL Y LA MODIFICA SIN TOCAR A LAS DEMAS ---";
+var bird = Pair();
+bird.name = "Piolin";
+var otherBird = Pair();
+otherBird.name = "Piolin";
+var sameBird = bird;
+sameBird.name = "Tweety";
+
+if (sameBird == bird and bird.name == "Tweety" and otherBird.name == "Piolin") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN CAMPO QUE VALE NIL EXISTE ---";
+var empty = Pair();
+empty.value = nil;
+
+if (empty.value == nil) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- ASIGNACION ENCADENADA DE CAMPOS ---";
+var point = Pair();
+point.x = point.y = 5;
+
+if (point.x == 5 and point.y == 5) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UNA FUNCION MODIFICA LA MISMA INSTANCIA QUE RECIBE ---";
+fun increment(counter) {
+    counter.value = counter.value + 1;
+}
+class Counter {}
+var counter = Counter();
+counter.value = 0;
+for (var i = 0; i < 3; i = i + 1) increment(counter);
+
+if (counter.value == 3) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN CAMPO PUEDE GUARDAR UNA FUNCION Y LLAMARSE ---";
+fun add(x, y) {
+    return x + y;
+}
+var calculator = Pair();
+calculator.operation = add;
+
+if (calculator.operation(2, 3) == 5) {
+    print "OK";
+} else {
+    print "ERROR";
+}
