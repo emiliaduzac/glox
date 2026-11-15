@@ -273,7 +273,10 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			if !ok {
 				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
 			}
-			vm.stack[len(vm.stack)-1] = value
+			if _, err := vm.pop(); err != nil {
+				return err
+			}
+			vm.push(value)
 
 		case c.OP_SET_PROPERTY:
 			object, err := vm.peek(1)
@@ -288,12 +291,15 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			if err != nil {
 				return err
 			}
-			value, err := vm.pop()
+			value, err := vm.peek(0)
 			if err != nil {
 				return err
 			}
 			instance.fields[name] = value
-			vm.stack[len(vm.stack)-1] = value
+			if err := vm.popTwo(); err != nil {
+				return err
+			}
+			vm.push(value)
 
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
@@ -538,7 +544,7 @@ func (vm *VirtualMachine) popNumberOperands() (float64, float64, error) {
 	return l, r, nil
 }
 
-// popTwo saca los dos operandos del tope del stack
+// popTwo saca los dos valores del tope del stack
 func (vm *VirtualMachine) popTwo() error {
 	if _, err := vm.pop(); err != nil {
 		return err
