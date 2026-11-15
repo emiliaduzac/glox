@@ -175,6 +175,14 @@ Agregar funciones hizo que pasemos de que el compilador escriba todo en un únic
 
 En cuanto a una diferencia importante en general con el libro es que en estos capítulos usa C para implementar clox, por lo que tiene que hacer manejo de memoria, pero nosotros en glox lo usamos como un struct común que luego se libera por el garbage collector propio de Go cuando no tiene más referencias.
 
+#### Declaracion de fucniones
+Cuando el compilador esta compilando el script y se topa con una funcoin tiene que dejar ahi y pasar a compialr el cuempo de esa funcion porqu eva a tener su chunk, su variables locales yc uando termine tiene que vovler al scrip donde habia quedado. Pra resolver esto el libro plantea tener un compilador neuvo por cad afuncion y cad auno cuarda una referecia al compilador de la funcion que lo continee que eso es el enclosing., asi soabe donde vovler. 
+
+Aca suge una diferencia con el libro, porque ahhi propone guardar lo que comparten todos los compiladores en dos variables globales, parser (por dónde va leyendo los tokens, los errores que encontró y si está en modo pánico) y current (el compilador de la función que se está compilando, que se cambia al entrar a una función y se vuelve a poner al salir).
+
+Nosotros lo hicimos distinto al libro donde current es un puntero que hay que ir cambiando a mano, apunta al compilador de la función hasta que la termina y después hay que volver a ponerlo en el de afuera. Es algo fácil de olvidarse y que después rompe todo. En Go no hace falta, porque cada compilador es un objeto con sus propios métodos, y cuando llamamos a un método, ese método ya trabaja sobre el compilador con el que lo llamamos. Por ejemplo para compilar el cuerpo de una función se llama a fc.block(), y ahí adentro todo lo que se haga es sobre fc, que es el compilador de esa función. Y cuando termina seguimos con el compilador de afuera sin haber cambiado nada. Así nunca hay que acordarse de volver para atrás. Con el parser es algo parecido, porque como cada linea del REPL es una compialcion neuva una variable global habrai que reiniciarla cada vez.
+
+Entonces lo que se comparte lo juntamos en parserState, que usan todos los compiladores por puntero, y lo propio de cada función queda en su Compiler. Se comparte por puntero porque tiene que haber un solo cursor, una sola lista de errores y un solo modo pánico. Si cada función tuviera una copia, cuando termina el cuerpo de una función el compilador de afuera no sabría por dónde seguir leyendo.
 
 
 ### Tests
