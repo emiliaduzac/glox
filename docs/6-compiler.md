@@ -200,18 +200,33 @@ Un return fuera de una función no tiene sentido porque no hay nada de donde sal
 
 ### Closures
 
-Al definir las funciones, permitíamos que estas usaran las variables declaradas dentro de su propio cuerpo (locales) o las globales, pero como las funciones se pueden anidar, podrían usar variables que son locales de otra función que las envuelve, y ahí no calificarían ni como globales ni como locales de la función más interna.
+#### Variables de otra función
 
-En los bloques por ejemplo esto no era un problema porque todos los bloques de una función comparten el mismo `Compiler` y la misma ventana del stack, pero ahora que existen las funciones cada una tiene su propio `Compiler`, con su propia lista de locales y su propia ventana en el stack, por lo que el índice que la variable tiene en la función de afuera no le sirve a la de adentro.
-Además, la función interna se podría devolver o guardar en una variable de afuera y seguir viva después de que la función que la envuelve retornó y su ventana se sacó del stack, junto con la variable que la interna necesitaba.
+Al definir las funciones, permitíamos que estas usaran las variables declaradas dentro de su propio cuerpo (locales) o las globales, pero como las funciones se pueden anidar, podrían usar variables que son locales de otra función que las envuelve, y ahí no calificarían ni como globales ni como locales de la función más interna. Además, la función interna se podría devolver o guardar en una variable de afuera y seguir viva después de que la función que la envuelve retornó y su ventana se sacó del stack, junto con la variable que la interna necesitaba.
 
-Otro problema es que cada vez que se ejecuta la declaración de una función interna (por ejemplo, en cada llamada a la de afuera), esta tiene que capturar sus propias variables. Entonces no alcanza con guardar en la función compilada las variables que usa, porque es una sola y la compartirían todas.
+Otro problema es que la declaración de una función interna se ejecuta una vez por cada llamada a la de afuera, y cada una de esas llamadas tiene sus propias variables. Entonces la función interna tiene siempre el mismo código, pero cada vez tiene que usar variables distintas, y no alcanza con guardarlas en la función compilada porque hay una sola, y terminarían usando las mismas variables.
 
-Para resolverlo el libro propone incorporar los `Closures` como un envoltorio de la función, y entonces:
+#### Function y Closure
 
-- **`Function`:** función estática. Se arma en tiempo de compilación y vive en el pool de constantes.
-- **`Closure`:** función viva en tiempo de ejecución. Se compone de una `Function` y un slice de **upvalues**, que serían las variables _locales pero externas_: una variable que la función usa, pero que no declaró ella misma.
+Para resolverlo el libro separa la función en dos:
 
+- **`Function`:** la arma el compilador, una sola por cada declaración. Tiene el código de la función y queda como constante en el chunk de la función que la contiene.
+- **`Closure`:** lo crea la VM cada vez que se ejecuta la declaración. Tiene un puntero a la `Function` y las variables de afuera que esa función usa (**upvalues**).
+
+Así el código de la función es el mismo, pero cada closure tiene sus propias variables.
+
+#### Upvalues
+
+Ahora, cuando compilamos el cuerpo de una función y encontramos una variable, buscamos en este orden: es local? → es un upvalue? → es global?.
+
+Un **upvalue** es una variable local pero externa: la función la usa, pero no la declaró ella, sino otra función que la envuelve.
+Para validar si es un upvalue, primero se busca en las locales del `enclosing` y, si no está, se ve si el `enclosing` la tiene como upvalue propio. Para que esto funcione, una función captura no solo las variables de afuera que usa ella, sino también las que usan las funciones declaradas dentro suyo. Esto es porque cuando se crea el closure de una función interna, solo se está ejecutando la que la envuelve directamente, y las de más arriba podrían haber retornado, así que la del medio es la única que puede pasarle la variable.
+
+#### Titulo ?
+
+Lo primero que tuvimos que hacer es dejar de emitir `OP_CONSTANT` para las funciones y emitir `OP_CLOSURE`, para que la VM distinga y sepa que tiene que crear el closure.
+
+Luego, al compilar las funciones, detectar cada upvalue hallado y guardarlo en un slice. Por cada upvalue, nos guardamos un booleano que indica si es una local de la función que la envuelve o un upvalue de ella (porque la variable viene de más afuera), y su índice en las locales o en los upvalues de esa función, según el caso. Al igual que con las locales, no solo las guardamos sino que emitimos `OP_GET_UPVALUE` / `OP_SET_UPVALUE`, con la posición en ese slice como operando, para que la VM sepa dónde ir a buscarla. A su vez, como el `Compiler` desaparece al terminar de compilar, cada `Function` guarda la cantidad de upvalues que tiene, así la VM sabe cuántos pares tiene que leer luego de un `OP_CLOSURE`.
 
 ### Tests
 
