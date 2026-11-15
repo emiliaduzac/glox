@@ -198,6 +198,18 @@ El return es un statement que si tiene una expresión la compila y emite un OP_R
 
 Un return fuera de una función no tiene sentido porque no hay nada de donde salir. Para detectarlo el compilador se fija si lo que está compilando es el script y si es así da un error. Ese error no corta la compilación si no que sigue leyendo para avisar si hay más errores porque el código está bien escrito y solo rompe una regla del lenguaje. Con esto nos acomplamso a lo que dice el libro que se podria permitir esto pero elige que sea un error. 
 
+### Clases
+
+#### Declaracion de clases
+
+Compilar una clase se hace como una declaración de una variable pero usando OP_CLASS que crea la clase y después esta se define como una variable global o queda como local en su slot. Si queda como local las reglas que ya tenemos siguen valiendo para las clases, como el shadowing para una variable de afuera, y que es un error repetir el nombre en el mismo scope local. Y en cuanto a si queda global vale la regla de que sí se puede redeclarar como pasa cuando usamos var.
+
+El nombre de la clase va como constante aunque sea una local porque OP_CLASS lo necesita para que la clase sepa cómo se llama.
+
+Cuando hay una variable local, ya sea que fue por fun o var, parseVariable no agrega su nombre a las constantes porque se lee por su posición en el stack, pero acá para la clase eso no sirve, por eso classDeclaration usa identifierConstant y después la declara con declareLocalVariable como hace el libro.
+
+Una diferencia con el libro es que el consume del libro reporta el error y la función sigue, pero en Go devuelve el error y hay que cortar, es por eso que classDeclaration devuelve error y en el libro tienen un void.
+
 ### Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
