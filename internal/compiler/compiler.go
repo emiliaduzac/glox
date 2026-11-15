@@ -301,7 +301,8 @@ func (c *Compiler) classDeclaration() error {
 	if err := c.cursor.Consume(token.IDENTIFIER, "class name"); err != nil {
 		return err
 	}
-	nameConstant, err := c.identifierConstant(c.cursor.Previous())
+	className := c.cursor.Previous()
+	nameConstant, err := c.identifierConstant(className)
 	if err != nil {
 		return err
 	}
@@ -310,10 +311,22 @@ func (c *Compiler) classDeclaration() error {
 	c.emit(byte(chunk.OP_CLASS), nameConstant)
 	c.defineVariable(nameConstant)
 
+	if err := c.namedVariable(className, false); err != nil {
+		return err
+	}
 	if err := c.cursor.Consume(token.LEFT_BRACE, "'{' before class body"); err != nil {
 		return err
 	}
-	return c.cursor.Consume(token.RIGHT_BRACE, "'}' after class body")
+	for !c.cursor.Check(token.RIGHT_BRACE) && !c.cursor.Check(token.EOF) {
+		if err := c.method(); err != nil {
+			return err
+		}
+	}
+	if err := c.cursor.Consume(token.RIGHT_BRACE, "'}' after class body"); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
+	return nil
 }
 
 func (c *Compiler) funDeclaration() error {
@@ -375,6 +388,21 @@ func (c *Compiler) compileFunction(funcType FunctionType) error {
 		}
 		c.emit(isLocal, upvalue.index)
 	}
+	return nil
+}
+
+func (c *Compiler) method() error {
+	if err := c.cursor.Consume(token.IDENTIFIER, "method name"); err != nil {
+		return err
+	}
+	constant, err := c.identifierConstant(c.cursor.Previous())
+	if err != nil {
+		return err
+	}
+	if err := c.compileFunction(TYPE_FUNCTION); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_METHOD), constant)
 	return nil
 }
 
