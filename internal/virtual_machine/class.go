@@ -25,3 +25,16 @@ func newInstance(class *class) *instance {
 func (i *instance) String() string {
 	return i.class.name + " instance"
 }
+
+type boundMethod struct {
+	receiver any
+	method   *closure
+}
+
+func newBoundMethod(receiver any, method *closure) *boundMethod {
+	return &boundMethod{receiver: receiver, method: method}
+}
+
+func (b *boundMethod) String() string {
+	return b.method.String()
+}
