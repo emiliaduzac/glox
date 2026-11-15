@@ -116,6 +116,15 @@ Una difernecia con el libro que tenemos es qye para agregar una nativa el libro 
 8. **OP_SET_GLOBAL**: en el libro se guarda el valor en la tabla y si la variable no existía se borra y se levanta el error. Nosotros hacemos la pregunta antes, nos fijamos si la variable existe en el `map`, y si no existe levantamos el error sin haber guardado nada, así nunca hay que borrar. El resultado es el mismo, una variable que no se declaró no se crea por asignarla.
 9. **Leer el nombre de una variable**: en el libro el `READ_STRING` no chequea que la constante sea un string, y en glox el `readString()` sí lo chequea y devuelve un error si no lo es.
 
+### Limitaciones conocidas
+
+Si bien estas limitaciones las fuimos contando en cada sección donde aparecen, para dejarlo más claro las enumeramos acá. Son límites que la VM tiene y el tree-walk no y como son comportamientos que dependen de la implementación y no del lenguaje, los documentamos y un programa en Lox no debería depender de ellos.
+
+- **Llamadas anidadas**: puede haber como mucho 63 llamadas anidadas, porque la VM tiene un máximo de 64 frames y el script ocupa uno. Si se pasa corta con un error de stack overflow mientras que el tree-walk aguanta una recursión mucho más profunda. Si bien esto es un numero que sigue el libro decidimos tomar ese mismo.
+- **Variables locales**: una función puede tener como mucho 255, contando sus parámetros, porque el operando de una local ocupa un byte y el slot 0 queda reservado para la función. El tree-walk no tiene este límite.
+- **Constantes**: cada función puede tener como mucho 256 constantes, porque su posición también ocupa un byte. Como cada función tiene su propio chunk el límite es por función, y en el tree-walk no existe.
+- **Tamaño de un salto**: el cuerpo de un if o de un while o for no puede pasar de los 65.535 bytes porque el salto se guarda en dos bytes, y esto también limita a break y continue. En el tree-walk no hay límite.
+
 ### Tests
 
 Para la VM implementamos una serie de tests unitarios, validando que la ejecución de cada instrucción tenga su efecto esperado. Para correrlos:
