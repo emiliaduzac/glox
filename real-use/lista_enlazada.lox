@@ -1,0 +1,66 @@
+class Nodo {}
+class Lista {}
+
+fun crearNodo(dato) {
+    var nodo = Nodo();
+    nodo.dato = dato;
+    nodo.proximo = nil;
+    return nodo;
+}
+
+fun crearLista() {
+    var lista = Lista();
+    lista.primero = nil;
+    lista.ultimo = nil;
+    lista.cantidad = 0;
+    return lista;
+}
+
+fun estaVacia(lista) {
+    return lista.cantidad == 0;
+}
+
+fun insertarPrimero(lista, dato) {
+    var nodo = crearNodo(dato);
+    nodo.proximo = lista.primero;
+    if (estaVacia(lista)) lista.ultimo = nodo;
+    lista.primero = nodo;
+    lista.cantidad = lista.cantidad + 1;
+}
+
+fun insertarUltimo(lista, dato) {
+    var nodo = crearNodo(dato);
+    if (estaVacia(lista)) {
+        lista.primero = nodo;
+    } else {
+        lista.ultimo.proximo = nodo;
+    }
+    lista.ultimo = nodo;
+    lista.cantidad = lista.cantidad + 1;
+}
+
+fun borrarPrimero(lista) {
+    if (estaVacia(lista)) return nil;
+    var dato = lista.primero.dato;
+    lista.primero = lista.primero.proximo;
+    if (lista.primero == nil) lista.ultimo = nil;
+    lista.cantidad = lista.cantidad - 1;
+    return dato;
+}
+
+fun verPrimero(lista) {
+    if (estaVacia(lista)) return nil;
+    return lista.primero.dato;
+}
+
+fun largo(lista) {
+    return lista.cantidad;
+}
+
+fun iterar(lista, visitar) {
+    var actual = lista.primero;
+    while (actual != nil) {
+        if (!visitar(actual.dato)) break;
+        actual = actual.proximo;
+    }
+}
