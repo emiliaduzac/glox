@@ -256,6 +256,25 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			vm.push(newClass(name))
 
+		case c.OP_GET_PROPERTY:
+			object, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			instance, ok := object.(*instance)
+			if !ok {
+				return errors.NewLoxError(vm.currentLine(), "only instances have properties")
+			}
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			value, ok := instance.fields[name]
+			if !ok {
+				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
+			}
+			vm.stack[len(vm.stack)-1] = value
+
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
 			offset, err := vm.readShort()

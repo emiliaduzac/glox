@@ -1946,3 +1946,81 @@ func TestCallClass(t *testing.T) {
 		utils.AssertValue(t, first != second, true)
 	})
 }
+
+func TestOpGetProperty(t *testing.T) {
+	getProperty := func(chunk *c.Chunk, object any, name string) {
+		writeConstant(chunk, object)
+		index := chunk.AddConstant(name)
+		chunk.Write(byte(c.OP_GET_PROPERTY), line)
+		chunk.Write(byte(index), line)
+	}
+
+	t.Run("Reemplaza la instancia por el valor del campo", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = "rojo"
+		getProperty(chunk, auto, "color")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], "rojo")
+	})
+
+	t.Run("Lee el campo con el nombre que indica el operando", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = "rojo"
+		auto.fields["marca"] = "Fiat"
+		getProperty(chunk, auto, "marca")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, stackValues(vm)[0], "Fiat")
+	})
+
+	t.Run("Un campo que vale nil existe y se puede leer", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = nil
+		getProperty(chunk, auto, "color")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], nil)
+	})
+
+	t.Run("Error si la instancia no tiene ese campo", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		getProperty(chunk, newInstance(newClass("Auto")), "color")
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "undefined property 'color'")
+	})
+
+	t.Run("Error si se lee una propiedad de algo que no es una instancia", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			object any
+		}{
+			{"un número", 1.0},
+			{"nil", nil},
+			{"una clase", newClass("Auto")},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				getProperty(chunk, test.object, "color")
+
+				err := run(vm, chunk)
+
+				utils.AssertErrorMessage(t, err, "only instances have properties")
+			})
+		}
+	})
+}
