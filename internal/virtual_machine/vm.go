@@ -237,8 +237,22 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			vm.stack[frame.slots+int(slot)] = value
 
 		// UpValues
-		// case c.OP_GET_UPVALUE:
-		// case c.OP_SET_UPVALUE:
+		case c.OP_GET_UPVALUE:
+			slot, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			vm.push(*frame.closure.upvalues[slot].location)
+		case c.OP_SET_UPVALUE:
+			slot, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			value, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			*frame.closure.upvalues[slot].location = value
 
 		case c.OP_CALL:
 			argCount, err := vm.readByte()
