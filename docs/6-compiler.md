@@ -198,6 +198,21 @@ El return es un statement que si tiene una expresión la compila y emite un OP_R
 
 Un return fuera de una función no tiene sentido porque no hay nada de donde salir. Para detectarlo el compilador se fija si lo que está compilando es el script y si es así da un error. Ese error no corta la compilación si no que sigue leyendo para avisar si hay más errores porque el código está bien escrito y solo rompe una regla del lenguaje. Con esto nos acomplamso a lo que dice el libro que se podria permitir esto pero elige que sea un error. 
 
+### Closures
+
+Al definir las funciones, permitíamos que estas usaran las variables declaradas dentro de su propio cuerpo (locales) o las globales, pero como las funciones se pueden anidar, podrían usar variables que son locales de otra función que las envuelve, y ahí no calificarían ni como globales ni como locales de la función más interna.
+
+En los bloques por ejemplo esto no era un problema porque todos los bloques de una función comparten el mismo `Compiler` y la misma ventana del stack, pero ahora que existen las funciones cada una tiene su propio `Compiler`, con su propia lista de locales y su propia ventana en el stack, por lo que el índice que la variable tiene en la función de afuera no le sirve a la de adentro.
+Además, la función interna se podría devolver o guardar en una variable de afuera y seguir viva después de que la función que la envuelve retornó y su ventana se sacó del stack, junto con la variable que la interna necesitaba.
+
+Otro problema es que cada vez que se ejecuta la declaración de una función interna (por ejemplo, en cada llamada a la de afuera), esta tiene que capturar sus propias variables. Entonces no alcanza con guardar en la función compilada las variables que usa, porque es una sola y la compartirían todas.
+
+Para resolverlo el libro propone incorporar los `Closures` como un envoltorio de la función, y entonces:
+
+- **`Function`:** función estática. Se arma en tiempo de compilación y vive en el pool de constantes.
+- **`Closure`:** función viva en tiempo de ejecución. Se compone de una `Function` y un slice de **upvalues**, que serían las variables _locales pero externas_: una variable que la función usa, pero que no declaró ella misma.
+
+
 ### Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
