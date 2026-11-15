@@ -184,6 +184,14 @@ Nosotros lo hicimos distinto al libro donde current es un puntero que hay que ir
 
 Entonces lo que se comparte lo juntamos en parserState, que usan todos los compiladores por puntero, y lo propio de cada función queda en su Compiler. Se comparte por puntero porque tiene que haber un solo cursor, una sola lista de errores y un solo modo pánico. Si cada función tuviera una copia, cuando termina el cuerpo de una función el compilador de afuera no sabría por dónde seguir leyendo.
 
+#### Parametros
+
+Los parametros de una funcion para nosotros son varibles locales de la funcion, y cada uno suma a la aridad de la misma. Asi que los aprametros ocupan las primeras posiciones que siguen depues de la funcion misma que es donde la vm deja los agumento cuando se llma asi que no hace falta copiar anda ahi. El maximo sigue siendo de 255 parametro igual que la primera parte del tree-walk.
+
+#### Llamadas
+Una llamada a la funcion como por ejemplo add(1,2) para compilarla, primero se compila lo que se queire llamar que es add en este caso, despues los argumentos de izquierda a derecha y al final se emite un OP_CALL que lleva al cantidad de argumentos. Como esa cantidad va en un byte enteonces la maxima cantidad es de 255 igual que en el tree walk. 
+Para qu el compilador puede reconocer la llmada , el '(' pasa a ser un operador infijo en el pratt parser con la precedencia de llamada.  
+
 
 ### Tests
 
