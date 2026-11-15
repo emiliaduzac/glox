@@ -295,6 +295,15 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			vm.push(newClass(name))
 
+		case c.OP_METHOD:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			if err := vm.defineMethod(name); err != nil {
+				return err
+			}
+
 		case c.OP_GET_PROPERTY:
 			object, err := vm.peek(0)
 			if err != nil {
@@ -686,4 +695,18 @@ func (vm *VirtualMachine) closeUpvalues(last int) {
 		up.location = &up.closed
 		vm.openUpvalues = up.next
 	}
+}
+
+func (vm *VirtualMachine) defineMethod(name string) error {
+	method, err := vm.peek(0)
+	if err != nil {
+		return err
+	}
+	klass, err := vm.peek(1)
+	if err != nil {
+		return err
+	}
+	klass.(*class).methods[name] = method.(*closure)
+	_, err = vm.pop()
+	return err
 }

@@ -2018,6 +2018,73 @@ func TestOpClass(t *testing.T) {
 	})
 }
 
+func TestOpMethod(t *testing.T) {
+	writeMethod := func(chunk *c.Chunk, name string, method *c.Function) {
+		writeClosure(chunk, method)
+		index := chunk.AddConstant(name)
+		chunk.Write(byte(c.OP_METHOD), line)
+		chunk.Write(byte(index), line)
+	}
+
+	t.Run("Guarda el closure en los métodos de la clase con el nombre del operando", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		acelerar := c.NewFunction()
+		writeConstant(chunk, auto)
+		writeMethod(chunk, "acelerar", acelerar)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(auto.methods), 1)
+		utils.AssertValue(t, auto.methods["acelerar"].function, acelerar)
+	})
+
+	t.Run("Saca el closure del stack y deja la clase en el tope", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		writeConstant(chunk, auto)
+		writeMethod(chunk, "acelerar", c.NewFunction())
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], auto)
+	})
+
+	t.Run("Varios OP_METHOD seguidos agregan cada método a la misma clase", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		acelerar, frenar := c.NewFunction(), c.NewFunction()
+		writeConstant(chunk, auto)
+		writeMethod(chunk, "acelerar", acelerar)
+		writeMethod(chunk, "frenar", frenar)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(auto.methods), 2)
+		utils.AssertValue(t, auto.methods["acelerar"].function, acelerar)
+		utils.AssertValue(t, auto.methods["frenar"].function, frenar)
+	})
+
+	t.Run("Un método con el mismo nombre que otro lo pisa", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		primero, segundo := c.NewFunction(), c.NewFunction()
+		writeConstant(chunk, auto)
+		writeMethod(chunk, "acelerar", primero)
+		writeMethod(chunk, "acelerar", segundo)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(auto.methods), 1)
+		utils.AssertValue(t, auto.methods["acelerar"].function, segundo)
+	})
+}
+
 func TestCallClass(t *testing.T) {
 	callClass := func(chunk *c.Chunk, class *class) {
 		writeConstant(chunk, class)
