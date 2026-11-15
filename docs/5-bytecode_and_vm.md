@@ -1,4 +1,4 @@
-## Bytecode y Virtual Machine
+# Bytecode y Virtual Machine
 
 En nuestra versión anterior, teníamos un **tree walking interpreter**, pero vimos que esto hacía que no fuera veloz. Para mejorar nuestro lenguaje, implementaremos un **bytecode compiler**.
 
@@ -11,7 +11,7 @@ Como _IR_ (Representación Intermedia), utilizamos _bytecode_, con la intención
 
 Estos bytecodes formarán un _instruction set ficticio_, un conjunto secuencial de instrucciones. Nos alcanza con un único conjunto, ya que funcionará donde sea que funcione nuestra VM, sin importar la arquitectura.
 
-### Chunks
+## Chunks
 
 Una instrucción tiene:
 
@@ -20,7 +20,7 @@ Una instrucción tiene:
 
 Los valores que usa el programa se guardan aparte, en un **pool de constantes**, y algunas instrucciones (como `OP_CONSTANT`) usan su operando como índice de ese pool. Por lo que finalmente un **chunk** se compone de este pool y del set de instrucciones.
 
-## Virtual Machine
+# Virtual Machine
 
 La VM simula el comportamiento de una CPU, y será la encargada de ejecutar nuestro código. Se compone de:
 
@@ -31,7 +31,7 @@ Al igual que el intérprete, la VM es la que ejecuta el programa. La diferencia 
 
 Si la vm detecta un error de runtime, como puede ser que se recibe un tipo incorrecto, entonces corta y devuelve el error con la linea. Pero como la vm mira con `peek()` antes de sacar del stack, si falla quedaría basura en el stack. Por este motivo, cuando el `run()` de la VM falla, invocamos a `resetStack()` usando el `defer` de Go. Además de vaciar el stack, ahora también saca los frames y vacía la lista de upvalues abiertos, para que en el REPL la próxima línea no reutilice upvalues que apuntaban a posiciones del stack que ya no existen.
 
-#### Instrucciones de statements y variables globales
+### Instrucciones de statements y variables globales
 
 Con los statements aparecen dos instrucciones. `OP_PRINT` saca el valor del tope del stack y lo imprime, usando el mismo `Stringify` que el tree-walk así los dos motores imprimen igual, por ejemplo un `nil` se muestra como `nil`. `OP_POP` simplemente saca el valor del tope y lo tira.
 
@@ -41,7 +41,7 @@ Para las globales hay tres:
 2. `OP_GET_GLOBAL` busca el nombre en esa tabla y apila el valor, y si no está levanta un error de runtime. Es importante ver que, para saber si está en la tabla usamos `valor, bool`, porque el `map` de Go devuelve `nil` tanto si la variable _no existe_ como si _existe y vale `nil`_, por ejemplo con `var a;`. Queremos esos casos porque uno es un error de que no existe la variable, y el otro no, porque Lox tolera que una variable sea `nil`.
 3. `OP_SET_GLOBAL` primero se fija si la variable existe, y si no existe levanta el error y no la crea, porque en Lox una variable no se puede declarar asignándola, tiene que estar declarada antes con `var`. Si existe le guarda el valor del tope, pero sin sacarlo del stack, porque la asignación es una expresión y su valor se puede seguir usando, como por ejemplo en `a = b = 5`.
 
-#### Variables globales vs locales
+### Variables globales vs locales
 
 La diferencia principal es que las globales son _late bound_: se resuelven en tiempo de ejecución, buscándolas por nombre en una tabla de globales, lo que permite que el código compile aunque se use una variable antes de ser declarada, lo único que importa es que exista cuando se ejecute.
 
@@ -49,7 +49,7 @@ En cambio las locales se resuelven en tiempo de compilación: el compilador ya s
 
 Otra diferencia es lo que sucede al declarar de nuevo una variable. Una global se puede redeclarar y solo se pisa el valor, pero una local en el mismo scope no, eso es un error de compilación. En cambio, con una local de un scope distinto sí se puede, y ahí lo que pasa es el _shadowing_.
 
-#### Control de flujo
+### Control de flujo
 
 Con el control de flujo, la VM deja de ejecutar siempre la instrucción siguiente. Las instrucciones de salto (`OP_JUMP_*`) mueven el instruction pointer hacia **adelante**, salteando instrucciones que no se tienen que ejecutar. En los condicionales, como `if-else`:
 
@@ -60,7 +60,7 @@ La cantidad de bytes a saltear viene en el operando, que ocupa dos bytes, así q
 
 El caso de los ciclos es parecido, pero al revés: el `OP_LOOP` **resta** un offset en vez de sumarlo, para volver al inicio del ciclo.
 
-#### Funciones y call frames
+### Funciones y call frames
 
 Con el agregado de funciones, la VM deja de tener un único chunk e ip para todo el programa, porque cada función tiene su propio chunk. Cuando se llama a una función, la VM tiene que pausar el chunk que estaba ejecutando, guardar por qué instrucción iba (su `ip`) y empezar a ejecutar el chunk de la función llamada. Cuando esa función termina, tiene que poder volver al chunk anterior y seguir desde la instrucción que había guardado.
 
@@ -120,7 +120,7 @@ Una diferencia con el libro que tenemos es que para agregar una nativa, el libro
 
 Además, incorporamos uno de los desafíos de este capítulo: agregarles aridad a las funciones nativas. El libro no la chequea para que llamarlas sea más rápido, así que en clox una llamada como `clock(1)` simplemente ignora el argumento. En glox cada nativa guarda la cantidad de argumentos que espera, y si no coincide, la VM devuelve el mismo error que con una función de Lox. Así se comportan igual que en el tree-walk, donde las nativas también chequean la aridad. Algo positivo de la versión del libro es que permite nativas con una cantidad variable de argumentos, como una `max` que acepte `max(1, 2)` y también `max(1, 2, 3)`. Con nuestro chequeo eso no se puede, pero no le delega a cada función nativa chequear los argumentos que le llegan.
 
-#### Closures
+### Closures
 
 Antes las funciones se cargaban con `OP_CONSTANT` como cualquier otra constante. Ahora la VM las carga con `OP_CLOSURE`, que crea un closure con un puntero a la `Function` y sus propios **upvalues**, y pushea el closure a su stack.
 
@@ -152,29 +152,35 @@ Cuando una variable sale del stack (terminó un bloque o una función retornó),
 
 La lista enlazada está ordenada por posición en el stack, empezando por la más alta (porque el stack siempre se va liberando desde su tope). El libro elige esta estructura porque para mantener el orden a veces hay que insertar en el medio, y al cerrar se sacan los primeros: en un array habría que mover los demás elementos, y en una lista enlazada alcanza con cambiar punteros. Como cada elemento es un upvalue, a estos les agregamos un campo `next` con el siguiente elemento. Por último, el libro compara punteros para mantener la lista ordenada. Como en Go no se pueden comparar punteros con `>`, guardamos también la posición del stack (`stackIndex`) y comparamos eso.
 
-#### Clases e instancias
+### Clases e instancias
 
-Creamos una clase que por ahora solo tiene como dato su nombre. Además de eso el método string para que el Stringify pueda llamarlo e imprimirlo. Si bien el libro habla de que no es estrictamente necesario para el programador que lo use, está bueno para mostrar el nombre en runtime como por ejemplo para el stack trace. 
+**Clases**
 
-Como viene pasando en el resto de la implementación de esta segunda parte no necesitamos el header de Obj ni tampoco el tipo ni las macros que propone el libro, al usar Go alcanza con any y luego pregunta con v.(*class). Siguiendo un poco con esta diferencia con el libro tampoco nos tenemos que hacer cargo de liberar la memoria para las clases.
+Creamos una clase que, por ahora, solo guarda su nombre. Además le agregamos el método `String()`, para que `Stringify` pueda imprimirla. El libro dice que el nombre no es estrictamente necesario para el programador, pero sirve para mostrarlo en runtime, por ejemplo en el **stack trace**.
 
-Llega el momento de las instancias que acá tienen que guardar a qué clase pertenecen para después poder encontrar sus métodos, y además sus propios campos. Sobre estos últimos es que tenemos una diferencia con el libro, porque también como ha pasado a lo largo de esta segunda parte más que nada se refiere a cómo se guarda esto en memoria. En Lox los campos no es que se declaran sino que se agregan en el runtime y se terminan buscando por nombre, ahí es donde el libro usa su tabla de hash y nosotros volvemos a un map[string]any que en el fondo es la misma idea pero difiere porque nosotros usamos Go. Un detalle acá es que como los campos se agregan en el runtime hay que hashear y buscar, frente a ya tenerlo fijo si el compilador los tiene declarados con cada tamaño, que es más rápido porque eso es solo sumar y desplazarse, eso sería una diferencia frente a un lenguaje estático.
+Como viene pasando en el resto de la implementación de esta segunda parte, no necesitamos el header de `Obj` ni tampoco el tipo `OBJ_CLASS` ni las macros que propone el libro: al usar Go alcanza con `any` y luego pregunta con `v.(*class)` para saber si un valor es una clase. Tampoco tenemos que liberar la memoria de las clases, porque lo hace el garbage collector de Go.
 
-Un detalle que también habla el libro y nos parece importante comentarlo es esto, que para el que programa una instancia de algo como un Auto y otra como un Perro son de tipos distintos y tiene toda la lógica que así sea, pero para nosotros en la vm es el mismo instance, digamos que lo único que cambia es a qué clase apuntan.
+**Instancias**
 
-Para crear la instancia se llama a la clase como si fuera una función, como por ejemplo Auto(), por lo que no hace falta una instrucción nueva ya que se usa el OP_CALL y lo que sí cambia es el caso en el callValue para detectarlo. Al crear la instancia la vm la pone en el lugar del stack donde estaba la clase y listo, no es necesario meterse con el frame porque no hay código Lox ahí para ejecutar.
+Una instancia guarda a qué clase pertenece, para después poder encontrar sus métodos, y sus propios campos.
+
+En Lox los campos no se declaran, sino que se agregan en runtime y se buscan por nombre. Para guardarlos, el libro usa su tabla de hash y nosotros un `map[string]any`, que es la misma idea, igual que con las variables globales. Un detalle es que, como los campos se agregan en runtime, cada acceso implica hashear el nombre y buscarlo. Esto es más lento que en un lenguaje estático, donde el compilador ya conoce los campos de cada clase y su tamaño, y acceder a uno es solo sumar un desplazamiento fijo.
+
+Además, un detalle importante que menciona el libro es que para el que programa, una instancia de algo como un `Auto` y otra de un `Perro` son de tipos distintos, y tiene sentido que así sea. Pero para la VM son el mismo tipo, `instance`: lo único que cambia es a qué clase apuntan.
+
+Para crear la instancia se llama a la clase como si fuera una función, por ejemplo `Auto()`, así que no hace falta una instrucción nueva: se usa `OP_CALL`. Lo que sí se agrega es un caso en `callValue` para detectarlo. Al crear la instancia, la vm la pone en el lugar del stack donde estaba la clase y listo: no hace falta abrir un frame porque no hay código Lox para ejecutar.
 
 #### Get y set para los campos
 
-Para cuando la VM ejecuta el OP_GET_PROPERTY la instancia ya está en el tope del stack porque lo que estaba a la izquierda se compiló antes, que eso cambia para el OP_SET_PROPERTY porque abajo queda la instancia y arriba el valor que se le quiere asignar y eso trae la diferencia entre las dos que para la última necesitamos mirar un lugar más abajo del tope para encontrar la instancia.
+Para cuando la VM ejecuta `OP_GET_PROPERTY`, la instancia ya está en el tope del stack, porque lo que estaba a la izquierda del punto se compiló antes. En `OP_SET_PROPERTY` cambia: abajo queda la instancia y arriba el valor que se quiere asignar, así que para encontrar la instancia hay que mirar un lugar más abajo del tope.
 
-En el get, una vez que ya ve que es una instancia busca el campo en el map de la misma y deja el valor en el lugar del stack que ocupaba la instancia, básicamente saca la instancia y mete el valor en el stack. En el set guarda el valor en el campo, saca el valor y la instancia y vuelve a meter el valor. Con esto se logra que la asignación sea una expresión entonces cuando haces, por ejemplo, print auto.velocidad = 5; se termina devolviendo el 5 que se usa después para imprimir.
+En el **get**, una vez que ya ve que es una instancia, busca el campo en el map de la misma y deja el valor en el lugar del stack que ocupaba la instancia, básicamente saca la instancia y mete el valor en el stack. En el **set** guarda el valor en el campo, saca el valor y la instancia y vuelve a meter el valor. Con esto se logra que la asignación sea una expresión entonces cuando haces, por ejemplo, `print auto.velocidad = 5;` se termina devolviendo el 5 que se usa después para imprimir.
 
-Un detalle de los campos para Lox es que no se declaran entonces si se asigna uno que no existía simplemente lo crea y guarda el valor, pero si existía lo pisa, con eso ya tenemos el crear y el modificar, pero si a la hora de querer leerlo no existe ahí sí levantamos un error.
+En Lox los campos no se declaran: si se asigna uno que no existía, se crea, y si ya existía, se pisa. Con eso ya tenemos crear y modificar. En cambio, leer un campo que no existe es un error.
 
-Los errores en runtime que tenemos acá son el que recién mencionamos de que no existe el campo en la instancia, el de tratar de leer el valor de algo que no es una instancia y también tratar de asignar a algo que no es una instancia, básicamente antes de leer o asignar la vm se fija que sea una instancia y si no lo es da error, y esto incluye a las clases, así que algo como A.x = 1 también es un error. Pero con un detalle y es que un campo puede ser nil y existir claramente, y como usamos un map que devuelve nil tanto si es el valor como si no lo encontró ahí tenemos que estar atentos para diferenciar los dos casos, esto es particular de Go y de que usamos un map.
+Antes de leer o asignar, la VM se fija que el valor sea una instancia, y si no lo es, da error. Esto incluye a las clases, así que algo como `A.x = 1` también es un error. Los errores de runtime de esta parte son entonces tres: leer un campo que no existe, leer de algo que no es una instancia y asignar a algo que no es una instancia. Un detalle propio de Go es que un campo puede existir y valer `nil`, y el map de Go también devuelve `nil` cuando no encuentra la clave. Para distinguir los dos casos usamos la forma `valor, ok := fields[nombre]`, donde `ok` indica si el campo existe.
 
-Sobre limitaciones conocidas para esta parte tenemos que no se puede borrar un campo porque si le asignas nil dijimos que es válido y sigue existiendo. Tampoco tenemos forma de preguntar si existe el campo sin que nos de error. 
+Sobre limitaciones conocidas para esta parte, tenemos que no se puede borrar un campo porque si le asignas `nil`, dijimos que era válido y por lo tanto seguiróa existiendo. Tampoco tenemos forma de preguntar si existe el campo sin que nos de error.
 
 ### Diferencias con el libro
 
@@ -190,15 +196,17 @@ Sobre limitaciones conocidas para esta parte tenemos que no se puede borrar un c
 8. **OP_SET_GLOBAL**: en el libro se guarda el valor en la tabla y si la variable no existía se borra y se levanta el error. Nosotros hacemos la pregunta antes, nos fijamos si la variable existe en el `map`, y si no existe levantamos el error sin haber guardado nada, así nunca hay que borrar. El resultado es el mismo, una variable que no se declaró no se crea por asignarla.
 9. **Leer el nombre de una variable**: en el libro el `READ_STRING` no chequea que la constante sea un string, y en glox el `readString()` sí lo chequea y devuelve un error si no lo es.
 10. **Orden de los upvalues abiertos**: el libro ordena la lista comparando punteros, y en Go no se puede, así que cada upvalue guarda su posición en el stack (`stackIndex`) y comparamos eso.
+11. Aridad de las nativas: el libro no la chequea pero nosotros sí, con el mismo error que las funciones de Lox.
 
 ### Limitaciones conocidas
 
-Si bien estas limitaciones las fuimos contando en cada sección donde aparecen, para dejarlo más claro las enumeramos acá. Son límites que la VM tiene y el tree-walk no y como son comportamientos que dependen de la implementación y no del lenguaje, los documentamos y un programa en Lox no debería depender de ellos.
+Si bien estas limitaciones las fuimos contando en cada sección donde aparecen, para dejarlo más claro las enumeramos acá. Son límites que el **bytecode compiler** tiene y el **tree-walk interpreter** no y como son comportamientos que dependen de la implementación y no del lenguaje, los documentamos y un programa en Lox no debería depender de ellos.
 
-- **Llamadas anidadas**: puede haber como mucho 63 llamadas anidadas, porque la VM tiene un máximo de 64 frames y el script ocupa uno. Si se pasa corta con un error de stack overflow mientras que el tree-walk aguanta una recursión mucho más profunda. Si bien esto es un numero que sigue el libro decidimos tomar ese mismo.
+- **Llamadas anidadas**: puede haber como mucho 63 llamadas anidadas, porque la VM tiene un máximo de 64 frames y el script ocupa uno. Si se pasa corta con un error de `stack overflow` mientras que el tree-walk aguanta una recursión mucho más profunda. Si bien esto es un numero que sigue el libro, decidimos tomar ese mismo.
 - **Variables locales**: una función puede tener como mucho 255, contando sus parámetros, porque el operando de una local ocupa un byte y el slot 0 queda reservado para la función. El tree-walk no tiene este límite.
 - **Constantes**: cada función puede tener como mucho 256 constantes, porque su posición también ocupa un byte. Como cada función tiene su propio chunk el límite es por función, y en el tree-walk no existe. Con las clases, los nombres de las clases y de los campos también ocupan lugar entre esas constantes.
-- **Tamaño de un salto**: el cuerpo de un if o de un while o for no puede pasar de los 65.535 bytes porque el salto se guarda en dos bytes, y esto también limita a break y continue. En el tree-walk no hay límite.
+- **Tamaño de un salto**: el cuerpo de un `if`, de un `while` o `for` no puede pasar de los 65.535 bytes porque el salto se guarda en dos bytes, y esto también limita a `break` y `continue`. En el tree-walk no hay límite.
+- **Upvalues**: una función puede capturar como mucho 256 variables de funciones que la envuelven, porque la posición de cada upvalue se emite en un byte. El tree-walk no tiene este límite.
 
 ### Tests
 
