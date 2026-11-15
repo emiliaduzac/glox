@@ -210,6 +210,16 @@ Cuando hay una variable local, ya sea que fue por fun o var, parseVariable no ag
 
 Una diferencia con el libro es que el consume del libro reporta el error y la función sigue, pero en Go devuelve el error y hay que cortar, es por eso que classDeclaration devuelve error y en el libro tienen un void.
 
+#### Get y set de propiedades
+
+Agregamos el punto, que es un operador infijo porque tiene algo a izquierda que es la expresión de la instancia, pero además este operador suma que tiene a la derecha también algo, que es un nombre y no una expresión. Si suponemos el ejemplo de que tenemos el x.a, ahí el 'a' no es una variable sino un nombre que tenemos que guardarnos y lo hacemos entre las constantes para que después la vm pueda buscar eso para la instancia.
+
+Un punto tiene la misma precedencia que los paréntesis de una llamada así que también se lee de izquierda a derecha. En el caso de que tengamos algo como punto y llamada como a.f().x el orden se sigue aplicando como aparecen, y en el caso de la negación primero se lee y después se niega porque el punto tiene más precedencia que el -, es decir si tenemos -a.x se lee la x y luego se niega. 
+
+Particularmente sobre el set y el get, se fija si se puede asignar y si viene un =, entonces ahí compila y se emite la OP_SET_PROPERTY y si no es la asignación entonces es el pedido del get, por lo que se emite la OP_GET_PROPERTY. El canAssign se usó acá también, y lo necesitamos porque en el ejemplo del libro de a + b.c = 3, si no lo tenemos lo terminaría leyendo como a + (b.c = 3) que eso es un error de gramática que no se permite. Para esto dentro del dot() se deja el = sin consumir y el error lo termina dando el parsePrecedence cuando lo encuentra. Un caso feliz de esto es el ejemplo f().x = 1 que ahí el canAssign dice que sí y por ende termina asignando bien. La asignación deja el valor en el stack es por esto que se puede encadenar, como en el ejemplo de tener algo como a.x = a.y = 1, que sale todo bien y es lo que esperamos. 
+
+Una diferencia que ya viene de antes es el tema de las constantes cuando aparece un nombre, porque el libro agrega una nueva y nosotros la reutilizamos, esto lo mencionamos antes, y aca se vuelve a hacer uso de esto que ayuda a no llegar tan rápido al límite de 256 constantes por función. Un detalle es que esto pasa tanto para algo como a.x + a.x que usa la misma x, como también si hacemos algo como x.x, donde la variable x y el campo x comparten la misma constante porque se guarda por nombre.
+
 ### Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
