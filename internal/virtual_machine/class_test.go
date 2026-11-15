@@ -16,3 +16,9 @@ func TestInstanceString(t *testing.T) {
 		utils.AssertValue(t, utils.Stringify(newInstance(newClass("Auto"))), "Auto instance")
 	})
 }
+
+func TestNewInstance(t *testing.T) {
+	t.Run("Una instancia nueva arranca sin campos", func(t *testing.T) {
+		utils.AssertValue(t, len(newInstance(newClass("Auto")).fields), 0)
+	})
+}

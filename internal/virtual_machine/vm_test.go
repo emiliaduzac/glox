@@ -1911,3 +1911,38 @@ func TestOpClass(t *testing.T) {
 		utils.AssertValue(t, stackValues(vm)[0].(*class).name, "MiClase")
 	})
 }
+
+func TestCallClass(t *testing.T) {
+	callClass := func(chunk *c.Chunk, class *class) {
+		writeConstant(chunk, class)
+		writeCall(chunk, 0)
+	}
+
+	t.Run("Llamar a una clase deja en su lugar una instancia de esa clase", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		callClass(chunk, auto)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		created, isInstance := stackValues(vm)[0].(*instance)
+		utils.AssertValue(t, isInstance, true)
+		utils.AssertValue(t, created.class, auto)
+	})
+
+	t.Run("Cada llamada a una clase crea una instancia distinta", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		callClass(chunk, auto)
+		callClass(chunk, auto)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		first := stackValues(vm)[0].(*instance)
+		second := stackValues(vm)[1].(*instance)
+		utils.AssertValue(t, first != second, true)
+	})
+}

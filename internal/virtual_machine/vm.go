@@ -300,6 +300,9 @@ func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 		return vm.call(function, argCount)
 	case *native:
 		return vm.callNative(function, argCount)
+	case *class:
+		vm.stack[len(vm.stack)-argCount-1] = newInstance(function)
+		return nil
 	default:
 		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
 	}
