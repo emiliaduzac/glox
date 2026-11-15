@@ -170,6 +170,13 @@ Un salto que se da importante al momento de llegar a funciones es que el compila
 
 Algo importante que se agrega con todo esto es lo del slot 0 en el stack, reservado para que la VM ponga la función que está ejecutando, y por ende, como el operando es de un byte hay 256 lugares y el slot 0 ocupa uno, ahora pasa a soportar hasta 255 variables locales, a diferencia del tree-walk, por lo que esto pasa a ser una **limitación conocida que tenemos en esta versión**.
 
+#### Una funcion con su propio chunk
+Agregar funciones hizo que pasemos de que el compilador escriba todo en un único chunk, a que teniendo funciones cada una tiene su propio código entonces la VM tiene que poder pasar de uno a otro cuando se llama a una función. En el libro marca que una función en lox es un valor como un número o string, así que tiene que poder guardarse como una variable. Además tiene un nombre para identificarla, su propio chunk y los parámetros, los cuales chequeamos para saber si recibe los esperados.
+
+En cuanto a una diferencia importante en general con el libro es que en estos capítulos usa C para implementar clox, por lo que tiene que hacer manejo de memoria, pero nosotros en glox lo usamos como un struct común que luego se libera por el garbage collector propio de Go cuando no tiene más referencias.
+
+
+
 ### Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
