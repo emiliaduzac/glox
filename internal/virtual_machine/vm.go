@@ -249,6 +249,13 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			frame = vm.currentFrame()
 
+		case c.OP_CLASS:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			vm.push(newClass(name))
+
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
 			offset, err := vm.readShort()

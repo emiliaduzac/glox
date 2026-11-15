@@ -1896,3 +1896,18 @@ func TestOpLoop(t *testing.T) {
 		utils.AssertValue(t, out.String(), "")
 	})
 }
+
+func TestOpClass(t *testing.T) {
+	t.Run("Apila una clase nueva con el nombre de la constante", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		name := chunk.AddConstant("MiClase")
+		chunk.Write(byte(c.OP_CLASS), line)
+		chunk.Write(byte(name), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0].(*class).name, "MiClase")
+	})
+}
