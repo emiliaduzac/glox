@@ -90,7 +90,9 @@ func (c *Compiler) expression() error {
 
 func (c *Compiler) declaration() {
 	var err error
-	if c.cursor.Match(token.FUN) {
+	if c.cursor.Match(token.CLASS) {
+		err = c.classDeclaration()
+	} else if c.cursor.Match(token.FUN) {
 		err = c.funDeclaration()
 	} else if c.cursor.Match(token.VAR) {
 		err = c.varDeclaration()
@@ -286,6 +288,25 @@ func (c *Compiler) returnStatement() error {
 	}
 	c.emit(byte(chunk.OP_RETURN))
 	return nil
+}
+
+func (c *Compiler) classDeclaration() error {
+	if err := c.cursor.Consume(token.IDENTIFIER, "class name"); err != nil {
+		return err
+	}
+	nameConstant, err := c.identifierConstant(c.cursor.Previous())
+	if err != nil {
+		return err
+	}
+	c.declareLocalVariable()
+
+	c.emit(byte(chunk.OP_CLASS), nameConstant)
+	c.defineVariable(nameConstant)
+
+	if err := c.cursor.Consume(token.LEFT_BRACE, "'{' before class body"); err != nil {
+		return err
+	}
+	return c.cursor.Consume(token.RIGHT_BRACE, "'}' after class body")
 }
 
 func (c *Compiler) funDeclaration() error {

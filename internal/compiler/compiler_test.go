@@ -1882,3 +1882,50 @@ func TestCompileBreak(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "';' after break")
 	})
 }
+
+func TestCompileClassDeclaration(t *testing.T) {
+	t.Run("Una clase se crea con OP_CLASS y se define como variable global", func(t *testing.T) {
+		chunk := compileSource(t, "class A {}")
+
+		assertBytes(t, chunk, byte(c.OP_CLASS), 0, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		utils.AssertValue(t, chunk.Constants[0], "A")
+	})
+
+	t.Run("Dentro de un bloque la clase es una variable local", func(t *testing.T) {
+		chunk := compileSource(t, "{ class A {} print A; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[0], "A")
+	})
+
+	t.Run("Error si se declaran dos clases con el mismo nombre en el mismo scope local", func(t *testing.T) {
+		err := compileSourceError(t, "{ class A {} class A {} }")
+		utils.AssertErrorMessage(t, err, "already a variable with this name in this scope")
+	})
+
+	t.Run("Errores de sintaxis en la declaración de clase", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+			errMsg string
+		}{
+			{"sin nombre", "class {}", "expected class name"},
+			{"sin llave que abre", "class A", "'{' before class body"},
+			{"sin llave que cierra", "class A {", "expected '}' after class body"},
+			{"el cuerpo no tiene declaraciones válidas", "class A { var x; }", "expected '}' after class body"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+				utils.AssertErrorMessage(t, err, test.errMsg)
+			})
+		}
+	})
+}
