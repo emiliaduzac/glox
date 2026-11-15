@@ -108,6 +108,12 @@ Creamos una clase que por ahora solo tiene como dato su nombre. Además de eso e
 
 Como viene pasando en el resto de la implementación de esta segunda parte no necesitamos el header de Obj ni tampoco el tipo ni las macros que propone el libro, al usar Go alcanza con any y luego pregunta con v.(*class). Siguiendo un poco con esta diferencia con el libro tampoco nos tenemos que hacer cargo de liberar la memoria para las clases.
 
+Llega el momento de las instancias que acá tienen que guardar a qué clase pertenecen para después poder encontrar sus métodos, y además sus propios campos. Sobre estos últimos es que tenemos una diferencia con el libro, porque también como ha pasado a lo largo de esta segunda parte más que nada se refiere a cómo se guarda esto en memoria. En Lox los campos no es que se declaran sino que se agregan en el runtime y se terminan buscando por nombre, ahí es donde el libro usa su tabla de hash y nosotros volvemos a un map[string]any que en el fondo es la misma idea pero difiere porque nosotros usamos Go. Un detalle acá es que como los campos se agregan en el runtime hay que hashear y buscar, frente a ya tenerlo fijo si el compilador los tiene declarados con cada tamaño, que es más rápido porque eso es solo sumar y desplazarse, eso sería una diferencia frente a un lenguaje estático.
+
+Un detalle que también habla el libro y nos parece importante comentarlo es esto, que para el que programa una instancia de algo como un Auto y otra como un Perro son de tipos distintos y tiene toda la lógica que así sea, pero para nosotros en la vm es el mismo instance, digamos que lo único que cambia es a qué clase apuntan.
+
+Para crear la instancia se llama a la clase como si fuera una función, como por ejemplo Auto(), por lo que no hace falta una instrucción nueva ya que se usa el OP_CALL y lo que sí cambia es el caso en el callValue para detectarlo. Al crear la instancia la vm la pone en el lugar del stack donde estaba la clase y listo, no es necesario meterse con el frame porque no hay código Lox ahí para ejecutar.
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
