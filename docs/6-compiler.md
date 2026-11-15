@@ -227,3 +227,9 @@ Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
 ```bash
 go test ./internal/compiler
 ```
+
+Para las clases agregamos los tests ([6-classes](../real-tests/6-classes.lox)) que solo corren con la VM, porque el tree-walk no tiene clases.
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm" 6-classes
+```
