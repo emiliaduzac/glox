@@ -84,6 +84,7 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			if len(vm.frames) == 1 && len(vm.stack) > frame.slots+1 {
 				return errors.NewLoxError(vm.currentLine(), "inconsistent Stack Height: should be empty at exit")
 			}
+			vm.closeUpvalues(frame.slots)
 			vm.stack = vm.stack[:frame.slots]
 			vm.frames = vm.frames[:len(vm.frames)-1]
 			if len(vm.frames) == 0 {
@@ -254,6 +255,12 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 				return err
 			}
 			*frame.closure.upvalues[slot].location = value
+		case c.OP_CLOSE_UPVALUE:
+			vm.closeUpvalues(len(vm.stack) - 1)
+			_, err := vm.pop()
+			if err != nil {
+				return err
+			}
 
 		case c.OP_CALL:
 			argCount, err := vm.readByte()
@@ -615,4 +622,13 @@ func (vm *VirtualMachine) captureUpvalue(stackIndex int) *upvalue {
 		prev.next = created
 	}
 	return created
+}
+
+func (vm *VirtualMachine) closeUpvalues(last int) {
+	for vm.openUpvalues != nil && vm.openUpvalues.stackIndex >= last {
+		up := vm.openUpvalues
+		up.closed = *up.location
+		up.location = &up.closed
+		vm.openUpvalues = up.next
+	}
 }

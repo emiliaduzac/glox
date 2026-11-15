@@ -6,6 +6,7 @@ type upvalue struct {
 	location   *any
 	next       *upvalue
 	stackIndex int
+	closed     any
 }
 
 func newUpvalue(location *any, stackIndex int) *upvalue {
