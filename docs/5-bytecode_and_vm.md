@@ -114,6 +114,18 @@ Un detalle que también habla el libro y nos parece importante comentarlo es est
 
 Para crear la instancia se llama a la clase como si fuera una función, como por ejemplo Auto(), por lo que no hace falta una instrucción nueva ya que se usa el OP_CALL y lo que sí cambia es el caso en el callValue para detectarlo. Al crear la instancia la vm la pone en el lugar del stack donde estaba la clase y listo, no es necesario meterse con el frame porque no hay código Lox ahí para ejecutar.
 
+#### Get y set para los campos
+
+Para cuando la VM ejecuta el OP_GET_PROPERTY la instancia ya está en el tope del stack porque lo que estaba a la izquierda se compiló antes, que eso cambia para el OP_SET_PROPERTY porque abajo queda la instancia y arriba el valor que se le quiere asignar y eso trae la diferencia entre las dos que para la última necesitamos mirar un lugar más abajo del tope para encontrar la instancia.
+
+En el get, una vez que ya ve que es una instancia busca el campo en el map de la misma y deja el valor en el lugar del stack que ocupaba la instancia, básicamente saca la instancia y mete el valor en el stack. En el set guarda el valor en el campo, saca el valor y la instancia y vuelve a meter el valor. Con esto se logra que la asignación sea una expresión entonces cuando haces, por ejemplo, print auto.velocidad = 5; se termina devolviendo el 5 que se usa después para imprimir.
+
+Un detalle de los campos para Lox es que no se declaran entonces si se asigna uno que no existía simplemente lo crea y guarda el valor, pero si existía lo pisa, con eso ya tenemos el crear y el modificar, pero si a la hora de querer leerlo no existe ahí sí levantamos un error.
+
+Los errores en runtime que tenemos acá son el que recién mencionamos de que no existe el campo en la instancia, el de tratar de leer el valor de algo que no es una instancia y también tratar de asignar a algo que no es una instancia, básicamente antes de leer o asignar la vm se fija que sea una instancia y si no lo es da error, y esto incluye a las clases, así que algo como A.x = 1 también es un error. Pero con un detalle y es que un campo puede ser nil y existir claramente, y como usamos un map que devuelve nil tanto si es el valor como si no lo encontró ahí tenemos que estar atentos para diferenciar los dos casos, esto es particular de Go y de que usamos un map.
+
+Sobre limitaciones conocidas para esta parte tenemos que no se puede borrar un campo porque si le asignas nil dijimos que es válido y sigue existiendo. Tampoco tenemos forma de preguntar si existe el campo sin que nos de error. 
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
