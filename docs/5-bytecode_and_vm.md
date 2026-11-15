@@ -158,6 +158,14 @@ Los errores en runtime que tenemos acá son el que recién mencionamos de que no
 
 Sobre limitaciones conocidas para esta parte tenemos que no se puede borrar un campo porque si le asignas nil dijimos que es válido y sigue existiendo. Tampoco tenemos forma de preguntar si existe el campo sin que nos de error. 
 
+#### Metodos
+
+Ahora cada clase puede tener sus métodos y van guardados en un map de closures, van en cada clase y no en cada instancia porque son los mismos para las instancias a diferencia de los campos. Como ha pasado a lo largo de esta segunda parte usamos un map y eso nos ayuda a no encargarnos explícitamente de la liberación de la memoria.
+
+Básicamente para definir un método la vm necesita tres cosas de ella, el nombre que viene entre las constantes del chunk, el closure del método que llega en el tope del stack y la clase que viene un nivel más abajo. Acá no tenemos chequeos en la vm de que lo que está en el stack realmente es una clase y un closure, igual que lo que hace el libro que lo toma así sabiendo el orden. Con eso, el OP_METHOD guarda el closure en el map de la clase con ese nombre y saca solo el closure del stack, así la clase queda arriba para el próximo método. 
+
+Un detalle sobre métodos acá es que si llegan dos con el mismo nombre no es un error, sino que el último pisa al primero igual que en el libro. Y como una curiosidad propia es que ahora sí usamos el klass como en el libro recién ahora, pero porque ya teníamos un tipo class y choca con el mismo nombre de la variable y no podemos, no como en el libro que habla de que class era palabra reservada de C++.
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.

@@ -265,6 +265,16 @@ Particularmente sobre el set y el get, se fija si se puede asignar y si viene un
 
 Una diferencia que ya viene de antes es el tema de las constantes cuando aparece un nombre, porque el libro agrega una nueva y nosotros la reutilizamos, esto lo mencionamos antes, y aca se vuelve a hacer uso de esto que ayuda a no llegar tan rápido al límite de 256 constantes por función. Un detalle es que esto pasa tanto para algo como a.x + a.x que usa la misma x, como también si hacemos algo como x.x, donde la variable x y el campo x comparten la misma constante porque se guarda por nombre.
 
+#### Metodos
+
+Al agregar los métodos nos aparece el problema de que una clase puede tener varios métodos y eso tiene que llegar a la vm como una serie de instrucciones de bytecode y no como un nodo del árbol que recorría antes el tree-walk. En el libro habla de que para el programador declarar una clase es una sola cosa, pero para nosotros el compilador lo emite como una serie de instrucciones que la vm ejecuta de a una.
+
+Primero tenemos ya el OP_CLASS que crea la clase vacía, después se guarda en su variable y se vuelve a agregar en el stack porque la vm la necesita ahí para agregarle los métodos. Si la clase es global al guardarla con OP_DEFINE_GLOBAL sale del stack y por eso hay que volver a cargarla, y si es local queda en su slot. Después por cada método se emite el OP_CLOSURE que deja el closure del método arriba de la clase en el stack y le sigue el OP_METHOD que lo guarda en la clase con su nombre y lo saca del stack, así la clase sigue quedando arriba para el siguiente. Y al final un OP_POP que saca a la clase, que ya quedó guardada en su variable con sus métodos.
+
+Además para agregarle métodos a la clase la vm necesita tener la clase a mano pero el compilador no puede saber si es global o local y por ende dónde queda, por eso usa el nombre para volver a cargarla con el namedVariable, que es el mismo que para una variable, y eso genera la instrucción que corresponda según el caso.
+
+Un detalle sobre métodos es que Lox no tiene declaración de campos para la clase así que todo lo que está entre {} es un método, así que si aparece otra cosa es un error. Se termina compilando con la misma función que para la fun así que termina quedando como un closure y puede usar las variables de afuera.
+
 ### Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
