@@ -45,6 +45,11 @@ const (
 
 	OP_CALL
 	OP_CLOSURE
+
+	OP_CLASS
+
+	OP_GET_PROPERTY
+	OP_SET_PROPERTY
 )
 
 var opCodeNames = map[OpCode]string{
@@ -84,6 +89,11 @@ var opCodeNames = map[OpCode]string{
 
 	OP_CALL:    "OP_CALL",
 	OP_CLOSURE: "OP_CLOSURE",
+
+	OP_CLASS: "OP_CLASS",
+
+	OP_GET_PROPERTY: "OP_GET_PROPERTY",
+	OP_SET_PROPERTY: "OP_SET_PROPERTY",
 }
 
 func (op OpCode) String() string {
@@ -129,7 +139,7 @@ func (c *Chunk) Disassemble(name string) {
 		fmt.Printf("%04d| %4d ", i, c.Lines[i])
 
 		switch op {
-		case OP_CONSTANT, OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL:
+		case OP_CONSTANT, OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL, OP_CLASS, OP_GET_PROPERTY, OP_SET_PROPERTY:
 			// Instrucciones con operandos: constantes
 			constantIndex := c.Bytes[i+1]
 			fmt.Printf("%s<%s>\n", op, c.constantString(constantIndex))

@@ -243,10 +243,38 @@ Para eso, cuando el compilador encuentra un upvalue que es local de la función 
 Entonces al terminar un bloque, por cada local emite `OP_CLOSE_UPVALUE` si fue capturada por una función más interna y `OP_POP` si no, indicándole a la VM que tiene que moverla al heap antes de sacarla, para que luego pueda ser usada. Cuando una función retorna, el compilador no tiene que hacer nada distinto, porque `OP_RETURN` saca todas sus locales de una vez moviendo la ventana y no hay una instrucción por variable que reemplazar (eso lo resuelve la VM cuando lee el `OP_RETURN`).
 Esto también se aplicó a `break` y `continue`, que al sacar las locales del ciclo antes de saltar también emiten `OP_CLOSE_UPVALUE` para las que estén capturadas.
 
+### Clases
+
+#### Declaracion de clases
+
+Compilar una clase se hace como una declaración de una variable pero usando OP_CLASS que crea la clase y después esta se define como una variable global o queda como local en su slot. Si queda como local las reglas que ya tenemos siguen valiendo para las clases, como el shadowing para una variable de afuera, y que es un error repetir el nombre en el mismo scope local. Y en cuanto a si queda global vale la regla de que sí se puede redeclarar como pasa cuando usamos var.
+
+El nombre de la clase va como constante aunque sea una local porque OP_CLASS lo necesita para que la clase sepa cómo se llama.
+
+Cuando hay una variable local, ya sea que fue por fun o var, parseVariable no agrega su nombre a las constantes porque se lee por su posición en el stack, pero acá para la clase eso no sirve, por eso classDeclaration usa identifierConstant y después la declara con declareLocalVariable como hace el libro.
+
+Una diferencia con el libro es que el consume del libro reporta el error y la función sigue, pero en Go devuelve el error y hay que cortar, es por eso que classDeclaration devuelve error y en el libro tienen un void.
+
+#### Get y set de propiedades
+
+Agregamos el punto, que es un operador infijo porque tiene algo a izquierda que es la expresión de la instancia, pero además este operador suma que tiene a la derecha también algo, que es un nombre y no una expresión. Si suponemos el ejemplo de que tenemos el x.a, ahí el 'a' no es una variable sino un nombre que tenemos que guardarnos y lo hacemos entre las constantes para que después la vm pueda buscar eso para la instancia.
+
+Un punto tiene la misma precedencia que los paréntesis de una llamada así que también se lee de izquierda a derecha. En el caso de que tengamos algo como punto y llamada como a.f().x el orden se sigue aplicando como aparecen, y en el caso de la negación primero se lee y después se niega porque el punto tiene más precedencia que el -, es decir si tenemos -a.x se lee la x y luego se niega. 
+
+Particularmente sobre el set y el get, se fija si se puede asignar y si viene un =, entonces ahí compila y se emite la OP_SET_PROPERTY y si no es la asignación entonces es el pedido del get, por lo que se emite la OP_GET_PROPERTY. El canAssign se usó acá también, y lo necesitamos porque en el ejemplo del libro de a + b.c = 3, si no lo tenemos lo terminaría leyendo como a + (b.c = 3) que eso es un error de gramática que no se permite. Para esto dentro del dot() se deja el = sin consumir y el error lo termina dando el parsePrecedence cuando lo encuentra. Un caso feliz de esto es el ejemplo f().x = 1 que ahí el canAssign dice que sí y por ende termina asignando bien. La asignación deja el valor en el stack es por esto que se puede encadenar, como en el ejemplo de tener algo como a.x = a.y = 1, que sale todo bien y es lo que esperamos. 
+
+Una diferencia que ya viene de antes es el tema de las constantes cuando aparece un nombre, porque el libro agrega una nueva y nosotros la reutilizamos, esto lo mencionamos antes, y aca se vuelve a hacer uso de esto que ayuda a no llegar tan rápido al límite de 256 constantes por función. Un detalle es que esto pasa tanto para algo como a.x + a.x que usa la misma x, como también si hacemos algo como x.x, donde la variable x y el campo x comparten la misma constante porque se guarda por nombre.
+
 ### Tests
 
 Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
 
 ```bash
 go test ./internal/compiler
+```
+
+Para las clases agregamos los tests ([6-classes](../real-tests/6-classes.lox)) que solo corren con la VM, porque el tree-walk no tiene clases.
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm" 6-classes
 ```

@@ -31,6 +31,7 @@ var rules map[token.TokenType]parseRule
 func init() {
 	rules = map[token.TokenType]parseRule{
 		token.LEFT_PAREN:    {prefix: (*Compiler).grouping, infix: (*Compiler).call, precedence: PREC_CALL},
+		token.DOT:           {prefix: nil, infix: (*Compiler).dot, precedence: PREC_CALL},
 		token.NUMBER:        {prefix: (*Compiler).value, infix: nil, precedence: PREC_NONE},
 		token.STRING:        {prefix: (*Compiler).value, infix: nil, precedence: PREC_NONE},
 		token.NIL:           {prefix: (*Compiler).literal, infix: nil, precedence: PREC_NONE},
