@@ -701,6 +701,26 @@ func (c *Compiler) argumentList() (byte, error) {
 	return byte(argCount), nil
 }
 
+func (c *Compiler) dot(canAssign bool) error {
+	if err := c.cursor.Consume(token.IDENTIFIER, "property name after '.'"); err != nil {
+		return err
+	}
+	name, err := c.identifierConstant(c.cursor.Previous())
+	if err != nil {
+		return err
+	}
+
+	if canAssign && c.cursor.Match(token.EQUAL) {
+		if err := c.expression(); err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_SET_PROPERTY), name)
+		return nil
+	}
+	c.emit(byte(chunk.OP_GET_PROPERTY), name)
+	return nil
+}
+
 func (c *Compiler) unary(_ bool) error {
 	operatorType := c.cursor.GetPreviousType()
 	if err := c.parsePrecedence(PREC_UNARY); err != nil {
