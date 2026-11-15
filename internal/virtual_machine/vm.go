@@ -260,7 +260,11 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 				return err
 			}
 			function := constant.(*c.Function)
-			vm.push(newClosure(function))
+			cl := newClosure(function)
+			if err := vm.fillUpvalues(cl, frame); err != nil {
+				return err
+			}
+			vm.push(cl)
 
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
@@ -554,4 +558,23 @@ func (vm *VirtualMachine) binaryOp(op func(left, right float64) any) error {
 func (vm *VirtualMachine) currentLine() int {
 	frame := vm.currentFrame()
 	return frame.closure.function.Chunk.Lines[frame.ip-1]
+}
+
+func (vm *VirtualMachine) fillUpvalues(cl *closure, frame *callFrame) error {
+	for i := range cl.upvalues {
+		isLocal, err := vm.readByte()
+		if err != nil {
+			return err
+		}
+		index, err := vm.readByte()
+		if err != nil {
+			return err
+		}
+		if isLocal == 1 {
+			cl.upvalues[i] = newUpvalue(&vm.stack[frame.slots+int(index)])
+		} else {
+			cl.upvalues[i] = frame.closure.upvalues[index]
+		}
+	}
+	return nil
 }
