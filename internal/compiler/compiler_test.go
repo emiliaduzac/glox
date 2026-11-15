@@ -1910,6 +1910,19 @@ func TestCompileClassDeclaration(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "already a variable with this name in this scope")
 	})
 
+	t.Run("Una clase global se puede redeclarar", func(t *testing.T) {
+		chunk := compileSource(t, "class A {} class A {}")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
 	t.Run("Errores de sintaxis en la declaración de clase", func(t *testing.T) {
 		tests := []struct {
 			name   string
@@ -1927,5 +1940,11 @@ func TestCompileClassDeclaration(t *testing.T) {
 				utils.AssertErrorMessage(t, err, test.errMsg)
 			})
 		}
+	})
+
+	t.Run("Una clase no puede ser el cuerpo de un if sin bloque", func(t *testing.T) {
+		err := compileSourceError(t, "if (true) class A {}")
+
+		utils.AssertError(t, err)
 	})
 }
