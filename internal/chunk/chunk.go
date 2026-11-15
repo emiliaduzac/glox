@@ -127,11 +127,27 @@ func (c *Chunk) Disassemble(name string) {
 		fmt.Printf("%04d| %4d ", i, c.Lines[i])
 
 		switch op {
-		case OP_CONSTANT, OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL, OP_CLOSURE:
+		case OP_CONSTANT, OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL:
 			// Instrucciones con operandos: constantes
 			constantIndex := c.Bytes[i+1]
 			fmt.Printf("%s<%s>\n", op, c.constantString(constantIndex))
 			i += 2
+
+		case OP_CLOSURE:
+			index := c.Bytes[i+1]
+			function := c.Constants[index].(*Function)
+			fmt.Printf("%s<%s>\n", op, c.constantString(index))
+			i += 2
+			for j := 0; j < function.UpvalueCount; j++ {
+				isLocal := c.Bytes[i]
+				upIndex := c.Bytes[i+1]
+				kind := "upvalue"
+				if isLocal == 1 {
+					kind = "local"
+				}
+				fmt.Printf("%04d|      | %s %d\n", i, kind, upIndex)
+				i += 2
+			}
 
 		case OP_GET_LOCAL, OP_SET_LOCAL, OP_GET_UPVALUE, OP_SET_UPVALUE:
 			// Instrucciones con operandos: slots

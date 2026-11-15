@@ -345,6 +345,14 @@ func (c *Compiler) compileFunction(funcType FunctionType) error {
 		return err
 	}
 	c.emit(byte(chunk.OP_CLOSURE), index)
+
+	for _, upvalue := range fc.upvalues {
+		isLocal := byte(0)
+		if upvalue.isLocal {
+			isLocal = 1
+		}
+		c.emit(isLocal, upvalue.index)
+	}
 	return nil
 }
 
@@ -812,9 +820,11 @@ func (c *Compiler) resolveUpvalue(name token.Token) int {
 		return -1
 	}
 
-	local := c.enclosing.resolveLocal(name)
-	if local != -1 {
+	if local := c.enclosing.resolveLocal(name); local != -1 {
 		return c.addUpvalue(byte(local), true)
+	}
+	if upvalue := c.enclosing.resolveUpvalue(name); upvalue != -1 {
+		return c.addUpvalue(byte(upvalue), false)
 	}
 	return -1
 }

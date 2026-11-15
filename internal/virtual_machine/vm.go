@@ -236,6 +236,10 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			vm.stack[frame.slots+int(slot)] = value
 
+		// UpValues
+		// case c.OP_GET_UPVALUE:
+		// case c.OP_SET_UPVALUE:
+
 		case c.OP_CALL:
 			argCount, err := vm.readByte()
 			if err != nil {
@@ -277,7 +281,6 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 				return err
 			}
 			frame.ip += offset
-
 		case c.OP_LOOP:
 			offset, err := vm.readShort()
 			if err != nil {
