@@ -83,7 +83,7 @@ func TestCompileFunctionDeclaration(t *testing.T) {
 	t.Run("Una función global se guarda como constante y se define como variable global", func(t *testing.T) {
 		chunk := compileSource(t, "fun f() {}")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CLOSURE), 1, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
 		utils.AssertValue(t, chunk.Constants[0], "f")
 		function := chunk.Constants[1].(*c.Function)
 		utils.AssertValue(t, function.Arity, 0)
@@ -103,7 +103,7 @@ func TestCompileFunctionDeclaration(t *testing.T) {
 	t.Run("Dentro de un bloque la función es una variable local", func(t *testing.T) {
 		chunk := compileSource(t, "{ fun f() {} }")
 
-		assertBytes(t, chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, chunk, byte(c.OP_CLOSURE), 0, byte(c.OP_POP), byte(c.OP_NIL), byte(c.OP_RETURN))
 		_, isFunction := chunk.Constants[0].(*c.Function)
 		utils.AssertValue(t, isFunction, true)
 	})
@@ -112,7 +112,7 @@ func TestCompileFunctionDeclaration(t *testing.T) {
 		chunk := compileSource(t, "fun a() { fun b() {} }")
 
 		outer := chunk.Constants[1].(*c.Function)
-		assertBytes(t, &outer.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, &outer.Chunk, byte(c.OP_CLOSURE), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
 		_, isFunction := outer.Chunk.Constants[0].(*c.Function)
 		utils.AssertValue(t, isFunction, true)
 	})
@@ -137,7 +137,7 @@ func TestCompileFunctionDeclaration(t *testing.T) {
 		assertBytes(t, chunk,
 			byte(c.OP_NIL),
 			byte(c.OP_DEFINE_GLOBAL), 0,
-			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_CLOSURE), 2,
 			byte(c.OP_DEFINE_GLOBAL), 1,
 			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
@@ -435,7 +435,7 @@ func TestCompileEnclosingFunction(t *testing.T) {
 
 		outer := chunk.Constants[1].(*c.Function)
 		assertBytes(t, &outer.Chunk,
-			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_CLOSURE), 0,
 			byte(c.OP_CONSTANT), 1,
 			byte(c.OP_PRINT),
 			byte(c.OP_NIL),
@@ -449,7 +449,7 @@ func TestCompileEnclosingFunction(t *testing.T) {
 		chunk := compileSource(t, "fun a() {} print 2;")
 
 		assertBytes(t, chunk,
-			byte(c.OP_CONSTANT), 1,
+			byte(c.OP_CLOSURE), 1,
 			byte(c.OP_DEFINE_GLOBAL), 0,
 			byte(c.OP_CONSTANT), 2,
 			byte(c.OP_PRINT),
@@ -464,9 +464,9 @@ func TestCompileEnclosingFunction(t *testing.T) {
 		chunk := compileSource(t, "fun a() { fun b() { fun c() {} } }")
 
 		a := chunk.Constants[1].(*c.Function)
-		assertBytes(t, &a.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, &a.Chunk, byte(c.OP_CLOSURE), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
 		b := a.Chunk.Constants[0].(*c.Function)
-		assertBytes(t, &b.Chunk, byte(c.OP_CONSTANT), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, &b.Chunk, byte(c.OP_CLOSURE), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
 		innermost := b.Chunk.Constants[0].(*c.Function)
 		assertBytes(t, &innermost.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
 	})

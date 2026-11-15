@@ -334,7 +334,12 @@ func (c *Compiler) compileFunction(funcType FunctionType) error {
 		return err
 	}
 
-	return c.emitConstant(fc.endCompiler())
+	index, err := c.makeConstant(fc.endCompiler())
+	if err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_CLOSURE), index)
+	return nil
 }
 
 func (c *Compiler) block() error {

@@ -36,6 +36,12 @@ func writeConstant(chunk *c.Chunk, value any) {
 	chunk.Write(byte(index), line)
 }
 
+func writeClosure(chunk *c.Chunk, function *c.Function) {
+	index := chunk.AddConstant(function)
+	chunk.Write(byte(c.OP_CLOSURE), line)
+	chunk.Write(byte(index), line)
+}
+
 func writeGetGlobal(chunk *c.Chunk, name string) {
 	index := chunk.AddConstant(name)
 	chunk.Write(byte(c.OP_GET_GLOBAL), line)
@@ -102,7 +108,7 @@ func TestScriptCallFrame(t *testing.T) {
 		err := vm.Run(function)
 
 		utils.AssertNoError(t, err)
-		utils.AssertValue(t, vm.stack[0], any(function))
+		utils.AssertValue(t, vm.stack[0].(*closure).function, function)
 		utils.AssertValue(t, vm.stack[1], 1.0)
 	})
 
@@ -161,7 +167,7 @@ func TestOpCall(t *testing.T) {
 			writeConstant(body, "hola")
 			body.Write(byte(c.OP_PRINT), line)
 		})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeCall(chunk, 0)
 
 		err := run(vm, chunk)
@@ -179,7 +185,7 @@ func TestOpCall(t *testing.T) {
 			body.Write(1, line)
 			body.Write(byte(c.OP_PRINT), line)
 		})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeConstant(chunk, 4.0)
 		writeCall(chunk, 1)
 
@@ -201,7 +207,7 @@ func TestOpCall(t *testing.T) {
 			body.Write(1, line)
 			body.Write(byte(c.OP_PRINT), line)
 		})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeConstant(chunk, 1.0)
 		writeConstant(chunk, 2.0)
 		writeCall(chunk, 2)
@@ -235,7 +241,7 @@ func TestOpCall(t *testing.T) {
 	t.Run("Error si se llama a una función con menos argumentos de los esperados", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		callee := newFunction(2, func(body *c.Chunk) {})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeConstant(chunk, 1.0)
 		writeCall(chunk, 1)
 
@@ -247,7 +253,7 @@ func TestOpCall(t *testing.T) {
 	t.Run("Error si se llama a una función con más argumentos de los esperados", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		callee := newFunction(1, func(body *c.Chunk) {})
-		writeConstant(chunk, callee)
+		writeClosure(chunk, callee)
 		writeConstant(chunk, 1.0)
 		writeConstant(chunk, 2.0)
 		writeCall(chunk, 2)
@@ -262,7 +268,7 @@ func TestOpCall(t *testing.T) {
 		for i := 1; i < depth; i++ {
 			next := callee
 			callee = newFunction(0, func(body *c.Chunk) {
-				writeConstant(body, next)
+				writeClosure(body, next)
 				writeCall(body, 0)
 			})
 		}
@@ -271,7 +277,7 @@ func TestOpCall(t *testing.T) {
 
 	t.Run("Se permiten llamadas anidadas hasta la profundidad máxima", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
-		writeConstant(chunk, nestedCalls(framesMax-1))
+		writeClosure(chunk, nestedCalls(framesMax-1))
 		writeCall(chunk, 0)
 
 		err := run(vm, chunk)
@@ -281,7 +287,7 @@ func TestOpCall(t *testing.T) {
 
 	t.Run("Error de stack overflow si las llamadas anidadas superan la profundidad máxima", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
-		writeConstant(chunk, nestedCalls(framesMax))
+		writeClosure(chunk, nestedCalls(framesMax))
 		writeCall(chunk, 0)
 
 		err := run(vm, chunk)
@@ -408,7 +414,7 @@ func TestReturn(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		var out bytes.Buffer
 		vm.out = &out
-		writeConstant(chunk, returning(5.0))
+		writeClosure(chunk, returning(5.0))
 		writeCall(chunk, 0)
 		chunk.Write(byte(c.OP_PRINT), line)
 		writeConstant(chunk, "listo")
@@ -430,7 +436,7 @@ func TestReturn(t *testing.T) {
 		suma.Chunk.Write(2, line)
 		suma.Chunk.Write(byte(c.OP_ADD), line)
 		suma.Chunk.Write(byte(c.OP_RETURN), line)
-		writeConstant(chunk, suma)
+		writeClosure(chunk, suma)
 		writeConstant(chunk, 2.0)
 		writeConstant(chunk, 3.0)
 		writeCall(chunk, 2)
@@ -448,7 +454,7 @@ func TestReturn(t *testing.T) {
 		vm.out = &out
 		callee := returning(1.0)
 		for i := 0; i < framesMax+5; i++ {
-			writeConstant(chunk, callee)
+			writeClosure(chunk, callee)
 			writeCall(chunk, 0)
 			chunk.Write(byte(c.OP_POP), line)
 		}
@@ -466,10 +472,10 @@ func TestReturn(t *testing.T) {
 		var out bytes.Buffer
 		vm.out = &out
 		outer := c.NewFunction()
-		writeConstant(&outer.Chunk, returning(5.0))
+		writeClosure(&outer.Chunk, returning(5.0))
 		writeCall(&outer.Chunk, 0)
 		outer.Chunk.Write(byte(c.OP_RETURN), line)
-		writeConstant(chunk, outer)
+		writeClosure(chunk, outer)
 		writeCall(chunk, 0)
 		chunk.Write(byte(c.OP_PRINT), line)
 
@@ -505,7 +511,7 @@ func TestStackTrace(t *testing.T) {
 		f := c.NewFunction()
 		f.Name = "f"
 		failingCallAt(&f.Chunk, 2)
-		writeConstant(chunk, f)
+		writeClosure(chunk, f)
 		callAt(chunk, 5)
 
 		err := run(vm, chunk)
