@@ -84,6 +84,16 @@ Cuando hay un error en tiempo de ejecución además del mensaje con la línea mo
 
 Acá hay una diferencia con el libro, que lo imprime en el momento en que ocurre el error. En glox la VM devuelve los errores y no los imprime, entonces el trace se arma en el defer de Run, que se ejecuta cuando falla cualquier instrucción, y se lo agrega al error antes de reiniciar el stack porque después de eso ya no quedarían los frames para recorrer.
 
+#### Return
+
+Cuando una función termina la VM ejecuta un OP_RETURN, que lo primero que hace es sacar el valor que se devuelve así no se pierde y después descarta todo lo que era de esa llamada, que es la función, sus argumentos y sus variables locales. Para eso corta el stack en el slots del frame y saca el frame de la pila. Si era el último el programa terminó y si no vuelve a poner el valor devuelto en el stack, que es donde lo espera el que lo llamó, y sigue con el frame anterior desde donde había quedado.
+
+Para que todas las funciones devuelvan algo el compilador agrega al final de cada una un OP_NIL y un OP_RETURN así que si no hay un return explícito se devuelve nil. Esto lo hace el libro también y es por lo que el programa termina cuando vuelve el frame del script.
+
+Acá hay un par de diferencias con el libro como cuando termina el script que hace un pop para sacar la función del script antes de salir. Nosotros no lo necesitamos porque cortar el stack en el slots del script ya lo deja todo vacío. Y el chequeo de que el stack quede vacío cuando termina el script, que si no se cumple avisa con un error, no es del libro pero sí nos basamos en ploxb y lo hacemos solo en el script porque en las funciones el corte ya lo limpia todo.
+
+Como OP_RETURN descarta todo lo de la llamada, al terminar el cuerpo de una función no hace falta sacar uno por uno los parámetros y las locales con OP_POP.
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
