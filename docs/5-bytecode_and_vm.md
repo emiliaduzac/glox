@@ -70,6 +70,14 @@ Un detalle es que los frames se guardan en su propia pila y el de arriba de todo
 
 Todo lo que usaba el ip y el chunk de la vm antes, ahora lo lee desde el frame actual. Esto lo hicimos en la VM con el currentFrame() que nos devuelve el de arriba. Y un detalle sobre el run es que se guarda el frame actual de una varible y lo va actualizando cuando entra o sale de una llamada así ya lo tiene actualizado al querer usarlo.
 
+#### Llamar a una funcion
+
+Cuando la VM ejecuta un OP_CALL ya sabe cuántos argumentos son, y con eso sabe que la función está esa cantidad de lugares antes del tope. Lo primero que hace es fijarse qué es lo que le piden llamar, y si no es una función corta con error. Acá hay una diferencia con el libro, que revisa el tipo del objeto, mientras que en Go como los valores de la VM son any, nos alcanza con un switch por tipo.
+
+Si es una función, chequea dos cosas antes de abrir el frame. Primero que la aridad sea la esperada, y si no devuelve un error que avisa cuántos argumentos esperaba y cuántos recibió. Y después que no se haya llegado al máximo de frames y si es así falla con stack overflow. Los mensajes del tipo que no se puede llamar y de la aridad son los mismos que ya tenía el tree-walk pero el de stack overflow es nuevo porque el tree-walk no tiene ese límite, y es la limitación que ya contamos con los call frames.
+
+Si pasa todos los chequeos se abre el frame, y ahí está lo importante. El slots apunta a la función dentro del stack, y siguiendo están los argumentos. Como los parámetros son las primeras variables locales de la función, cada uno coincide con el argumento que le toca, así que no hace falta copiarlos porque el frame arranca desde ahí directamente.
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
