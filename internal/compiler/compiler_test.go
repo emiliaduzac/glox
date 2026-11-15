@@ -1882,3 +1882,229 @@ func TestCompileBreak(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "';' after break")
 	})
 }
+
+func TestCompileClassDeclaration(t *testing.T) {
+	t.Run("Una clase se crea con OP_CLASS y se define como variable global", func(t *testing.T) {
+		chunk := compileSource(t, "class A {}")
+
+		assertBytes(t, chunk, byte(c.OP_CLASS), 0, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		utils.AssertValue(t, chunk.Constants[0], "A")
+	})
+
+	t.Run("Dentro de un bloque la clase es una variable local", func(t *testing.T) {
+		chunk := compileSource(t, "{ class A {} print A; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_PRINT),
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[0], "A")
+	})
+
+	t.Run("Error si se declaran dos clases con el mismo nombre en el mismo scope local", func(t *testing.T) {
+		err := compileSourceError(t, "{ class A {} class A {} }")
+		utils.AssertErrorMessage(t, err, "already a variable with this name in this scope")
+	})
+
+	t.Run("Una clase global se puede redeclarar", func(t *testing.T) {
+		chunk := compileSource(t, "class A {} class A {}")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Errores de sintaxis en la declaración de clase", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+			errMsg string
+		}{
+			{"sin nombre", "class {}", "expected class name"},
+			{"sin llave que abre", "class A", "'{' before class body"},
+			{"sin llave que cierra", "class A {", "expected '}' after class body"},
+			{"el cuerpo no tiene declaraciones válidas", "class A { var x; }", "expected '}' after class body"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+				utils.AssertErrorMessage(t, err, test.errMsg)
+			})
+		}
+	})
+
+	t.Run("Una clase no puede ser el cuerpo de un if sin bloque", func(t *testing.T) {
+		err := compileSourceError(t, "if (true) class A {}")
+
+		utils.AssertError(t, err)
+	})
+}
+
+func TestCompileGetExpression(t *testing.T) {
+	t.Run("Leer una propiedad compila el objeto y después OP_GET_PROPERTY con el nombre como constante", func(t *testing.T) {
+		chunk := compileExpr(t, "a.x")
+
+		assertExprBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_GET_PROPERTY), 1)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+		utils.AssertValue(t, chunk.Constants[1], "x")
+	})
+
+	t.Run("El nombre después del punto no se resuelve como variable aunque exista una local con ese nombre", func(t *testing.T) {
+		chunk := compileSource(t, "{ var x = 1; print a.x; }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CONSTANT), 0,
+			byte(c.OP_GET_GLOBAL), 1,
+			byte(c.OP_GET_PROPERTY), 2,
+			byte(c.OP_PRINT),
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[2], "x")
+	})
+
+	t.Run("Las propiedades se leen de izquierda a derecha", func(t *testing.T) {
+		chunk := compileExpr(t, "a.b.c")
+
+		assertExprBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_GET_PROPERTY), 1, byte(c.OP_GET_PROPERTY), 2)
+		utils.AssertValue(t, chunk.Constants[1], "b")
+		utils.AssertValue(t, chunk.Constants[2], "c")
+	})
+
+	t.Run("El punto y la llamada se pueden combinar y se aplican en el orden en que aparecen", func(t *testing.T) {
+		chunk := compileExpr(t, "a.f().x")
+
+		assertExprBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_PROPERTY), 1,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_GET_PROPERTY), 2,
+		)
+		utils.AssertValue(t, chunk.Constants[1], "f")
+		utils.AssertValue(t, chunk.Constants[2], "x")
+	})
+
+	t.Run("El punto tiene más precedencia que un operador unario", func(t *testing.T) {
+		chunk := compileExpr(t, "-a.x")
+
+		assertExprBytes(t, chunk, byte(c.OP_GET_GLOBAL), 0, byte(c.OP_GET_PROPERTY), 1, byte(c.OP_NEGATE))
+		utils.AssertValue(t, chunk.Constants[1], "x")
+	})
+
+	t.Run("Leer dos veces la misma propiedad vuelve a usar la constante del nombre", func(t *testing.T) {
+		chunk := compileExpr(t, "a.x + a.x")
+
+		assertExprBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_PROPERTY), 1,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_PROPERTY), 1,
+			byte(c.OP_ADD),
+		)
+		utils.AssertValue(t, len(chunk.Constants), 2)
+		utils.AssertValue(t, chunk.Constants[1], "x")
+	})
+
+	t.Run("Error si después del punto no hay un nombre", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"viene un ';'", "a."},
+			{"hay un número", "a.1"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileExprError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, "property name after '.'")
+			})
+		}
+	})
+}
+
+func TestCompileSetExpression(t *testing.T) {
+	t.Run("Asignar una propiedad compila el objeto, después el valor y al final OP_SET_PROPERTY con el nombre", func(t *testing.T) {
+		chunk := compileSource(t, "a.x = 1;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_SET_PROPERTY), 1,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[0], "a")
+		utils.AssertValue(t, chunk.Constants[1], "x")
+		utils.AssertValue(t, chunk.Constants[2], 1.0)
+	})
+
+	t.Run("En una cadena de propiedades solo la última se asigna y las anteriores se leen", func(t *testing.T) {
+		chunk := compileSource(t, "a.b.c = 1;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_PROPERTY), 1,
+			byte(c.OP_CONSTANT), 3,
+			byte(c.OP_SET_PROPERTY), 2,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[1], "b")
+		utils.AssertValue(t, chunk.Constants[2], "c")
+		utils.AssertValue(t, chunk.Constants[3], 1.0)
+	})
+
+	t.Run("Se puede asignar una propiedad del resultado de una llamada", func(t *testing.T) {
+		chunk := compileSource(t, "f().x = 1;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_SET_PROPERTY), 1,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[0], "f")
+		utils.AssertValue(t, chunk.Constants[1], "x")
+		utils.AssertValue(t, chunk.Constants[2], 1.0)
+	})
+
+	t.Run("La asignación es una expresión y se encadena de derecha a izquierda", func(t *testing.T) {
+		chunk := compileSource(t, "a.x = a.y = 1;")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 3,
+			byte(c.OP_SET_PROPERTY), 2,
+			byte(c.OP_SET_PROPERTY), 1,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[1], "x")
+		utils.AssertValue(t, chunk.Constants[2], "y")
+		utils.AssertValue(t, chunk.Constants[3], 1.0)
+	})
+
+	t.Run("Error si la propiedad a asignar está dentro de una operación", func(t *testing.T) {
+		err := compileSourceError(t, "a + b.c = 3;")
+
+		utils.AssertErrorMessage(t, err, "invalid assignment target")
+	})
+}

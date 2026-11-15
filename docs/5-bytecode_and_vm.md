@@ -102,6 +102,30 @@ Una nativa no tiene bytecode ni chunk solo la cantidad de argumentos que espera 
 
 Una difernecia con el libro que tenemos es qye para agregar una nativa el libro usa defineNative que además apila y desapila valores para protegerlos de su garbage collector. En glox eso no hace falta así que tenemos una tabla con las nativas que la VM instala como globales al crearse y agregar otra es sumar una entrada a esa tabla. Otra diferencia es el clock porque el de clox mide el tiempo de CPU y el nuestro devuelve el tiempo del reloj igual que el del tree-walk así los dos caminos miden lo mismo y los benchmarks se pueden comparar. 
 
+#### Clases e instancias
+
+Creamos una clase que por ahora solo tiene como dato su nombre. Además de eso el método string para que el Stringify pueda llamarlo e imprimirlo. Si bien el libro habla de que no es estrictamente necesario para el programador que lo use, está bueno para mostrar el nombre en runtime como por ejemplo para el stack trace. 
+
+Como viene pasando en el resto de la implementación de esta segunda parte no necesitamos el header de Obj ni tampoco el tipo ni las macros que propone el libro, al usar Go alcanza con any y luego pregunta con v.(*class). Siguiendo un poco con esta diferencia con el libro tampoco nos tenemos que hacer cargo de liberar la memoria para las clases.
+
+Llega el momento de las instancias que acá tienen que guardar a qué clase pertenecen para después poder encontrar sus métodos, y además sus propios campos. Sobre estos últimos es que tenemos una diferencia con el libro, porque también como ha pasado a lo largo de esta segunda parte más que nada se refiere a cómo se guarda esto en memoria. En Lox los campos no es que se declaran sino que se agregan en el runtime y se terminan buscando por nombre, ahí es donde el libro usa su tabla de hash y nosotros volvemos a un map[string]any que en el fondo es la misma idea pero difiere porque nosotros usamos Go. Un detalle acá es que como los campos se agregan en el runtime hay que hashear y buscar, frente a ya tenerlo fijo si el compilador los tiene declarados con cada tamaño, que es más rápido porque eso es solo sumar y desplazarse, eso sería una diferencia frente a un lenguaje estático.
+
+Un detalle que también habla el libro y nos parece importante comentarlo es esto, que para el que programa una instancia de algo como un Auto y otra como un Perro son de tipos distintos y tiene toda la lógica que así sea, pero para nosotros en la vm es el mismo instance, digamos que lo único que cambia es a qué clase apuntan.
+
+Para crear la instancia se llama a la clase como si fuera una función, como por ejemplo Auto(), por lo que no hace falta una instrucción nueva ya que se usa el OP_CALL y lo que sí cambia es el caso en el callValue para detectarlo. Al crear la instancia la vm la pone en el lugar del stack donde estaba la clase y listo, no es necesario meterse con el frame porque no hay código Lox ahí para ejecutar.
+
+#### Get y set para los campos
+
+Para cuando la VM ejecuta el OP_GET_PROPERTY la instancia ya está en el tope del stack porque lo que estaba a la izquierda se compiló antes, que eso cambia para el OP_SET_PROPERTY porque abajo queda la instancia y arriba el valor que se le quiere asignar y eso trae la diferencia entre las dos que para la última necesitamos mirar un lugar más abajo del tope para encontrar la instancia.
+
+En el get, una vez que ya ve que es una instancia busca el campo en el map de la misma y deja el valor en el lugar del stack que ocupaba la instancia, básicamente saca la instancia y mete el valor en el stack. En el set guarda el valor en el campo, saca el valor y la instancia y vuelve a meter el valor. Con esto se logra que la asignación sea una expresión entonces cuando haces, por ejemplo, print auto.velocidad = 5; se termina devolviendo el 5 que se usa después para imprimir.
+
+Un detalle de los campos para Lox es que no se declaran entonces si se asigna uno que no existía simplemente lo crea y guarda el valor, pero si existía lo pisa, con eso ya tenemos el crear y el modificar, pero si a la hora de querer leerlo no existe ahí sí levantamos un error.
+
+Los errores en runtime que tenemos acá son el que recién mencionamos de que no existe el campo en la instancia, el de tratar de leer el valor de algo que no es una instancia y también tratar de asignar a algo que no es una instancia, básicamente antes de leer o asignar la vm se fija que sea una instancia y si no lo es da error, y esto incluye a las clases, así que algo como A.x = 1 también es un error. Pero con un detalle y es que un campo puede ser nil y existir claramente, y como usamos un map que devuelve nil tanto si es el valor como si no lo encontró ahí tenemos que estar atentos para diferenciar los dos casos, esto es particular de Go y de que usamos un map.
+
+Sobre limitaciones conocidas para esta parte tenemos que no se puede borrar un campo porque si le asignas nil dijimos que es válido y sigue existiendo. Tampoco tenemos forma de preguntar si existe el campo sin que nos de error. 
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
@@ -122,7 +146,7 @@ Si bien estas limitaciones las fuimos contando en cada sección donde aparecen, 
 
 - **Llamadas anidadas**: puede haber como mucho 63 llamadas anidadas, porque la VM tiene un máximo de 64 frames y el script ocupa uno. Si se pasa corta con un error de stack overflow mientras que el tree-walk aguanta una recursión mucho más profunda. Si bien esto es un numero que sigue el libro decidimos tomar ese mismo.
 - **Variables locales**: una función puede tener como mucho 255, contando sus parámetros, porque el operando de una local ocupa un byte y el slot 0 queda reservado para la función. El tree-walk no tiene este límite.
-- **Constantes**: cada función puede tener como mucho 256 constantes, porque su posición también ocupa un byte. Como cada función tiene su propio chunk el límite es por función, y en el tree-walk no existe.
+- **Constantes**: cada función puede tener como mucho 256 constantes, porque su posición también ocupa un byte. Como cada función tiene su propio chunk el límite es por función, y en el tree-walk no existe. Con las clases, los nombres de las clases y de los campos también ocupan lugar entre esas constantes.
 - **Tamaño de un salto**: el cuerpo de un if o de un while o for no puede pasar de los 65.535 bytes porque el salto se guarda en dos bytes, y esto también limita a break y continue. En el tree-walk no hay límite.
 
 ### Tests

@@ -1896,3 +1896,224 @@ func TestOpLoop(t *testing.T) {
 		utils.AssertValue(t, out.String(), "")
 	})
 }
+
+func TestOpClass(t *testing.T) {
+	t.Run("Apila una clase nueva con el nombre de la constante", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		name := chunk.AddConstant("MiClase")
+		chunk.Write(byte(c.OP_CLASS), line)
+		chunk.Write(byte(name), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0].(*class).name, "MiClase")
+	})
+}
+
+func TestCallClass(t *testing.T) {
+	callClass := func(chunk *c.Chunk, class *class) {
+		writeConstant(chunk, class)
+		writeCall(chunk, 0)
+	}
+
+	t.Run("Llamar a una clase deja en su lugar una instancia de esa clase", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		callClass(chunk, auto)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		created, isInstance := stackValues(vm)[0].(*instance)
+		utils.AssertValue(t, isInstance, true)
+		utils.AssertValue(t, created.class, auto)
+	})
+
+	t.Run("Cada llamada a una clase crea una instancia distinta", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		callClass(chunk, auto)
+		callClass(chunk, auto)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		first := stackValues(vm)[0].(*instance)
+		second := stackValues(vm)[1].(*instance)
+		utils.AssertValue(t, first != second, true)
+	})
+}
+
+func TestOpGetProperty(t *testing.T) {
+	getProperty := func(chunk *c.Chunk, object any, name string) {
+		writeConstant(chunk, object)
+		index := chunk.AddConstant(name)
+		chunk.Write(byte(c.OP_GET_PROPERTY), line)
+		chunk.Write(byte(index), line)
+	}
+
+	t.Run("Reemplaza la instancia por el valor del campo", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = "rojo"
+		getProperty(chunk, auto, "color")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], "rojo")
+	})
+
+	t.Run("Lee el campo con el nombre que indica el operando", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = "rojo"
+		auto.fields["marca"] = "Fiat"
+		getProperty(chunk, auto, "marca")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, stackValues(vm)[0], "Fiat")
+	})
+
+	t.Run("Un campo que vale nil existe y se puede leer", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = nil
+		getProperty(chunk, auto, "color")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], nil)
+	})
+
+	t.Run("Error si la instancia no tiene ese campo", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		getProperty(chunk, newInstance(newClass("Auto")), "color")
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "undefined property 'color'")
+	})
+
+	t.Run("Error si se lee una propiedad de algo que no es una instancia", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			object any
+		}{
+			{"un número", 1.0},
+			{"nil", nil},
+			{"una clase", newClass("Auto")},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				getProperty(chunk, test.object, "color")
+
+				err := run(vm, chunk)
+
+				utils.AssertErrorMessage(t, err, "only instances have properties")
+			})
+		}
+	})
+}
+
+func TestOpSetProperty(t *testing.T) {
+	setProperty := func(chunk *c.Chunk, object any, name string, value any) {
+		writeConstant(chunk, object)
+		writeConstant(chunk, value)
+		index := chunk.AddConstant(name)
+		chunk.Write(byte(c.OP_SET_PROPERTY), line)
+		chunk.Write(byte(index), line)
+	}
+
+	t.Run("Crea el campo si la instancia no lo tenía", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		setProperty(chunk, auto, "color", "rojo")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, auto.fields["color"], "rojo")
+	})
+
+	t.Run("Pisa el valor si el campo ya existía", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = "rojo"
+		setProperty(chunk, auto, "color", "azul")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, auto.fields["color"], "azul")
+		utils.AssertValue(t, len(auto.fields), 1)
+	})
+
+	t.Run("Asigna el campo con el nombre que indica el operando", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = "rojo"
+		setProperty(chunk, auto, "marca", "Fiat")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, auto.fields["marca"], "Fiat")
+		utils.AssertValue(t, auto.fields["color"], "rojo")
+	})
+
+	t.Run("Asignar nil deja el campo existiendo con nil", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newInstance(newClass("Auto"))
+		auto.fields["color"] = "rojo"
+		setProperty(chunk, auto, "color", nil)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		value, exists := auto.fields["color"]
+		utils.AssertValue(t, exists, true)
+		utils.AssertValue(t, value, nil)
+	})
+
+	t.Run("Deja en el stack solo el valor asignado donde estaba la instancia", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		setProperty(chunk, newInstance(newClass("Auto")), "color", "rojo")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], "rojo")
+	})
+
+	t.Run("Error si se asigna un campo a algo que no es una instancia", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			object any
+		}{
+			{"un número", 1.0},
+			{"nil", nil},
+			{"una clase", newClass("Auto")},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				setProperty(chunk, test.object, "color", "rojo")
+
+				err := run(vm, chunk)
+
+				utils.AssertErrorMessage(t, err, "only instances have fields")
+			})
+		}
+	})
+}

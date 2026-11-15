@@ -249,6 +249,58 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			frame = vm.currentFrame()
 
+		case c.OP_CLASS:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			vm.push(newClass(name))
+
+		case c.OP_GET_PROPERTY:
+			object, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			instance, ok := object.(*instance)
+			if !ok {
+				return errors.NewLoxError(vm.currentLine(), "only instances have properties")
+			}
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			value, ok := instance.fields[name]
+			if !ok {
+				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
+			}
+			if _, err := vm.pop(); err != nil {
+				return err
+			}
+			vm.push(value)
+
+		case c.OP_SET_PROPERTY:
+			object, err := vm.peek(1)
+			if err != nil {
+				return err
+			}
+			instance, ok := object.(*instance)
+			if !ok {
+				return errors.NewLoxError(vm.currentLine(), "only instances have fields")
+			}
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			value, err := vm.peek(0)
+			if err != nil {
+				return err
+			}
+			instance.fields[name] = value
+			if err := vm.popTwo(); err != nil {
+				return err
+			}
+			vm.push(value)
+
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:
 			offset, err := vm.readShort()
@@ -293,6 +345,9 @@ func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 		return vm.call(function, argCount)
 	case *native:
 		return vm.callNative(function, argCount)
+	case *class:
+		vm.stack[len(vm.stack)-argCount-1] = newInstance(function)
+		return nil
 	default:
 		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
 	}
@@ -489,7 +544,7 @@ func (vm *VirtualMachine) popNumberOperands() (float64, float64, error) {
 	return l, r, nil
 }
 
-// popTwo saca los dos operandos del tope del stack
+// popTwo saca los dos valores del tope del stack
 func (vm *VirtualMachine) popTwo() error {
 	if _, err := vm.pop(); err != nil {
 		return err
