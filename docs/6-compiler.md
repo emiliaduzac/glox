@@ -62,7 +62,7 @@ Es importante ver el efecto que tiene cada statement sobre el stack de la VM (su
 
 Esto es importante porque, si cada statement dejara algo en el stack, con muchos statements seguidos el stack crecería constantemente. Además, es lo que permite que los índices de las variables locales coincidan con su posición en el stack (ver [variables locales y scopes](#variables-locales-y-scopes)). La única excepción es la declaración de una variable local, que deja su valor en el stack a propósito, porque ese valor es la variable, y se saca recién al cerrar su bloque.
 
-Para asegurarnos de que esto se cumpla, cuando la VM llega a `OP_RETURN` verifica que el stack esté vacío. Si no lo está, levanta un error, porque significa que el compilador dejó algo de más.
+Para asegurarnos de que esto se cumpla, cuando termina el script la VM verifica que el stack haya quedado vacío y si no levanta un error, porque significa que el compilador dejó algo de más.
 
 ### Manejo de errores
 
@@ -192,6 +192,11 @@ Los parametros de una funcion para nosotros son varibles locales de la funcion, 
 Una llamada a la funcion como por ejemplo add(1,2) para compilarla, primero se compila lo que se queire llamar que es add en este caso, despues los argumentos de izquierda a derecha y al final se emite un OP_CALL que lleva al cantidad de argumentos. Como esa cantidad va en un byte enteonces la maxima cantidad es de 255 igual que en el tree walk. 
 Para qu el compilador puede reconocer la llmada , el '(' pasa a ser un operador infijo en el pratt parser con la precedencia de llamada.  
 
+#### Return
+
+El return es un statement que si tiene una expresión la compila y emite un OP_RETURN, y si no tiene devuelve nil, es decir que emite un OP_NIL y un OP_RETURN igual que lo que se agrega al final de cada función. Acá hay una diferencia importante con el tree-walk, porque allá el recorrido era recursivo y para salir de varias llamadas anidadas usamos como un truco que era que el ReturnValue sube como si fuera un error. En la VM eso no hace falta porque el bytecode es una secuencia plana y el return es una instrucción más, que corta la llamada y vuelve al frame anterior como vimos en return de la VM.
+
+Un return fuera de una función no tiene sentido porque no hay nada de donde salir. Para detectarlo el compilador se fija si lo que está compilando es el script y si es así da un error. Ese error no corta la compilación si no que sigue leyendo para avisar si hay más errores porque el código está bien escrito y solo rompe una regla del lenguaje. Con esto nos acomplamso a lo que dice el libro que se podria permitir esto pero elige que sea un error. 
 
 ### Tests
 
