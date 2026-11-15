@@ -102,6 +102,28 @@ Una nativa no tiene bytecode ni chunk solo la cantidad de argumentos que espera 
 
 Una difernecia con el libro que tenemos es qye para agregar una nativa el libro usa defineNative que además apila y desapila valores para protegerlos de su garbage collector. En glox eso no hace falta así que tenemos una tabla con las nativas que la VM instala como globales al crearse y agregar otra es sumar una entrada a esa tabla. Otra diferencia es el clock porque el de clox mide el tiempo de CPU y el nuestro devuelve el tiempo del reloj igual que el del tree-walk así los dos caminos miden lo mismo y los benchmarks se pueden comparar. 
 
+#### Closures
+
+Antes las funciones se cargaban con `OP_CONSTANT` como cualquier otra constante. Ahora la VM las carga con `OP_CLOSURE`, que crea un closure con un puntero a la `Function` y sus propios **upvalues**, y pushea el closure a su stack.
+
+Como todas las funciones se emiten con `OP_CLOSURE`, en el stack y en las variables nunca hay una `Function`, siempre un closure que la envuelve. Eso implica que el `callFrame` ahora guarda el closure que se está ejecutando, no la `Function`. Esto es importante, porque mientras se ejecuta una función la VM necesita llegar a sus upvalues, pero la `Function` solo sabe cuántos upvalues hay y de dónde sacarlos, y eso es igual para todos sus closures. En cambio,la variable concreta cambia en cada uno: dos closures de la misma función pueden haberse creado en llamadas distintas a la función de afuera, y cada uno captura la variable de su llamada. Por eso las referencias están en el closure.
+
+El script es el único que no se crea con `OP_CLOSURE`, porque no está declarado dentro de ninguna función, así que la VM lo envuelve en un closure cuando lo recibe en `Run()`, antes de ejecutarlo.
+
+**Upvalues**
+
+En la VM, un upvalue es un objeto que apunta a una variable de la función que envuelve a otra. Así, cuando se ejecuta la función interna, puede usar esa variable aunque no esté en su propia ventana del stack. Se guarda un puntero y no una copia del valor porque la función interna tiene que poder modificar la variable real, y que ese cambio se vea desde afuera y en las próximas llamadas.
+
+El puntero se guarda al crear el closure ya que al ejecutar `OP_CLOSURE` la que está corriendo es la función de afuera, y se sabe dónde están sus variables. Para eso, la VM lee los pares `<isLocal> <index>` que dejó el compilador, y para cada uno:
+
+- **Si la variable es local de la función de afuera**, está en su ventana, en `slots + index`, así que crea un upvalue que apunta ahí.
+- **Si no**, la función de afuera ya la tiene como upvalue, e `index` es su posición en sus upvalues. Reutiliza ese mismo upvalue sin crear uno nuevo.
+
+Después, cuando la función interna se ejecuta, `OP_GET_UPVALUE` y `OP_SET_UPVALUE` buscan el upvalue en su closure y leen o escriben a través del puntero.
+
+En los call frames contamos que, a diferencia del libro, usamos un índice y no un puntero para marcar dónde empieza la ventana, porque si el stack creciera, Go podría moverlo y el puntero quedaría viejo. Acá sí usamos un puntero al stack, y es seguro porque el stack se crea con capacidad fija y nunca crece, así que Go no lo mueve.
+
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
