@@ -1,11 +1,12 @@
 package virtualmachine
 
 type class struct {
-	name string
+	name    string
+	methods map[string]*closure
 }
 
 func newClass(name string) *class {
-	return &class{name: name}
+	return &class{name: name, methods: map[string]*closure{}}
 }
 
 func (c *class) String() string {
