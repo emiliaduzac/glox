@@ -1,8 +1,18 @@
 ## Extra
 
-Como extra, decidimos incorporar **break** y **continue** a los ciclos. Como vimos en clase, cuando queremos agregar funcionalidad nueva, tenemos que ir en el orden correspondiente: _scanner → compiler → vm_.
+Como extra, decidimos incorporar **break** y **continue** a los ciclos. Como vimos en clase, cuando queremos agregar funcionalidad nueva, tenemos que ir en el orden correspondiente: _scanner → compiler → VM_.
 
-### Continue
+También resolvimos otros desafíos que iba proponiendo el libro. Estos los fuimos explicando en la doc de la VM o del compilador, pero los mencionamos acá para resaltarlos.
+
+### Índice
+
+- [Continue](#continue)
+- [Break](#break)
+- [Aridad de funciones nativas](5-bytecode_and_vm.md#funciones-nativas)
+- [Reutilizar constantes de nombres repetidos](6-compiler.md#nombres-repetidos)
+
+
+## Continue
 
 `continue` corta la iteración actual de un ciclo y pasa directamente a la siguiente: lo que queda del cuerpo no se ejecuta. En un `while`, vuelve a evaluar la condición directo, pero en un `for` tiene que ejecutar el incremento y recién después volver a la condición.
 
@@ -38,7 +48,7 @@ Finalmente, `continueStatement()` se ejecuta luego de encontrar un `continue`. P
 
 En la VM no hace falta ningún cambio: el `continue` se arma solo con instrucciones que ya existían (`OP_POP` y `OP_LOOP`).
 
-### Break
+## Break
 
 Un `break`, a diferencia del `continue`, no corta solo la iteración actual: termina el ciclo por completo. Tanto en un `for` como en un `while`, salta a lo que sigue después del ciclo, sin volver a evaluar la condición ni ejecutar el incremento. Si hay ciclos anidados, sale del más interno.
 
@@ -89,7 +99,7 @@ En la VM tampoco hace falta ningún cambio.
 
 - **Solo en el bytecode compiler, pero el scanner es compartido.** Como el tree-walk interpreter usa el mismo scanner, `break` y `continue` pasaron a ser palabras reservadas en los dos modos, pero si se usan como statements sin `--vm`, el parser del tree-walk da un error de sintaxis.
 
-- **Solo salen del ciclo más interno.** No hay forma de salir de varios ciclos a la vez, como un `break` con un número de niveles (por ej `break 2` si está anidado en 2 loops) o con el tipo de ciclo del que se quiere salir (`break while`). Son extensiones que se proponen en [este hilo de r/ProgrammingLanguages](https://www.reddit.com/r/ProgrammingLanguages/comments/o671sd/what_is_the_correct_approach_to_implementing/).
+- **Solo salen del ciclo más interno.** No hay forma de salir de varios ciclos a la vez, como un `break` con un número de niveles (por ej `break 2` si está anidado en 2 loops) o con el tipo de ciclo del que se quiere salir (`break while`). Son extensiones que se proponen en [este hilo](https://www.reddit.com/r/ProgrammingLanguages/comments/o671sd/what_is_the_correct_approach_to_implementing/).
 
 - **El tamaño del salto.** Al usar `OP_JUMP` y `OP_LOOP`, el salto se guarda en un operando de 2 bytes, así que un `break` o un `continue` puede saltar como máximo 65.535 bytes: si el cuerpo del ciclo es más grande, el compilador da error. No es una limitación nueva (es la misma de los `if` y los ciclos), pero vale la pena destacarla.
 
