@@ -3,11 +3,13 @@ package virtualmachine
 import c "tp-lox/internal/chunk"
 
 type upvalue struct {
-	location *any
+	location   *any
+	next       *upvalue
+	stackIndex int
 }
 
-func newUpvalue(slot *any) *upvalue {
-	return &upvalue{location: slot}
+func newUpvalue(location *any, stackIndex int) *upvalue {
+	return &upvalue{location: location, stackIndex: stackIndex}
 }
 
 type closure struct {

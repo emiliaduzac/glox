@@ -24,11 +24,12 @@ type callFrame struct {
 }
 
 type VirtualMachine struct {
-	frames  []callFrame
-	stack   []any
-	out     io.Writer
-	globals map[string]any
-	debug   bool
+	frames       []callFrame
+	stack        []any
+	out          io.Writer
+	globals      map[string]any
+	debug        bool
+	openUpvalues *upvalue
 }
 
 func NewVirtualMachine() *VirtualMachine {
@@ -393,6 +394,7 @@ func (vm *VirtualMachine) printStackAndGlobal(offset int) {
 func (vm *VirtualMachine) resetStack() {
 	vm.stack = vm.stack[:0]
 	vm.frames = vm.frames[:0]
+	vm.openUpvalues = nil
 }
 
 func (vm *VirtualMachine) stackBase() int {
@@ -585,10 +587,32 @@ func (vm *VirtualMachine) fillUpvalues(cl *closure, frame *callFrame) error {
 			return err
 		}
 		if isLocal == 1 {
-			cl.upvalues[i] = newUpvalue(&vm.stack[frame.slots+int(index)])
+			cl.upvalues[i] = vm.captureUpvalue(frame.slots + int(index))
 		} else {
 			cl.upvalues[i] = frame.closure.upvalues[index]
 		}
 	}
 	return nil
+}
+
+func (vm *VirtualMachine) captureUpvalue(stackIndex int) *upvalue {
+	var prev *upvalue
+	current := vm.openUpvalues
+	for current != nil && current.stackIndex > stackIndex {
+		prev = current
+		current = current.next
+	}
+
+	if current != nil && current.stackIndex == stackIndex {
+		return current
+	}
+
+	created := newUpvalue(&vm.stack[stackIndex], stackIndex)
+	created.next = current
+	if prev == nil {
+		vm.openUpvalues = created
+	} else {
+		prev.next = created
+	}
+	return created
 }
