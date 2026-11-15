@@ -1,3 +1,5 @@
+// LISTA ENLAZADA 
+
 class Nodo {}
 class Lista {}
 
@@ -64,3 +66,122 @@ fun iterar(lista, visitar) {
         actual = actual.proximo;
     }
 }
+
+// HELPERS PARA LOS TESTS
+
+fun sonIguales(a, b) {
+    if (largo(a) != largo(b)) return false;
+    var actualA = a.primero;
+    var actualB = b.primero;
+    while (actualA != nil) {
+        if (actualA.dato != actualB.dato) return false;
+        actualA = actualA.proximo;
+        actualB = actualB.proximo;
+    }
+    return true;
+}
+
+fun verificar(condicion) {
+    if (condicion) {
+        print "OK";
+    } else {
+        print "ERROR";
+    }
+}
+
+// MERGESORT
+
+fun mergeSort(lista) {
+    // caso base: si tiene 0 o 1 elemento ya está ordenada
+    if (lista.cantidad <= 1) return lista;
+
+    var medio = lista.cantidad / 2;
+    var izquierda = obtenerIzquierda(lista, medio);
+    var derecha = lista; // a la original le quedó la otra mitad
+
+    var izquierdaOrdenada = mergeSort(izquierda);
+    var derechaOrdenada = mergeSort(derecha);
+
+    return merge(izquierdaOrdenada, derechaOrdenada);
+}
+
+fun obtenerIzquierda(lista, medio) {
+    var izquierda = crearLista();
+    for (var i = 0; i < medio; i = i + 1) {
+        var elem = borrarPrimero(lista);
+        insertarUltimo(izquierda, elem);
+    }
+    return izquierda;
+}
+
+fun merge(izquierda, derecha) {
+    var resultado = crearLista();
+
+    while (!estaVacia(izquierda) and !estaVacia(derecha)) {
+        if (verPrimero(izquierda) <= verPrimero(derecha)) {
+            insertarUltimo(resultado, borrarPrimero(izquierda));
+        } else {
+            insertarUltimo(resultado, borrarPrimero(derecha));
+        }
+    }
+
+    // lo que sobra de una de las dos ya está ordenado
+    while (!estaVacia(izquierda)) {
+        insertarUltimo(resultado, borrarPrimero(izquierda));
+    }
+    while (!estaVacia(derecha)) {
+        insertarUltimo(resultado, borrarPrimero(derecha));
+    }
+
+    return resultado;
+}
+
+// MERGESORT TESTS
+
+print "--- MERGESORT ORDENA [0, 7, 4, 1, 8, 5, 2, 9, 6, 3] ---";
+
+var desordenada = crearLista();
+var esperada = crearLista();
+
+for (var i = 0; i < 10; i = i + 1) {
+    insertarUltimo(desordenada, (i * 7) % 10);
+    insertarUltimo(esperada, i);
+}
+
+var res = mergeSort(desordenada);
+verificar(sonIguales(res, esperada));
+
+
+print "--- MERGESORT CON UNA LISTA VACIA [] ---";
+
+verificar(estaVacia(mergeSort(crearLista())));
+
+
+print "--- MERGESORT CON REPETIDOS [3, 1, 3] ---";
+
+var conRepetidos = crearLista();
+insertarUltimo(conRepetidos, 3);
+insertarUltimo(conRepetidos, 1);
+insertarUltimo(conRepetidos, 3);
+
+var esperadaConRepetidos = crearLista();
+insertarUltimo(esperadaConRepetidos, 1);
+insertarUltimo(esperadaConRepetidos, 3);
+insertarUltimo(esperadaConRepetidos, 3);
+
+var res = mergeSort(conRepetidos);
+verificar(sonIguales(res, esperadaConRepetidos));
+
+
+print "--- MERGESORT LISTA YA ORDENADA [1, 2, 3, 4, 5, 6] ---";
+
+var ordenada = crearLista();
+insertarUltimo(conRepetidos, 1);
+insertarUltimo(conRepetidos, 2);
+insertarUltimo(conRepetidos, 3);
+insertarUltimo(conRepetidos, 4);
+insertarUltimo(conRepetidos, 5);
+insertarUltimo(conRepetidos, 6);
+
+var res = mergeSort(ordenada);
+verificar(sonIguales(res, ordenada));
