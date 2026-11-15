@@ -9,8 +9,9 @@ import (
 )
 
 type Local struct {
-	Name  token.Token
-	Depth int
+	Name       token.Token
+	Depth      int
+	IsCaptured bool
 }
 
 type FunctionType int
@@ -192,7 +193,7 @@ func (c *Compiler) addLocal(name token.Token) {
 		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "too many local variables in scope"))
 		return
 	}
-	local := Local{Name: name, Depth: -1} // no inicializada
+	local := Local{Name: name, Depth: -1, IsCaptured: false} // no inicializada
 	c.locals = append(c.locals, local)
 }
 
@@ -248,7 +249,7 @@ func (c *Compiler) endScope() {
 	c.scopeDepth--
 
 	for len(c.locals) > 0 && c.locals[len(c.locals)-1].Depth > c.scopeDepth {
-		c.emit(byte(chunk.OP_POP))
+		c.emitPopLocal(c.locals[len(c.locals)-1])
 		c.locals = c.locals[:len(c.locals)-1]
 	}
 }
@@ -614,6 +615,14 @@ func (c *Compiler) patchBreakJumps() error {
 
 func (c *Compiler) popLoopLocals(currentLoop *Loop) {
 	for i := len(c.locals) - 1; i >= 0 && c.locals[i].Depth > currentLoop.scopeDepth; i-- {
+		c.emitPopLocal(c.locals[i])
+	}
+}
+
+func (c *Compiler) emitPopLocal(local Local) {
+	if local.IsCaptured {
+		c.emit(byte(chunk.OP_CLOSE_UPVALUE))
+	} else {
 		c.emit(byte(chunk.OP_POP))
 	}
 }
@@ -821,6 +830,7 @@ func (c *Compiler) resolveUpvalue(name token.Token) int {
 	}
 
 	if local := c.enclosing.resolveLocal(name); local != -1 {
+		c.enclosing.locals[local].IsCaptured = true
 		return c.addUpvalue(byte(local), true)
 	}
 	if upvalue := c.enclosing.resolveUpvalue(name); upvalue != -1 {
