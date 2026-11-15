@@ -32,6 +32,11 @@ type Loop struct {
 	breakJumps []int
 }
 
+type Upvalue struct {
+	index   byte
+	isLocal bool
+}
+
 type Compiler struct {
 	*parserState
 	enclosing   *Compiler
@@ -41,6 +46,7 @@ type Compiler struct {
 	scopeDepth  int
 	identifiers map[string]byte
 	loops       []Loop
+	upvalues    []Upvalue
 }
 
 // NewCompiler crea un nuevo compiler, a partir de una lista de tokens generados por el scanner.
@@ -762,10 +768,12 @@ func (c *Compiler) namedVariable(name token.Token, canAssign bool) error {
 	var getOp, setOp chunk.OpCode
 	var arg byte
 
-	localIndex := c.resolveLocal(name)
-	if localIndex != -1 {
+	if localIndex := c.resolveLocal(name); localIndex != -1 {
 		getOp, setOp = chunk.OP_GET_LOCAL, chunk.OP_SET_LOCAL
 		arg = byte(localIndex)
+	} else if upIndex := c.resolveUpvalue(name); upIndex != -1 {
+		getOp, setOp = chunk.OP_GET_UPVALUE, chunk.OP_SET_UPVALUE
+		arg = byte(upIndex)
 	} else {
 		var err error
 		arg, err = c.identifierConstant(name)
@@ -797,6 +805,35 @@ func (c *Compiler) resolveLocal(name token.Token) int {
 		}
 	}
 	return -1
+}
+
+func (c *Compiler) resolveUpvalue(name token.Token) int {
+	if c.enclosing == nil {
+		return -1
+	}
+
+	local := c.enclosing.resolveLocal(name)
+	if local != -1 {
+		return c.addUpvalue(byte(local), true)
+	}
+	return -1
+}
+
+func (c *Compiler) addUpvalue(index byte, isLocal bool) int {
+	for i, upvalue := range c.upvalues {
+		if upvalue.index == index && upvalue.isLocal == isLocal {
+			return i
+		}
+	}
+
+	if len(c.upvalues) == math.MaxUint8+1 {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "too many closure variables in function"))
+		return 0
+	}
+
+	c.upvalues = append(c.upvalues, Upvalue{index: index, isLocal: isLocal})
+	c.function.UpvalueCount++
+	return len(c.upvalues) - 1
 }
 
 func (c *Compiler) variable(canAssign bool) error {

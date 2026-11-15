@@ -6,7 +6,7 @@ type closure struct {
 	function *c.Function
 }
 
-func NewClosure(function *c.Function) *closure {
+func newClosure(function *c.Function) *closure {
 	return &closure{function: function}
 }
 

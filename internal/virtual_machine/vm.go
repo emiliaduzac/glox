@@ -49,7 +49,7 @@ func (vm *VirtualMachine) SetDebugMode() {
 }
 
 func (vm *VirtualMachine) Run(function *c.Function) (err error) {
-	script := NewClosure(function)
+	script := newClosure(function)
 	vm.push(script)
 	defer func() {
 		if err != nil {
@@ -256,7 +256,7 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 				return err
 			}
 			function := constant.(*c.Function)
-			vm.push(NewClosure(function))
+			vm.push(newClosure(function))
 
 		// Control de flujo
 		case c.OP_JUMP_IF_FALSE:

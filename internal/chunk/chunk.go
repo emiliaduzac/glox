@@ -35,6 +35,9 @@ const (
 	OP_GET_LOCAL
 	OP_SET_LOCAL
 
+	OP_GET_UPVALUE
+	OP_SET_UPVALUE
+
 	OP_LOOP
 	OP_JUMP_IF_FALSE
 	OP_JUMP
@@ -66,6 +69,9 @@ var opCodeNames = map[OpCode]string{
 	OP_DEFINE_GLOBAL: "OP_DEFINE_GLOBAL",
 	OP_GET_GLOBAL:    "OP_GET_GLOBAL",
 	OP_SET_GLOBAL:    "OP_SET_GLOBAL",
+
+	OP_GET_UPVALUE: "OP_GET_UPVALUE",
+	OP_SET_UPVALUE: "OP_SET_UPVALUE",
 
 	OP_GET_LOCAL: "OP_GET_LOCAL",
 	OP_SET_LOCAL: "OP_SET_LOCAL",
@@ -127,7 +133,7 @@ func (c *Chunk) Disassemble(name string) {
 			fmt.Printf("%s<%s>\n", op, c.constantString(constantIndex))
 			i += 2
 
-		case OP_GET_LOCAL, OP_SET_LOCAL:
+		case OP_GET_LOCAL, OP_SET_LOCAL, OP_GET_UPVALUE, OP_SET_UPVALUE:
 			// Instrucciones con operandos: slots
 			varIndex := c.Bytes[i+1]
 			fmt.Printf("%s<@%d>\n", op, varIndex)

@@ -3,9 +3,10 @@ package chunk
 import "fmt"
 
 type Function struct {
-	Arity int
-	Chunk Chunk
-	Name  string
+	Arity        int
+	Chunk        Chunk
+	Name         string
+	UpvalueCount int
 }
 
 func NewFunction() *Function {
