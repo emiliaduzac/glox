@@ -317,14 +317,14 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			if err != nil {
 				return err
 			}
-			value, ok := instance.fields[name]
-			if !ok {
-				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
-			}
-			if _, err := vm.pop(); err != nil {
+			if value, ok := instance.fields[name]; ok {
+				if _, err := vm.pop(); err != nil {
+					return err
+				}
+				vm.push(value)
+			} else if err := vm.bindMethod(instance.class, name); err != nil {
 				return err
 			}
-			vm.push(value)
 
 		case c.OP_SET_PROPERTY:
 			object, err := vm.peek(1)
@@ -398,6 +398,23 @@ func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 	default:
 		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
 	}
+}
+
+func (vm *VirtualMachine) bindMethod(klass *class, name string) error {
+	method, ok := klass.methods[name]
+	if !ok {
+		return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
+	}
+	receiver, err := vm.peek(0)
+	if err != nil {
+		return err
+	}
+	bound := newBoundMethod(receiver, method)
+	if _, err := vm.pop(); err != nil {
+		return err
+	}
+	vm.push(bound)
+	return nil
 }
 
 func (vm *VirtualMachine) call(cl *closure, argCount int) error {

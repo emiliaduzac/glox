@@ -2167,7 +2167,53 @@ func TestOpGetProperty(t *testing.T) {
 		utils.AssertValue(t, stackValues(vm)[0], nil)
 	})
 
-	t.Run("Error si la instancia no tiene ese campo", func(t *testing.T) {
+	t.Run("Si no hay un campo con ese nombre deja el método de la clase como bound method de la instancia", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		acelerar := c.NewFunction()
+		auto.methods["acelerar"] = newClosure(acelerar)
+		fiat := newInstance(auto)
+		getProperty(chunk, fiat, "acelerar")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		bound, isBound := stackValues(vm)[0].(*boundMethod)
+		utils.AssertValue(t, isBound, true)
+		utils.AssertValue(t, bound.receiver, any(fiat))
+		utils.AssertValue(t, bound.method, auto.methods["acelerar"])
+	})
+
+	t.Run("Un campo tapa a un método con el mismo nombre", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		auto.methods["color"] = newClosure(c.NewFunction())
+		fiat := newInstance(auto)
+		fiat.fields["color"] = "rojo"
+		getProperty(chunk, fiat, "color")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, stackValues(vm)[0], "rojo")
+	})
+
+	t.Run("Leer dos veces el mismo método da dos bound methods distintos", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		auto.methods["acelerar"] = newClosure(c.NewFunction())
+		fiat := newInstance(auto)
+		getProperty(chunk, fiat, "acelerar")
+		getProperty(chunk, fiat, "acelerar")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, stackValues(vm)[0] != stackValues(vm)[1], true)
+	})
+
+	t.Run("Error si la instancia no tiene ni un campo ni un método con ese nombre", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		getProperty(chunk, newInstance(newClass("Auto")), "color")
 
