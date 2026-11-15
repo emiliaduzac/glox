@@ -94,6 +94,14 @@ Acá hay un par de diferencias con el libro como cuando termina el script que ha
 
 Como OP_RETURN descarta todo lo de la llamada, al terminar el cuerpo de una función no hace falta sacar uno por uno los parámetros y las locales con OP_POP.
 
+#### Funciones nativas
+
+Las funciones nativas no están escritas en Lox sino en Go que es el lenguaje con el que hicimos la implementación, y sirven para que un programa pueda hacer cosas que Lox solo no puede, como saber el tiempo. La primera que trae el libro es clock y nosotros hicimos la misma, que aprovechamos para usarla para el benchmark mas adelante como ya hicimos en el tree-walk.
+
+Una nativa no tiene bytecode ni chunk solo la cantidad de argumentos que espera y una función de Go que recibe los argumentos y devuelve un valor. Por eso cuando la VM llama a una nativa no abre un frame como con una función de Lox si no que directamente chequea la aridad y ejecuta la función de Go con los argumentos que están en el stack y deja el resultado en lugar de la función y sus argumentos.
+
+Una difernecia con el libro que tenemos es qye para agregar una nativa el libro usa defineNative que además apila y desapila valores para protegerlos de su garbage collector. En glox eso no hace falta así que tenemos una tabla con las nativas que la VM instala como globales al crearse y agregar otra es sumar una entrada a esa tabla. Otra diferencia es el clock porque el de clox mide el tiempo de CPU y el nuestro devuelve el tiempo del reloj igual que el del tree-walk así los dos caminos miden lo mismo y los benchmarks se pueden comparar. 
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
