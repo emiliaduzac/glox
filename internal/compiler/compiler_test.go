@@ -2289,6 +2289,34 @@ func TestCompileThis(t *testing.T) {
 	})
 }
 
+func TestCompileInitializer(t *testing.T) {
+	t.Run("init devuelve this", func(t *testing.T) {
+		chunk := compileSource(t, "class A { init() {} }")
+
+		init := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &init.Chunk, byte(c.OP_GET_LOCAL), 0, byte(c.OP_RETURN))
+	})
+
+	t.Run("Un return sin valor en init también devuelve this", func(t *testing.T) {
+		chunk := compileSource(t, "class A { init() { return; } }")
+
+		init := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &init.Chunk,
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_RETURN),
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Un método que no se llama init sigue devolviendo nil", func(t *testing.T) {
+		chunk := compileSource(t, "class A { m() {} }")
+
+		method := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &method.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+}
+
 func TestCompileThisOutsideClass(t *testing.T) {
 	t.Run("Error si se usa this afuera de una clase", func(t *testing.T) {
 		tests := []struct {

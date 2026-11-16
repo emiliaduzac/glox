@@ -20,6 +20,7 @@ const (
 	TYPE_FUNCTION FunctionType = iota
 	TYPE_SCRIPT
 	TYPE_METHOD
+	TYPE_INITIALIZER
 )
 
 type parserState struct {
@@ -412,7 +413,11 @@ func (c *Compiler) method() error {
 	if err != nil {
 		return err
 	}
-	if err := c.compileFunction(TYPE_METHOD); err != nil {
+	funcType := TYPE_METHOD
+	if c.cursor.GetPreviousLexeme() == "init" {
+		funcType = TYPE_INITIALIZER
+	}
+	if err := c.compileFunction(funcType); err != nil {
 		return err
 	}
 	c.emit(byte(chunk.OP_METHOD), constant)
@@ -626,7 +631,11 @@ func (c *Compiler) emit(bytes ...byte) {
 }
 
 func (c *Compiler) emitReturn() {
-	c.emit(byte(chunk.OP_NIL))
+	if c.funcType == TYPE_INITIALIZER {
+		c.emit(byte(chunk.OP_GET_LOCAL), 0)
+	} else {
+		c.emit(byte(chunk.OP_NIL))
+	}
 	c.emit(byte(chunk.OP_RETURN))
 }
 
