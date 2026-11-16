@@ -234,3 +234,6 @@ Podemos ver claramente como los lenguajes nativos son superiores, y también clo
 <img src="graficos/3-evolucion.png" alt="evolución de glox a lo largo de la cursada" width="600">
 
 > Figura 3: comparación entre glox tree walk y glox bytcode para los 3 programas. Marca lo mencionado: glox VM supera a TW en `minsky` y `fibonacci`, pero no en `fizzbuzz`. Graficamente esta diferencia es muy notoria.
+
+
+En resumen, glox con bytecode duplica la velocidad de nuestra entrega 1 y queda cerca de otra implementación en Go de Lox, aunque lejos de clox y de los lenguajes nativos.
