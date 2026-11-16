@@ -2072,6 +2072,28 @@ func TestOpInherit(t *testing.T) {
 		utils.AssertValue(t, perro.methods["hacerRuido"].function, ladrar)
 		utils.AssertValue(t, animal.methods["hacerRuido"], ruido)
 	})
+
+	t.Run("Error si la superclase no es una clase", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			superclass any
+		}{
+			{"un número", 48.0},
+			{"nil", nil},
+			{"una función", newClosure(c.NewFunction())},
+			{"una instancia", newInstance(newClass("Animal"))},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				inherit(chunk, test.superclass, newClass("Perro"))
+
+				err := run(vm, chunk)
+
+				utils.AssertErrorMessage(t, err, "superclass must be a class")
+			})
+		}
+	})
 }
 
 func TestOpMethod(t *testing.T) {

@@ -783,15 +783,19 @@ func (vm *VirtualMachine) defineMethod(name string) error {
 }
 
 func (vm *VirtualMachine) inherit() error {
-	superclass, err := vm.peek(1)
+	value, err := vm.peek(1)
 	if err != nil {
 		return err
+	}
+	superclass, ok := value.(*class)
+	if !ok {
+		return errors.NewLoxError(vm.currentLine(), "superclass must be a class")
 	}
 	subclass, err := vm.peek(0)
 	if err != nil {
 		return err
 	}
-	maps.Copy(subclass.(*class).methods, superclass.(*class).methods)
+	maps.Copy(subclass.(*class).methods, superclass.methods)
 	_, err = vm.pop()
 	return err
 }
