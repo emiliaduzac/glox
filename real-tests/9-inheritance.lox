@@ -1,0 +1,269 @@
+print "--- UNA SUBCLASE HEREDA LOS METODOS DE LA SUPERCLASE ---";
+class Animal {
+    eat() {
+        return "come";
+    }
+}
+class Dog < Animal {
+    bark() {
+        return "ladra";
+    }
+}
+var dog = Dog();
+
+if (dog.eat() == "come" and dog.bark() == "ladra") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN METODO PROPIO TAPA AL HEREDADO ---";
+class Animal {
+    makeSound() {
+        return "ruido";
+    }
+}
+class Dog < Animal {
+    makeSound() {
+        return "guau";
+    }
+}
+
+if (Dog().makeSound() == "guau" and Animal().makeSound() == "ruido") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- LOS METODOS SE HEREDAN A TRAVES DE VARIOS NIVELES ---";
+class Animal {
+    eat() {
+        return "come";
+    }
+}
+class Dog < Animal {}
+class Puppy < Dog {}
+
+if (Puppy().eat() == "come") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- LA SUBCLASE HEREDA INIT ---";
+class Animal {
+    init(name) {
+        this.name = name;
+    }
+}
+class Dog < Animal {}
+var firulais = Dog("Firulais");
+
+if (firulais.name == "Firulais") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN METODO HEREDADO USA LOS METODOS DE LA SUBCLASE ---";
+class Animal {
+    speak() {
+        return this.makeSound();
+    }
+    makeSound() {
+        return "ruido";
+    }
+}
+class Dog < Animal {
+    makeSound() {
+        return "guau";
+    }
+}
+
+if (Dog().speak() == "guau" and Animal().speak() == "ruido") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- SUPER LLAMA AL METODO DE LA SUPERCLASE AUNQUE ESTE TAPADO ---";
+class Animal {
+    introduce() {
+        return "soy un animal";
+    }
+}
+class Dog < Animal {
+    introduce() {
+        return super.introduce() + " y un perro";
+    }
+}
+
+if (Dog().introduce() == "soy un animal y un perro") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- SUPER NO SE CONFUNDE CON UN CAMPO DEL MISMO NOMBRE ---";
+class Animal {
+    makeSound() {
+        return "ruido";
+    }
+}
+class Dog < Animal {
+    parentSound() {
+        return super.makeSound();
+    }
+    parentSoundMethod() {
+        return super.makeSound;
+    }
+}
+var dog = Dog();
+dog.makeSound = "un campo";
+var soundMethod = dog.parentSoundMethod();
+
+if (dog.parentSound() == "ruido" and soundMethod() == "ruido") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- SUPER.INIT INICIALIZA LA PARTE DE LA SUPERCLASE ---";
+class Animal {
+    init(name) {
+        this.name = name;
+    }
+}
+class Dog < Animal {
+    init(name, owner) {
+        super.init(name);
+        this.owner = owner;
+    }
+}
+var firulais = Dog("Firulais", "Ana");
+
+if (firulais.name == "Firulais" and firulais.owner == "Ana") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- SUPER SE RESUELVE DESDE LA CLASE DONDE ESTA ESCRITO ---";
+class Animal {
+    makeSound() {
+        return "ruido";
+    }
+}
+class Dog < Animal {
+    makeSound() {
+        return "guau";
+    }
+    parentSound() {
+        return super.makeSound();
+    }
+}
+class Puppy < Dog {
+    makeSound() {
+        return "aullido";
+    }
+}
+
+if (Puppy().parentSound() == "ruido") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- SUPER ENCUENTRA UN METODO QUE LA SUPERCLASE HEREDO ---";
+class Animal {
+    eat() {
+        return "come";
+    }
+}
+class Dog < Animal {}
+class Puppy < Dog {
+    eat() {
+        return "cachorro " + super.eat();
+    }
+}
+
+if (Puppy().eat() == "cachorro come") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN METODO DE SUPER GUARDADO EN UNA VARIABLE RECUERDA SU INSTANCIA ---";
+class Animal {
+    introduce() {
+        return this.name + " es un animal";
+    }
+}
+class Dog < Animal {
+    introduce() {
+        return this.name + " es un perro";
+    }
+    parentIntroduce() {
+        return super.introduce;
+    }
+}
+var firulais = Dog();
+firulais.name = "Firulais";
+var introduce = firulais.parentIntroduce();
+firulais = nil;
+
+if (introduce() == "Firulais es un animal") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UNA FUNCION ADENTRO DE UN METODO PUEDE USAR SUPER ---";
+class Animal {
+    makeSound() {
+        return "ruido";
+    }
+}
+class Dog < Animal {
+    makeSound() {
+        return "guau";
+    }
+    later() {
+        fun inner() {
+            return super.makeSound();
+        }
+        return inner;
+    }
+}
+var inner = Dog().later();
+
+if (inner() == "ruido") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- REASIGNAR LA VARIABLE DE LA SUPERCLASE NO CAMBIA LA HERENCIA ---";
+class Animal {
+    eat() {
+        return "come";
+    }
+}
+class Dog < Animal {
+    parentEat() {
+        return super.eat();
+    }
+}
+class Cat {
+    eat() {
+        return "come pescado";
+    }
+}
+var dog = Dog();
+Animal = Cat;
+
+if (dog.eat() == "come" and dog.parentEat() == "come") {
+    print "OK";
+} else {
+    print "ERROR";
+}
