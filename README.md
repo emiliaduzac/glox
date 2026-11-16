@@ -20,7 +20,7 @@ Implementación de una variante propia del lenguaje [Lox](https://craftinginterp
 
 ## Documentación de la implementación
 
-Como la implementación será desarrollada en etapas, decidimos separar la documentación en un documento por etapa, para facilitar su lectura y comprensión. Toda la documentación técnica se encuentra bajo la carpeta **docs**.
+Como la implementación será desarrollada en etapas, decidimos separar la documentación en un documento por etapa, para facilitar su lectura y comprensión. Toda la documentación técnica se encuentra bajo la carpeta **docs**, y la de los **extras** y **benchmarks** en sus propias carpetas.
 
 > Indice de documentación
 
@@ -31,8 +31,8 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Bytecode & Virtual Machine](docs/5-bytecode_and_vm.md)
 - [Compiler](docs/6-compiler.md)
 - [Extras propios](docs/7-extra.md)
-- [Benchmarks](docs/z-benchmarks.md)
-- [Uso Real](real-use/uso_real.md)
+- [Benchmarks](benchmarks/benchmarks.md)
+- [Uso Real de Glox](real-use/uso_real.md)
 
 ## Cómo correr lox
 
