@@ -139,4 +139,16 @@ python3 real-tests/script.py "go run ./cmd --vm" 5-break-continue
 
 ## Funciones nativas
 
-Al igual que para la primer entrega, implementamos la función nativa `clock()`, pero esta vez también sumamos `input()`, con la intención de poder usarla para nuestro programa de uso real de glox. Como indica el nombre, esta función permite al usuario ingresar valores por consola.
+Al igual que para la primer entrega, implementamos la función nativa `clock()`, pero esta vez también sumamos otras más, con la intención de poder usarla para nuestro programa de uso real de glox.
+
+- `input()`: ingresar valores por consola
+- `str(value)`: convierte a string
+- `num(value)`: convierte a número
+
+Para cada una bastó con agregar su función nativa en Go, y sumarla a la tabla de nativas.
+
+> A pesar de que se verán en uso en el programa de caso real, incorporamos algunos tests para las mismas:
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm" 8-natives.lox
+```

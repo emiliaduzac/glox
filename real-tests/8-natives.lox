@@ -1,0 +1,41 @@
+print "--- STR CONVIERTE UN NUMERO A STRING ---";
+if (str(8) == "8") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- STR PERMITE CONCATENAR NUMEROS ---";
+if ("Nota: " + str(8) == "Nota: 8") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- NUM CONVIERTE UN STRING A NUMERO ---";
+if (num("3.5") == 3.5) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- NUM DEVUELVE NIL SI NO ES UN NUMERO ---";
+if (num("abc") == nil) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- NUM Y STR SON INVERSAS ---";
+if (num(str(42)) == 42) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- INPUT DEVUELVE NIL SI NO HAY ENTRADA ---";
+if (input() == nil) {
+    print "OK";
+} else {
+    print "ERROR";
+}

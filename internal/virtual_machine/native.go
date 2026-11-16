@@ -3,7 +3,10 @@ package virtualmachine
 import (
 	"bufio"
 	"os"
+	"strconv"
+	"strings"
 	"time"
+	"tp-lox/internal/utils"
 )
 
 type nativeFn func(args []any) any
@@ -21,6 +24,8 @@ func builtinNatives() map[string]*native {
 	return map[string]*native{
 		"clock": {arity: 0, fn: clockNative},
 		"input": {arity: 0, fn: inputNative},
+		"str":   {arity: 1, fn: strNative},
+		"num":   {arity: 1, fn: numNative},
 	}
 }
 
@@ -35,4 +40,20 @@ func inputNative(_ []any) any {
 		return nil
 	}
 	return input.Text()
+}
+
+func strNative(value []any) any {
+	return utils.Stringify(value[0])
+}
+
+func numNative(args []any) any {
+	text, ok := args[0].(string)
+	if !ok {
+		return nil
+	}
+	n, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
+	if err != nil {
+		return nil
+	}
+	return n
 }
