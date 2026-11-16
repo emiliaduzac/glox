@@ -109,8 +109,8 @@ while (ingresoNombre != nil and ingresoNombre != "") {
     }
 
     var notaNumerica = num(ingresoNota);
-    if (notaNumerica == nil) {
-        print "Debe ingresar una nota numerica";
+    if (notaNumerica == nil or notaNumerica < 0 or notaNumerica > 10) {
+        print "Debe ingresar una nota numerica, entre 0 y 10s";
         continue;
     }
 
@@ -121,10 +121,12 @@ while (ingresoNombre != nil and ingresoNombre != "") {
 var ordenados = bubbleSortReverse(alumnos);
 
 var top5 = ListadoAlumnos();
+var suma = 0;
 
 while (top5.cantidad < 5 and ordenados.cantidad > 0) {
     var elem = ordenados.borrarPrimero();
     top5.insertarUltimo(elem.dato.nombre, elem.dato.nota);
+    suma = suma + elem.dato.nota;
 }
 
 print " ";
@@ -133,4 +135,8 @@ if (top5.estaVacia()) {
 } else {
     print "-- TOP 5 ALUMNOS DE GFIUBA: ";
     top5.imprimir();
+    print " ";
+
+    var promedio = suma / top5.cantidad;
+    print "El promedio de los alumnos del top: " + str(promedio);
 }

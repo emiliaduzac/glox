@@ -8,10 +8,9 @@ También resolvimos otros desafíos que iba proponiendo el libro. Estos los fuim
 
 - [Continue](#continue)
 - [Break](#break)
+- [Funciones nativas](#funciones-nativas)
 - [Aridad de funciones nativas](5-bytecode_and_vm.md#funciones-nativas)
 - [Reutilizar constantes de nombres repetidos](6-compiler.md#nombres-repetidos)
-- [Funciones nativas](#funciones-nativas)
-
 
 ## Continue
 
@@ -141,7 +140,7 @@ python3 real-tests/script.py "go run ./cmd --vm" 5-break-continue
 
 Al igual que para la primer entrega, implementamos la función nativa `clock()`, pero esta vez también sumamos otras más, con la intención de poder usarla para nuestro programa de uso real de glox.
 
-- `input(mensaje)`: ingresar valores por consola
+- `input(mensaje)`: ingresar valores por consola. En este caso, el marcar la aridad forzó a que el input si o si tenga que recibir un mensaje. Es decir: si o si se debe recibir un mensaje, no se puede usar `input();`.
 - `str(value)`: convierte a string
 - `num(value)`: convierte a número
 
