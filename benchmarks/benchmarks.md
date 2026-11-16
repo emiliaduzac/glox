@@ -163,7 +163,7 @@ Tanto en `fibonacci` como en `minsky`, clox fue la más rápida (lo cual era esp
 
 También se cumple que ploxb es más rápido que plox, igual que glox VM es más rápido que glox TW y clox más rápido que jlox: el bytecode ayuda a agilizar, tal como anticipamos al implementar [bytecode](../docs/5-bytecode_and_vm.md). Aunque la última comparación (clox vs jlox) probablemente no se deba solamente al bytcode, sino al uso de C.
 
-Algo que nos sorprendió mucho es es `fizzbuzz`, donde la entrega 1 (TW) es más rápida que en la versión VM. Nuestas hipótesis de porque sucede esto se explican en [Evolución de glox](#evolución-de-glox).
+Algo que nos sorprendió mucho es es `fizzbuzz`, donde la entrega 1 (TW) es más rápida que en la versión VM. Nuestas hipótesis de porque sucede esto se explican en [Evolución de glox](#2-evolución-de-glox).
 
 Algo esperado es que las implementaciones en Python fueron las más lentas por mucho, entre 68x y 122x más lentas que glox. En cuanto a jlox, en `minsky` que es corto, es 3.35x más lento que glox, mientras que en `fibonacci` que es más largo, su mediana (248.5 ms) es prácticamente igual a la de glox. Es algo parecido a lo que vimos en los benchmarks de la entrega 1 con `go run`: un costo fijo que pesa más cuanto más corto es el programa. En ese caso era compilar glox pero acá creemos que es el arranque de la JVM. Además, el JIT de Java que optimiza el código mientras corre, puede ser una razón que ayude.
 
