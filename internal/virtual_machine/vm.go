@@ -3,6 +3,7 @@ package virtualmachine
 import (
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"os"
 	"sort"
@@ -291,6 +292,24 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			frame = vm.currentFrame()
 
+		case c.OP_SUPER_INVOKE:
+			method, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			argCount, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			superclass, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			if err := vm.invokeFromClass(superclass.(*class), method, int(argCount)); err != nil {
+				return err
+			}
+			frame = vm.currentFrame()
+
 		case c.OP_CLOSURE:
 			constant, err := vm.readConstant()
 			if err != nil {
@@ -309,6 +328,11 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 				return err
 			}
 			vm.push(newClass(name))
+
+		case c.OP_INHERIT:
+			if err := vm.inherit(); err != nil {
+				return err
+			}
 
 		case c.OP_METHOD:
 			name, err := vm.readString()
@@ -338,6 +362,19 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 				}
 				vm.push(value)
 			} else if err := vm.bindMethod(instance.class, name); err != nil {
+				return err
+			}
+
+		case c.OP_GET_SUPER:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			superclass, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			if err := vm.bindMethod(superclass.(*class), name); err != nil {
 				return err
 			}
 
@@ -772,6 +809,24 @@ func (vm *VirtualMachine) defineMethod(name string) error {
 		return err
 	}
 	klass.(*class).methods[name] = method.(*closure)
+	_, err = vm.pop()
+	return err
+}
+
+func (vm *VirtualMachine) inherit() error {
+	value, err := vm.peek(1)
+	if err != nil {
+		return err
+	}
+	superclass, ok := value.(*class)
+	if !ok {
+		return errors.NewLoxError(vm.currentLine(), "superclass must be a class")
+	}
+	subclass, err := vm.peek(0)
+	if err != nil {
+		return err
+	}
+	maps.Copy(subclass.(*class).methods, superclass.methods)
 	_, err = vm.pop()
 	return err
 }

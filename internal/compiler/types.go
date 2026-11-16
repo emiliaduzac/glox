@@ -36,5 +36,11 @@ type Upvalue struct {
 }
 
 type classCompiler struct {
-	enclosing *classCompiler
+	enclosing     *classCompiler
+	hasSuperclass bool
 }
+
+var (
+	thisToken  = token.Token{TokenType: token.THIS, Lexeme: "this"}
+	superToken = token.Token{TokenType: token.SUPER, Lexeme: "super"}
+)

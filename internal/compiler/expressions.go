@@ -226,3 +226,42 @@ func (c *Compiler) this(_ bool) error {
 	}
 	return c.variable(false)
 }
+
+func (c *Compiler) super(_ bool) error {
+	if c.currentClass == nil {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't use 'super' outside of a class"))
+	} else if !c.currentClass.hasSuperclass {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't use 'super' in a class with no superclass"))
+	}
+
+	if err := c.cursor.Consume(token.DOT, "'.' after 'super'"); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.IDENTIFIER, "superclass method name"); err != nil {
+		return err
+	}
+	name, err := c.identifierConstant(c.cursor.Previous())
+	if err != nil {
+		return err
+	}
+
+	if err := c.namedVariable(thisToken, false); err != nil {
+		return err
+	}
+	if c.cursor.Match(token.LEFT_PAREN) {
+		argCount, err := c.argumentList()
+		if err != nil {
+			return err
+		}
+		if err := c.namedVariable(superToken, false); err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_SUPER_INVOKE), name, argCount)
+		return nil
+	}
+	if err := c.namedVariable(superToken, false); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_GET_SUPER), name)
+	return nil
+}

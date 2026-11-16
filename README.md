@@ -111,4 +111,4 @@ python3 real-tests/script.py "go run ./cmd --vm"
 
 En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
 
-Los tests `5-break-continue`, `6-classes`, `7-methods` y `8-natives` solo pasan con el **bytecode compiler**, porque el tree walking interpreter no tiene las implementaciones necesarias.
+Los tests `5-break-continue`, `6-classes`, `7-methods`, `8-natives` y `9-inheritance` solo pasan con el **bytecode compiler**, porque el tree walking interpreter no tiene las implementaciones necesarias.

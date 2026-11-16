@@ -33,7 +33,7 @@ func newFunctionCompiler(state *parserState, enclosing *Compiler, funcType Funct
 	}
 	slotZero := Local{Depth: 0}
 	if funcType != TYPE_FUNCTION {
-		slotZero.Name = token.Token{TokenType: token.THIS, Lexeme: "this"}
+		slotZero.Name = thisToken
 	}
 	return &Compiler{
 		parserState: state,
@@ -235,6 +235,28 @@ func (c *Compiler) classDeclaration() error {
 
 	c.currentClass = &classCompiler{enclosing: c.currentClass}
 	defer func() { c.currentClass = c.currentClass.enclosing }()
+
+	if c.cursor.Match(token.LESS) {
+		if err := c.cursor.Consume(token.IDENTIFIER, "superclass name"); err != nil {
+			return err
+		}
+		if err := c.variable(false); err != nil {
+			return err
+		}
+		if className.Lexeme == c.cursor.GetPreviousLexeme() {
+			c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "a class can't inherit from itself"))
+		}
+		c.beginScope()
+		defer c.endScope()
+		c.addLocal(superToken)
+		c.defineVariable(0)
+
+		if err := c.namedVariable(className, false); err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_INHERIT))
+		c.currentClass.hasSuperclass = true
+	}
 
 	if err := c.namedVariable(className, false); err != nil {
 		return err

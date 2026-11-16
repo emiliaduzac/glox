@@ -53,6 +53,7 @@ func init() {
 		token.OR:            {prefix: nil, infix: (*Compiler).logicOr, precedence: PREC_OR},
 		token.IDENTIFIER:    {prefix: (*Compiler).variable, infix: nil, precedence: PREC_NONE},
 		token.THIS:          {prefix: (*Compiler).this, infix: nil, precedence: PREC_NONE},
+		token.SUPER:         {prefix: (*Compiler).super, infix: nil, precedence: PREC_NONE},
 	}
 }
 
