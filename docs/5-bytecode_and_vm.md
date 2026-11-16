@@ -190,6 +190,24 @@ Básicamente para definir un método la vm necesita tres cosas de ella, el nombr
 
 Un detalle sobre métodos acá es que si llegan dos con el mismo nombre no es un error, sino que el último pisa al primero igual que en el libro. Y como una curiosidad propia es que ahora sí usamos el klass como en el libro recién ahora, pero porque ya teníamos un tipo class y choca con el mismo nombre de la variable y no podemos, no como en el libro que habla de que class era palabra reservada de C++.
 
+#### Bound methods
+
+En Lox leer un método y llamarlo son dos cosas separadas. Se puede hacer `perro.ladrar("fuerte")` de una, pero también `var m = perro.ladrar;` y llamar a `m` mucho después. El tema es que cuando se llama `m`, el método tiene que saber sobre qué instancia se está ejecutando, y entre que se lee y se llama ese dato se perdería. En el tree-walk esto lo resolvía el `Environment`, pero acá las locales viven en el stack, las globales en un `map` y las variables capturadas en upvalues, así que no hay un lugar donde guardarlo. Por eso el libro agrega un tipo nuevo que es el **bound method**, que guarda la instancia de la que salió el método, a la que llama _receptor_, y el closure del método.
+
+El receptor lo guardamos como `any` igual que el libro, que lo guarda como un `Value` aunque solo las instancias tengan métodos, para no tener que convertirlo cada vez que se usa. Cuando se imprime se muestra igual que la función del método, por ejemplo `<fn ladrar>`, porque para el que programa es una función más y no tiene por qué saber que por adentro es otra cosa. 
+
+**Leer un método**
+
+No hace falta ninguna instrucción nueva porque leer un método es lo mismo que leer un campo ya que por ejemplo `perro.ladrar` ya se compila a `OP_GET_PROPERTY`. Lo que cambia es la vm que primero se fija si la instancia tiene un campo con ese nombre, y si no lo tiene busca un método en su clase. Si lo encuentra arma el bound method con la instancia que está en el tope del stack, saca la instancia y deja el bound method en su lugar. Como los campos se buscan primero, un campo con el mismo nombre que un método lo tapa. Y si no hay ni campo ni método da el mismo error que ya teníamos.
+
+Un detalle es que cada vez que se lee un método se crea un bound method nuevo así que `perro.ladrar == perro.ladrar` da `false`, porque son dos objetos distintos aunque apunten a la misma instancia y al mismo método.
+
+**Llamar un método**
+
+Para llamarlo se agrega un caso más en `callValue` que lo que hace ver si lo que se llama es un bound method y ahi se llama a su closure con el mismo `call` de siempre. Así el chequeo de la aridad y el armado del frame son iguales que para cualquier función, y con eso ya funciona.
+
+Acá hay una diferencia con el libro porque en este se tiene que encargar de liberar la memoria del bound method a mano, pero pedirle al garbage collector que deje vivos al receptor y al closure, y demás particularidades, que nosotros de eso no nos encargamos explícitamente como ya hemos nombrado en diferentes partes, pero aca particualrmente seguimos usando el garbage collector de Go y el resultado es el mismo, que mientras siga existiendo el bound method la instancia no se libera.
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
