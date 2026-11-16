@@ -23,9 +23,10 @@ const (
 )
 
 type parserState struct {
-	cursor    *token.TokenCursor
-	errs      []error
-	panicMode bool
+	cursor       *token.TokenCursor
+	errs         []error
+	panicMode    bool
+	currentClass *classCompiler
 }
 
 type Loop struct {
@@ -37,6 +38,10 @@ type Loop struct {
 type Upvalue struct {
 	index   byte
 	isLocal bool
+}
+
+type classCompiler struct {
+	enclosing *classCompiler
 }
 
 type Compiler struct {
@@ -315,6 +320,9 @@ func (c *Compiler) classDeclaration() error {
 
 	c.emit(byte(chunk.OP_CLASS), nameConstant)
 	c.defineVariable(nameConstant)
+
+	c.currentClass = &classCompiler{enclosing: c.currentClass}
+	defer func() { c.currentClass = c.currentClass.enclosing }()
 
 	if err := c.namedVariable(className, false); err != nil {
 		return err
@@ -935,6 +943,10 @@ func (c *Compiler) variable(canAssign bool) error {
 }
 
 func (c *Compiler) this(_ bool) error {
+	if c.currentClass == nil {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't use 'this' outside of a class"))
+		return nil
+	}
 	return c.variable(false)
 }
 

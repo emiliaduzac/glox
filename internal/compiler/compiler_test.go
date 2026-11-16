@@ -2288,3 +2288,36 @@ func TestCompileThis(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "invalid assignment target")
 	})
 }
+
+func TestCompileThisOutsideClass(t *testing.T) {
+	t.Run("Error si se usa this afuera de una clase", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"en el script", "print this;"},
+			{"en una función", "fun f() { print this; }"},
+			{"después de que terminó la clase", "class A { m() {} } print this;"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, "can't use 'this' outside of a class")
+			})
+		}
+	})
+
+	t.Run("Una clase declarada dentro de un método deja que se siga usando this de la clase de afuera", func(t *testing.T) {
+		err := compileSourceError(t, "class A { m() { class B {} print this; } }")
+
+		utils.AssertNoError(t, err)
+	})
+
+	t.Run("Si la clase tiene un error de sintaxis, this después de la clase sigue siendo un error", func(t *testing.T) {
+		errs := compileErrors(t, "class A { m( } print this;")
+
+		utils.AssertValue(t, len(errs), 2)
+		utils.AssertErrorMessage(t, errs[1], "can't use 'this' outside of a class")
+	})
+}
