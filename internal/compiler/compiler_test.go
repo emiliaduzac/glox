@@ -2315,6 +2315,29 @@ func TestCompileInitializer(t *testing.T) {
 		method := chunk.Constants[2].(*c.Function)
 		assertBytes(t, &method.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
 	})
+
+	t.Run("Error si init devuelve un valor", func(t *testing.T) {
+		err := compileSourceError(t, "class A { init() { return 1; } }")
+
+		utils.AssertErrorMessage(t, err, "can't return a value from an initializer")
+	})
+
+	t.Run("Fuera de init se puede devolver un valor", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"en un método que no es init", "class A { m() { return 1; } }"},
+			{"en una función adentro de init", "class A { init() { fun f() { return 1; } } }"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertNoError(t, err)
+			})
+		}
+	})
 }
 
 func TestCompileThisOutsideClass(t *testing.T) {

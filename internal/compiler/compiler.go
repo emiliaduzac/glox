@@ -298,6 +298,9 @@ func (c *Compiler) returnStatement() error {
 		c.emitReturn()
 		return nil
 	}
+	if c.funcType == TYPE_INITIALIZER {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't return a value from an initializer"))
+	}
 	if err := c.expression(); err != nil {
 		return err
 	}
