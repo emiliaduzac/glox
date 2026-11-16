@@ -2481,6 +2481,82 @@ func TestOpGetSuper(t *testing.T) {
 	})
 }
 
+func TestOpSuperInvoke(t *testing.T) {
+	superInvoke := func(chunk *c.Chunk, superclass *class, name string, argCount byte) {
+		writeConstant(chunk, superclass)
+		index := chunk.AddConstant(name)
+		chunk.Write(byte(c.OP_SUPER_INVOKE), line)
+		chunk.Write(byte(index), line)
+		chunk.Write(argCount, line)
+	}
+	returnConstant := func(value any) func(body *c.Chunk) {
+		return func(body *c.Chunk) {
+			writeConstant(body, value)
+			body.Write(byte(c.OP_RETURN), line)
+		}
+	}
+	returnLocal := func(slot byte) func(body *c.Chunk) {
+		return func(body *c.Chunk) {
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(slot, line)
+			body.Write(byte(c.OP_RETURN), line)
+		}
+	}
+
+	t.Run("Llama al método de la superclase y no al de la instancia", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		animal.methods["presentarse"] = newMethod("presentarse", 0, returnConstant("soy un animal"))
+		perro := newClass("Perro")
+		perro.methods["presentarse"] = newMethod("presentarse", 0, returnConstant("soy un perro"))
+		writeConstant(chunk, newInstance(perro))
+		superInvoke(chunk, animal, "presentarse", 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], "soy un animal")
+	})
+
+	t.Run("El método recibe la instancia y los argumentos", func(t *testing.T) {
+		firulais := newInstance(newClass("Perro"))
+		tests := []struct {
+			name     string
+			slot     byte
+			expected any
+		}{
+			{"la instancia", 0, firulais},
+			{"el argumento", 1, "hueso"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				animal := newClass("Animal")
+				animal.methods["comer"] = newMethod("comer", 1, returnLocal(test.slot))
+				writeConstant(chunk, firulais)
+				writeConstant(chunk, "hueso")
+				superInvoke(chunk, animal, "comer", 1)
+
+				err := run(vm, chunk)
+
+				utils.AssertNoError(t, err)
+				utils.AssertValue(t, stackValues(vm)[0], test.expected)
+			})
+		}
+	})
+
+	t.Run("Error si la superclase no tiene ese método", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, newInstance(newClass("Perro")))
+		superInvoke(chunk, newClass("Animal"), "ladrar", 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "undefined property 'ladrar'")
+	})
+}
+
 func TestOpSetProperty(t *testing.T) {
 	setProperty := func(chunk *c.Chunk, object any, name string, value any) {
 		writeConstant(chunk, object)

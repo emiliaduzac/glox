@@ -292,6 +292,24 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			frame = vm.currentFrame()
 
+		case c.OP_SUPER_INVOKE:
+			method, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			argCount, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			superclass, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			if err := vm.invokeFromClass(superclass.(*class), method, int(argCount)); err != nil {
+				return err
+			}
+			frame = vm.currentFrame()
+
 		case c.OP_CLOSURE:
 			constant, err := vm.readConstant()
 			if err != nil {

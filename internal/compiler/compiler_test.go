@@ -2499,6 +2499,23 @@ func TestCompileSuper(t *testing.T) {
 		utils.AssertValue(t, method.Chunk.Constants[0], "n")
 	})
 
+	t.Run("Una llamada a super emite OP_SUPER_INVOKE", func(t *testing.T) {
+		chunk := compileSource(t, "class Animal {} class Perro < Animal { comer(comida, cantidad) { super.comer(comida, cantidad); } }")
+
+		method := chunk.Constants[3].(*c.Function)
+		assertBytes(t, &method.Chunk,
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_GET_LOCAL), 2,
+			byte(c.OP_GET_UPVALUE), 0,
+			byte(c.OP_SUPER_INVOKE), 0, 2,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, method.Chunk.Constants[0], "comer")
+	})
+
 	t.Run("super se resuelve desde una función dentro de un método", func(t *testing.T) {
 		chunk := compileSource(t, "class A {} class B < A { m() { fun f() { super.m; } } }")
 
@@ -2550,6 +2567,7 @@ func TestCompileSuper(t *testing.T) {
 		}{
 			{"sin punto", "class A {} class B < A { m() { super; } }", "expected '.' after 'super'"},
 			{"sin nombre del método", "class A {} class B < A { m() { super.; } }", "expected superclass method name"},
+			{"sin cerrar los argumentos", "class Animal {} class Perro < Animal { comer(comida) { super.comer(comida; } }", "')' after arguments"},
 		}
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {

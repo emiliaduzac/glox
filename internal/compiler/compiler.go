@@ -1019,6 +1019,17 @@ func (c *Compiler) super(_ bool) error {
 	if err := c.namedVariable(thisToken, false); err != nil {
 		return err
 	}
+	if c.cursor.Match(token.LEFT_PAREN) {
+		argCount, err := c.argumentList()
+		if err != nil {
+			return err
+		}
+		if err := c.namedVariable(superToken, false); err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_SUPER_INVOKE), name, argCount)
+		return nil
+	}
 	if err := c.namedVariable(superToken, false); err != nil {
 		return err
 	}

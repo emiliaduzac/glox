@@ -45,6 +45,7 @@ const (
 
 	OP_CALL
 	OP_INVOKE
+	OP_SUPER_INVOKE
 	OP_CLOSURE
 
 	OP_CLASS
@@ -92,9 +93,10 @@ var opCodeNames = map[OpCode]string{
 	OP_JUMP_IF_FALSE: "OP_JUMP_IF_FALSE",
 	OP_JUMP:          "OP_JUMP",
 
-	OP_CALL:    "OP_CALL",
-	OP_INVOKE:  "OP_INVOKE",
-	OP_CLOSURE: "OP_CLOSURE",
+	OP_CALL:         "OP_CALL",
+	OP_INVOKE:       "OP_INVOKE",
+	OP_SUPER_INVOKE: "OP_SUPER_INVOKE",
+	OP_CLOSURE:      "OP_CLOSURE",
 
 	OP_CLASS:   "OP_CLASS",
 	OP_INHERIT: "OP_INHERIT",
@@ -182,7 +184,7 @@ func (c *Chunk) Disassemble(name string) {
 			fmt.Printf("%s<%d>\n", op, argCount)
 			i += 2
 
-		case OP_INVOKE:
+		case OP_INVOKE, OP_SUPER_INVOKE:
 			constantIndex, argCount := c.Bytes[i+1], c.Bytes[i+2]
 			fmt.Printf("%s<%s, %d>\n", op, c.constantString(constantIndex), argCount)
 			i += 3
