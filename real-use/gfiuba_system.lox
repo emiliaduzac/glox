@@ -120,7 +120,7 @@ while (ingresoNombre != nil and ingresoNombre != "") {
 
     var notaNumerica = num(ingresoNota);
     if (notaNumerica == nil or notaNumerica < 1 or notaNumerica > 10) {
-        print "Debe ingresar una nota numerica, entre 1 y 10s";
+        print "Debe ingresar una nota numerica, entre 1 y 10";
         continue;
     }
 

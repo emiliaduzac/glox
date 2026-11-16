@@ -58,4 +58,4 @@ Todo esto puede encontrarse en [`gfiuba_system.lox`](gfiuba_system.lox)
 
 **Ejemplo de uso**
 
-<img src="ejemplo-uso-gfiuba.png" alt="ejemplo de uso del sistema gfiuba" width="600">
+![ejemplo de uso del sistema gfiuba](ejemplo-uso-gfiuba.png)
