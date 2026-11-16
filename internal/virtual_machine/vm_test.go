@@ -2476,13 +2476,13 @@ func TestOpInvoke(t *testing.T) {
 	t.Run("Ejecuta el método y deja lo que devuelve en el lugar del receptor y los argumentos", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		auto := newClass("Auto")
-		auto.methods["velocidad"] = newMethod("velocidad", 1, func(body *c.Chunk) {
+		auto.methods["acelerar"] = newMethod("acelerar", 1, func(body *c.Chunk) {
 			writeConstant(body, 120.0)
 			body.Write(byte(c.OP_RETURN), line)
 		})
 		writeConstant(chunk, newInstance(auto))
-		writeConstant(chunk, "rojo")
-		invoke(chunk, "velocidad", 1)
+		writeConstant(chunk, 20.0)
+		invoke(chunk, "acelerar", 1)
 
 		err := run(vm, chunk)
 
@@ -2494,11 +2494,11 @@ func TestOpInvoke(t *testing.T) {
 	t.Run("El receptor queda en el slot 0 del método", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		auto := newClass("Auto")
-		auto.methods["yo"] = newMethod("yo", 1, returnLocal(0))
+		auto.methods["pintar"] = newMethod("pintar", 1, returnLocal(0))
 		receptor := newInstance(auto)
 		writeConstant(chunk, receptor)
 		writeConstant(chunk, "rojo")
-		invoke(chunk, "yo", 1)
+		invoke(chunk, "pintar", 1)
 
 		err := run(vm, chunk)
 
@@ -2510,11 +2510,11 @@ func TestOpInvoke(t *testing.T) {
 	t.Run("Los argumentos quedan en los slots que siguen en el orden en que se pasaron", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		auto := newClass("Auto")
-		auto.methods["segundo"] = newMethod("segundo", 2, returnLocal(2))
+		auto.methods["cambiarColor"] = newMethod("cambiarColor", 2, returnLocal(2))
 		writeConstant(chunk, newInstance(auto))
 		writeConstant(chunk, "rojo")
 		writeConstant(chunk, "azul")
-		invoke(chunk, "segundo", 2)
+		invoke(chunk, "cambiarColor", 2)
 
 		err := run(vm, chunk)
 
@@ -2523,18 +2523,25 @@ func TestOpInvoke(t *testing.T) {
 	})
 
 	t.Run("Error si el receptor no es una instancia", func(t *testing.T) {
+		auto := newClass("Auto")
+		auto.methods["acelerar"] = newMethod("acelerar", 1, func(body *c.Chunk) {})
 		tests := []struct {
 			name     string
 			receiver any
+			args     []any
 		}{
-			{"un número", 1.0},
-			{"una clase", newClass("Auto")},
+			{"un número", 1.0, nil},
+			{"una clase", auto, nil},
+			{"un número aunque el argumento sea una instancia", 1.0, []any{newInstance(auto)}},
 		}
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 				vm, chunk := setUpVM(t)
 				writeConstant(chunk, test.receiver)
-				invoke(chunk, "acelerar", 0)
+				for _, arg := range test.args {
+					writeConstant(chunk, arg)
+				}
+				invoke(chunk, "acelerar", byte(len(test.args)))
 
 				err := run(vm, chunk)
 
@@ -2553,7 +2560,81 @@ func TestOpInvoke(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "undefined property 'volar'")
 	})
 
-	t.Run("Error si se invoca con otra cantidad de argumentos que los parámetros del método", func(t *testing.T) {
+	t.Run("Llama a la función guardada en un campo", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		calculadora := newInstance(newClass("Calculadora"))
+		operacion := newMethod("operacion", 1, returnLocal(0))
+		calculadora.fields["operacion"] = operacion
+		writeConstant(chunk, calculadora)
+		writeConstant(chunk, 2.0)
+		invoke(chunk, "operacion", 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], operacion)
+	})
+
+	t.Run("Un campo tapa a un método", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		auto.methods["sonido"] = newMethod("sonido", 0, func(body *c.Chunk) {
+			writeConstant(body, "del método")
+			body.Write(byte(c.OP_RETURN), line)
+		})
+		instancia := newInstance(auto)
+		instancia.fields["sonido"] = newMethod("sonido", 0, func(body *c.Chunk) {
+			writeConstant(body, "del campo")
+			body.Write(byte(c.OP_RETURN), line)
+		})
+		writeConstant(chunk, instancia)
+		invoke(chunk, "sonido", 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, stackValues(vm)[0], "del campo")
+	})
+
+	t.Run("Un bound method guardado en un campo conserva su instancia", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		perro := newInstance(newClass("Perro"))
+		auto := newInstance(newClass("Auto"))
+		auto.fields["alarma"] = newBoundMethod(perro, newMethod("ladrar", 0, returnLocal(0)))
+		writeConstant(chunk, auto)
+		invoke(chunk, "alarma", 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, stackValues(vm)[0], perro)
+	})
+
+	t.Run("Error si el campo no se puede llamar", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			value any
+		}{
+			{"un número", 1.0},
+			{"nil", nil},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				auto := newInstance(newClass("Auto"))
+				auto.fields["color"] = test.value
+				writeConstant(chunk, auto)
+				invoke(chunk, "color", 0)
+
+				err := run(vm, chunk)
+
+				utils.AssertErrorMessage(t, err, "can only call functions and classes")
+			})
+		}
+	})
+
+	t.Run("Error si la cantidad de argumentos no coincide", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		auto := newClass("Auto")
 		auto.methods["acelerar"] = newMethod("acelerar", 1, func(body *c.Chunk) {})

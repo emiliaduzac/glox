@@ -433,6 +433,10 @@ func (vm *VirtualMachine) invoke(name string, argCount int) error {
 	if !ok {
 		return errors.NewLoxError(vm.currentLine(), "only instances have methods")
 	}
+	if value, ok := instance.fields[name]; ok {
+		vm.stack[len(vm.stack)-argCount-1] = value
+		return vm.callValue(value, argCount)
+	}
 	return vm.invokeFromClass(instance.class, name, argCount)
 }
 
