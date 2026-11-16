@@ -19,6 +19,7 @@ type FunctionType int
 const (
 	TYPE_FUNCTION FunctionType = iota
 	TYPE_SCRIPT
+	TYPE_METHOD
 )
 
 type parserState struct {
@@ -61,12 +62,16 @@ func newFunctionCompiler(state *parserState, enclosing *Compiler, funcType Funct
 	if funcType != TYPE_SCRIPT {
 		function.Name = state.cursor.GetPreviousLexeme()
 	}
+	slotZero := Local{Depth: 0}
+	if funcType != TYPE_FUNCTION {
+		slotZero.Name = token.Token{TokenType: token.THIS, Lexeme: "this"}
+	}
 	return &Compiler{
 		parserState: state,
 		enclosing:   enclosing,
 		function:    function,
 		funcType:    funcType,
-		locals:      []Local{{Depth: 0}},
+		locals:      []Local{slotZero},
 		identifiers: map[string]byte{},
 	}
 }
@@ -399,7 +404,7 @@ func (c *Compiler) method() error {
 	if err != nil {
 		return err
 	}
-	if err := c.compileFunction(TYPE_FUNCTION); err != nil {
+	if err := c.compileFunction(TYPE_METHOD); err != nil {
 		return err
 	}
 	c.emit(byte(chunk.OP_METHOD), constant)
@@ -927,6 +932,10 @@ func (c *Compiler) addUpvalue(index byte, isLocal bool) int {
 
 func (c *Compiler) variable(canAssign bool) error {
 	return c.namedVariable(c.cursor.Previous(), canAssign)
+}
+
+func (c *Compiler) this(_ bool) error {
+	return c.variable(false)
 }
 
 func (c *Compiler) logicAnd(_ bool) error {

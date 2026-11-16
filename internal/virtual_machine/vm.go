@@ -389,6 +389,7 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 	switch function := callee.(type) {
 	case *boundMethod:
+		vm.stack[len(vm.stack)-argCount-1] = function.receiver
 		return vm.call(function.method, argCount)
 	case *closure:
 		return vm.call(function, argCount)

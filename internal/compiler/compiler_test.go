@@ -2260,3 +2260,31 @@ func TestCompileMethodDeclaration(t *testing.T) {
 		}
 	})
 }
+
+func TestCompileThis(t *testing.T) {
+	t.Run("this dentro de un método lee la varaible local del slot 0", func(t *testing.T) {
+		chunk := compileSource(t, "class A { m() { print this; } }")
+
+		method := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &method.Chunk, byte(c.OP_GET_LOCAL), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("Una función dentro de un método captura this como upvalue", func(t *testing.T) {
+		chunk := compileSource(t, "class A { m() { fun f() { print this; } } }")
+
+		method := chunk.Constants[2].(*c.Function)
+		inner := method.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &inner.Chunk, byte(c.OP_GET_UPVALUE), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, &method.Chunk,
+			byte(c.OP_CLOSURE), 0, 1, 0,
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si se asigna a this", func(t *testing.T) {
+		err := compileSourceError(t, "class A { m() { this = 1; } }")
+
+		utils.AssertErrorMessage(t, err, "invalid assignment target")
+	})
+}

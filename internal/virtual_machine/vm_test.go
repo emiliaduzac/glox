@@ -2170,6 +2170,28 @@ func TestCallBoundMethod(t *testing.T) {
 		utils.AssertValue(t, out.String(), "6\n")
 	})
 
+	t.Run("Al llamar a un bound method el receptor queda en el slot 0 y los argumentos después", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		mostrar := newMethod("mostrar", 1, func(body *c.Chunk) {
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(0, line)
+			body.Write(byte(c.OP_PRINT), line)
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(1, line)
+			body.Write(byte(c.OP_PRINT), line)
+		})
+		writeConstant(chunk, newBoundMethod(newInstance(newClass("Auto")), mostrar))
+		writeConstant(chunk, "rojo")
+		writeCall(chunk, 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "Auto instance\nrojo\n")
+	})
+
 	t.Run("Error si se llama a un bound method con otra cantidad de argumentos", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		acelerar := newMethod("acelerar", 1, func(body *c.Chunk) {})
