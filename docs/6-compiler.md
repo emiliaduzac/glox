@@ -325,6 +325,16 @@ Al compilador le toca detectar errores siguiendo un poco la idea del libro enton
 
 Pero un error que chequeamos y ya es de sintaxis es si no viene el nombre depsues del < por lo que ahi si devolvemos directamente el error. lo que no puede saber el compilador es si realmente es una clase lo indicado como superclase, eso recien lo ve la vm en runtime.
 
+#### Superclase como variable local
+
+Después de copiar los métodos ya no necesitamos la superclase para heredar pero si la vamos a necesitar para super, porque no se resuelve con la superclase de la instancia sino con la de la clase donde está escrito. El libro lo muestra con una clase A, una B que hereda de A y una C que hereda de B, donde un super.metodo() escrito adentro de B va a A aunque la instancia sea de C, así que básicamente cada subclase tiene que guardarse su superclase en algún lado.
+
+Entonces aprovechamos que la superclase ya está en el stack porque la cargamos antes del OP_INHERIT, y en vez de tirarla al final la dejamos en una variable local llamada super. Para eso cada subclase abre su propio scope, la agrega  y cuando termina la clase el scope se cierra y la variable sale del stack con su OP_POP como cualquier local. Es una palabra reservada y no puede chocar con ninguna variable del que programa.
+
+Un detalle importante es que cada subclase abre su propio scope porque todas usan el mismo nombre, así que si declaramos dos subclases en el mismo bloque y no tuvieran cada una el suyo, las dos variables super chocarían y daría error de que la variable ya existe.
+
+Una diferencia con el libro es que nosotros en glox un error de sintaxis corta la función con return err, así que el scope nunca se cerraría haceindo que lo que venga después en el programa se compilaría como local y saldrían errores falsos, por ejemplo un var a; var a; diría que la variable ya existe. Es el mismo problema que tuvimos con la pila de clases en this y lo resolvemos igual que ahi es decir con un defer.
+
 ## Tests
 
 > Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
