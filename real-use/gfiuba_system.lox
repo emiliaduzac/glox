@@ -68,11 +68,9 @@ class ListadoAlumnos {
             var medalla = "  ";
             if (puesto == 1) {
                 medalla = "🥇";
-            }
-            if (puesto == 2) {
+            } else if (puesto == 2) {
                 medalla = "🥈";
-            }
-            if (puesto == 3) {
+            } else if (puesto == 3) {
                 medalla = "🥉";
             }
             print medalla + str(puesto) + ". " + actual.dato.nombre + ": " + str(actual.dato.nota);
