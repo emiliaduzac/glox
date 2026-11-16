@@ -1,4 +1,4 @@
-# Uso real
+# Uso real de Glox
 
 Como un caso de uso real de nuestro lenguaje, decidimos implementar los siguientes algoritmos de ordenamiento: **mergesort**, **quicksort** y **bubblesort**. Esto implicó también crear una **lista enlazada** utilizando Glox. Dado que al momento de implementarlo no contábamos con métodos para clases, usamos funciones que editaban el estado de las clases. A futuro, podría mejorarse haciendo que la lista enlazada y el nodo tengan sus propios métodos en vez de ser modificada por fuera.
 
@@ -27,3 +27,5 @@ Para ejecutar los tests:
 ```bash
 go run ./cmd --vm ./real-use/sorting_lists.lox
 ```
+
+Todo esto puede encontrarse en [`sorting_lists.lox`](sorting_lists.lox)
