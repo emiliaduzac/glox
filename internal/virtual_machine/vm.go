@@ -347,6 +347,19 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 				return err
 			}
 
+		case c.OP_GET_SUPER:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			superclass, err := vm.pop()
+			if err != nil {
+				return err
+			}
+			if err := vm.bindMethod(superclass.(*class), name); err != nil {
+				return err
+			}
+
 		case c.OP_SET_PROPERTY:
 			object, err := vm.peek(1)
 			if err != nil {
