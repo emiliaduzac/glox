@@ -76,7 +76,7 @@ Hacemos cuatro comparaciones:
 1. **glox contra otras implementaciones de Lox**: los mismos programas con las 7 implementaciones.
 2. **La evolución de glox**: la versión tree-walk de la entrega 1 contra la versión final con bytecode. Además, comparamos ejecutar el binario compilado contra `go run`, que compila glox en cada ejecución. Vale la pena mencionar que la versión final sin `--vm` también es tree-walk, pero usamos el tag de la entrega 1 para medir exactamente lo que habíamos entregado
 3. **Lox contra otros lenguajes**: los mismos programas escritos en **Go** y en **Python**. Elegimos esos dos porque son los lenguajes en los que están hechas glox, golox, plox y ploxb.
-4. **Optimización de métodos**: medimos cuánto mejora la velocidad la optimización de `OP_INVOKE` que tomamos del libro (ver [Invoke](../docs/5-bytecode_and_vm.md#invoke)). Para eso comparamos dos formas de llamar al mismo método: `c.metodo()`, que usa `OP_INVOKE`, y `(c.metodo)()`, que sigue el camino anterior y crea un bound method en cada llamada. Lo hacemos en glox y en clox, para ver si la mejora es la misma en Go que en C.
+4. **Optimización de métodos**: medimos cuánto mejora la velocidad la optimización de `OP_INVOKE` (ver [Invoke](../docs/5-bytecode_and_vm.md#invoke)). Comparamos dos versiones del mismo programa: una que llama a los métodos normalmente, usando `OP_INVOKE`, y otra que fuerza el camino anterior a la optimización, creando un bound method en cada llamada. Como ambas se ejecutan con el mismo binario, la única diferencia es el camino de la llamada. Lo hacemos en glox y en clox, para ver si la mejora es la misma en Go que en C.
 
 Para correr **las primeras 3** mediciones:
 
@@ -98,11 +98,12 @@ En los benchmarks de la entrega 1 medimos con `time`, ejecutando cada programa 5
 
 ## Programas
 
-Usamos tres programas, cada uno enfocado en una parte distinta del lenguaje. `fibonacci` y `minsky` corren en las 7 implementaciones, así que solo usan lo que todas soportan: no usan `%`, `break` ni `continue`, ni clases.
+Usamos cuatro programas, cada uno enfocado en una parte distinta del lenguaje. `fibonacci` y `minsky` corren en las 7 implementaciones, así que solo usan lo que todas soportan: no usan `%`, `break` ni `continue`, ni clases.
 
 - `fibonacci.lox` (n = 30): **CPU y llamadas a funciones**. El fibonacci recursivo hace unos muchísimas llamadas y cada una abre y cierra un frame.
 - `minsky.lox` (n = 200000): **CPU, ciclos y condicionales**. Simula una máquina de registros con un único `while`, con asignaciones y condicionales sobre variables locales. Al ser el más corto, el arranque de cada implementación pesa más en la medición.
 - `fizzbuzz.lox` (n = 100000): **memoria y strings**. Acumula el resultado en un string, y cada concatenación crea un string nuevo copiando el anterior entero. Es el que más memoria reserva y el único donde el garbage collector tiene trabajo real.
+- `methods_optimized.lox` y `methods.lox`: **llamadas a métodos**. Es un programa que usa el libro para medir sus propias optimizaciones: llama a seis métodos de una instancia en cada vuelta de un ciclo, hasta sumar 100.000.000. En `methods.lox` cada llamada se escribe entre paréntesis, por ejemplo `(zoo.ant)()`, lo que hace que el compilador no use `OP_INVOKE` y se cree un bound method en cada llamada. Solo corre en glox y clox, que son las implementaciones con esta optimización.
 
 El operador `%` es una extensión de la cátedra: lo tienen glox, plox y ploxb, pero no existe en el Lox del libro, así que clox, jlox y golox no lo soportan. Por eso `fizzbuzz` solo se compara entre las implementaciones que lo tienen.
 
@@ -115,10 +116,11 @@ Antes de medir, definimos algunas hipótesis que esperamos ver en los resultados
 3. **Las implementaciones en Python van a ser las más lentas**, porque son un intérprete corriendo sobre otro intérprete.
 4. **glox VM y golox van a estar cerca**: ambos son bytecode compilers de Lox. Nos resulta interesante ver que diferencias podrían mostrar. Si las hay, deberían ser optimizaciones que alguno de los dos agregó, o decisiones de diseño.
 5. **Compilar Go en cada corrida (`go run`) suma un costo fijo**. Ya lo vimos en los benchmarks de la primer entrega, donde sumaba unos 40 a 50 ms. Esperamos que se mantenga igual, porque ese costo depende de compilar glox y no del programa.
+6. **`OP_INVOKE` va a mejorar la velocidad de las llamadas a métodos**, tanto en glox como en clox, porque evita crear un bound method en cada llamada. Además, el libro ya nos cuenta que el sí detecto una mejora. Esperamos que la mejora sea menor en glox, porque en Go la memoria la maneja el runtime.
 
 ## Resultados
 
-### Distintas implementaciones de Lox
+### 1. Distintas implementaciones de Lox
 
 **Tiempo** es el promedio ± el desvío estándar de las corridas y **Memoria**, el promedio de la memoria máxima que usó el proceso. Los datos completos de cada corrida (incluyendo el uso de CPU y las instrucciones ejecutadas) están en `benchmarks/resultados/`.
 
@@ -165,7 +167,7 @@ Algo que nos sorprendió mucho es es `fizzbuzz`, donde la entrega 1 (TW) es más
 
 Algo esperado es que las implementaciones en Python fueron las más lentas por mucho, entre 68x y 122x más lentas que glox. En cuanto a jlox, en `minsky` que es corto, es 3.35x más lento que glox, mientras que en `fibonacci` que es más largo, su mediana (248.5 ms) es prácticamente igual a la de glox. Es algo parecido a lo que vimos en los benchmarks de la entrega 1 con `go run`: un costo fijo que pesa más cuanto más corto es el programa. En ese caso era compilar glox pero acá creemos que es el arranque de la JVM. Además, el JIT de Java que optimiza el código mientras corre, puede ser una razón que ayude.
 
-### Evolución de glox
+### 2. Evolución de glox
 
 **tree-walk vs bytecode**
 
@@ -192,7 +194,7 @@ Otro detalle a destacar es que, en los 3 programas, la versión VM usa menos mem
 
 Por último, se mantiene la conclusión de la entrega 1: `go run` suma un costo fijo, el de **compilar glox**. En este caso fueron 41.6 ms, dentro de los 40 a 50 ms que medimos en la entrega anterior.
 
-### Lox contra otros lenguajes
+### 3. Lox contra otros lenguajes
 
 **Go**
 
@@ -218,7 +220,20 @@ Además, Python nativo le gana a glox en los tres programas. Es decir, incluso u
 
 El caso raro es `fizzbuzz`: Go nativo es solo 1.34x más rápido que glox, y Python nativo es 12x más rápido que Go. Como los programas en Go y en Python son el mismo algoritmo, la diferencia no viene de que uno haga más trabajo que el otro sino que creemos que viene de como cada lenguaje maneja la concatenación de strings.
 
-## Conclusiones
+### 4. Optimización de métodos
+
+| Implementación | Bound method (s) | Invoke (s) | Mejora | Memoria bound (MB) | Memoria invoke (MB) |
+|---|---|---|---|---|---|
+| glox | **10.384** ± 0.212 | **8.771** ± 0.105 | 1.18x más rápido | 10.1 | 9.9 |
+| clox | **4.580** ± 0.024 | **1.182** ± 0.007 | 3.87x más rápido | 2.3 | 1.1 |
+
+**Análisis**
+
+Tal como esperábamos, `OP_INVOKE` mejora la velocidad de las llamadas a métodos en las dos implementaciones: 1.18x en glox y 3.87x en clox. La diferencia en clox es mayor que en glox, por lo que creemos que se relaciona con el lenguaje de implementación.
+
+En el uso de memoria, es bastante notorio que ambas versiones de glox utilizan bastante más que las de clox. Creemos que se relaciona con que en clox el manejo de memoria se hace explícitamente en C, mientras que en glox se suma todo el runtime de Go. Entre las dos versiones de glox la diferencia es mínima (10.1 contra 9.9 MB), pero entre las versiones de clox se nota más: la versión con bound method usa el doble (2.3 contra 1.1 MB).
+
+El libro menciona que con esta optimización obtuvo una mejora de **7,6x**, pero nosotros obtuvimos bastante menos, incluso en clox (3.87x). No sabemos si este es el programa que se uso para medir esta optimización puntual, pero como el libro lo presenta en el capitulo de optimizaciones creemos que si. Si lo fuera, las mediciones se realizaron sobre el mismo programa, por lo que las diferencias deberían ser en cuanto a la forma de medir o el entorno usado. 
 
 ### Hipótesis
 
@@ -231,6 +246,8 @@ El caso raro es `fizzbuzz`: Go nativo es solo 1.34x más rápido que glox, y Pyt
 4. Sabíamos que glox VM y golox iban a estar cerca: golox es entre 1.12x y 1.26x más rápido, aunque usa un poco más de memoria. Podría deberse a decisiones de diseño, pero no nos profundizamos en la implementación de golox.
 
 5. `go run` suma un costo fijo: esto se mantiene a lo que notamos de la primer entrega. Agrega 41.6 ms, lo que entra en  los 40 a 50 ms que habíamos medido.
+
+6. `OP_INVOKE` mejoró la velocidad en las dos implementaciones, y como esperábamos, la mejora fue menor en glox (1.18x) que en clox (3.87x).
 
 <img src="graficos/1-fibonacci.png" alt="fibonacci con todas las implementaciones" width="600">
 
