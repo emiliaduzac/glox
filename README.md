@@ -31,7 +31,7 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Compiler](docs/6-compiler.md)
 - [Extras propios](docs/7-extra.md)
 - [Benchmarks](benchmarks/benchmarks.md)
-- [Uso Real de Glox](real-use/uso_real.md)
+- [Casos de uso reales con Glox](real-use/uso_real.md)
 
 ## Cómo correr lox
 

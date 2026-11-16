@@ -82,11 +82,11 @@ Al principio pensamos en aprovechar algo típico de Go: cortar el statement con 
 
 Otra diferencia con el libro es que, en C, reportar un error no corta la función: sigue leyendo tokens. En Go, en cambio, devolver un error corta la función en ese punto. Por eso tenemos dos caminos:
   - cuando el código está mal escrito y no se puede seguir leyendo (por ejemplo, falta un `)`), **devolvemos el error y se sincroniza.**
-  - cuando el código está bien escrito pero rompe una regla del lenguaje (como redeclarar una variable local en el mismo scope), **lo reportamos con `report` y seguimos compilando normalmente.**
+  - cuando el código está bien escrito pero rompe una regla del lenguaje (como redeclarar una variable local en el mismo scope), **lo reportamos con `report` y seguimos compilando**. Aunque se prende el modo pánico, así que si en ese mismo statement hubiera otro error, no se muestra.
 
 Al terminar de compilar, si hubieron errores, se devuelven todos juntos en un solo error. Además, en ese caso no se devuelve el chunk: el bytecode generado puede estar incompleto (por ejemplo, con saltos sin completar), así que la VM no llega a ejecutar nada.
 
-Vale la pena mencionar que este cambio aplica solamente al compiler, no al scanner.
+Vale la pena destacar que este cambio aplica solamente al compilador, no al scanner. Si el scanner encuentra un error (por ejemplo, un string sin cerrar), corta ahí y devuelve solo ese error, así que el compilador no llega a ejecutarse y no se muestran los demás. Esto es una diferencia con el libro: en clox el scanner no corta, sino que genera un token de error que el compilador reporta como cualquier otro y sigue compilando.
 
 ## Variables globales
 
