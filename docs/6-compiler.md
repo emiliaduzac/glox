@@ -295,6 +295,8 @@ El slot 0 se llama `this` en todo lo que no sea una función común y esto tiene
 
 Siguiendo la idea del libro tenemos el error de compilacion cuando se usa this fuera de una clase, y un detalle con eso es que fijarse si estamos en un método no alcanza por lo de la función adentro de un método, entonces lleva una pila con las clases que se están compilando donde cada una apunta a la de afuera, el libro dice que no es comun pero Lox deja declarar una clase adentro de un método de otra. Y bueno la idea es que si aparece un `this` con la pila vacía, es un error.
 
+Una diferencia con el libro es que guarda la clase actual en una variable global y nosotros en `parserState` que es lo que ya comparten por puntero todos los compiladores (ver [Funciones](#funciones)), así un método que tiene su propio compilador ve la misma clase que la declaración de afuera. Pero la diferencia más grande es cuándo se saca la clase de la pila porque el libro lo hace al final de la declaración y le funciona, porque en C cuando hay un error de sintaxis lo reporta y la función sigue de largo hasta el final. En glox un error de sintaxis corta la función con `return err`, así que con una clase con error nunca se llegaría a esa última línea entoences la clase quedaría en la pila y un `this` suelto más abajo ya no daría error. Por eso la sacamos con un `defer`, que se ejecuta siempre al salir de la función sea como sea y así el resultado es el mismo que en el libro aunque lo hayamos hecho de otra forma.
+
 ### Init
 
 Con la vm llamando al `init` nos aparecía un problema porque el `init` se compila como cualquier método y termina con el `OP_NIL` y el `OP_RETURN` que pone el compilador al final, y el `OP_RETURN` deja lo que devuelve donde el que llamó espera el resultado, entonces `var a = Auto("rojo");` terminaba guardando `nil` en `a` y no la instancia. Lo que hace el libro es resolverlo en el compilador haciendo que el `init` siempre devuelva `this` que ya está en el slot 0, así la vm no tiene que hacer nada distinto.
@@ -307,7 +309,11 @@ Un detalle es que cada compilador mira su tipo entonces si hay una función aden
 
 Una diferencia con el libro es que para saber si el método se llama `init` en C tienen que comparar el largo y los bytes porque el token apunta al código y nosotros como el lexema ya es un `string` lo comparamos con `==`. 
 
-Una diferencia con el libro es que guarda la clase actual en una variable global y nosotros en `parserState` que es lo que ya comparten por puntero todos los compiladores (ver [Funciones](#funciones)), así un método que tiene su propio compilador ve la misma clase que la declaración de afuera. Pero la diferencia más grande es cuándo se saca la clase de la pila porque el libro lo hace al final de la declaración y le funciona, porque en C cuando hay un error de sintaxis lo reporta y la función sigue de largo hasta el final. En glox un error de sintaxis corta la función con `return err`, así que con una clase con error nunca se llegaría a esa última línea entoences la clase quedaría en la pila y un `this` suelto más abajo ya no daría error. Por eso la sacamos con un `defer`, que se ejecuta siempre al salir de la función sea como sea y así el resultado es el mismo que en el libro aunque lo hayamos hecho de otra forma.
+### Invoke
+
+En el compilador lo del invoke está en `dot()` porque después de leer el nombre ahora se fija si viene un `(` y si es así compila los argumentos con el mismo `argumentList()` de las llamadas y emite el `OP_INVOKE` con el nombre y la cantidad de argumentos, en vez del `OP_GET_PROPERTY` y el `OP_CALL` que salían antes (para qué sirve lo contamos en la [vm](5-bytecode_and_vm.md#invoke)). Esto va después de fijarse si es una asignación así que `a.x = 1` sigue siendo un set como antes.
+
+Un detalle es que solo se optimiza cuando el `(` viene justo después del nombre, entonces `(a.m)()` sigue compilando como antes porque los paréntesis cierran el `a.m` antes de la llamada y lo mismo con `var m = a.m; m();`, que siguen pasando por el bound method. Y bueno como `this` es una local más, un `this.m()` adentro de un método también usa el `OP_INVOKE`.
 
 ## Tests
 

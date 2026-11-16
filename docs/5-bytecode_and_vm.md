@@ -222,6 +222,18 @@ Si la clase no tiene `init` entonces sigue como venía antes que no abría el fr
 
 Una diferencia con el libro es que el `init` lo guarda en la vm como un string para no crearlo en cada llamada y compararlo por puntero, y tiene que cuidar que su garbage collector no lo libere, y nosotros usamos una constante y el `map` busca por el contenido. Acá aparece la diferencia que nosotros por el tema del `map` se calcula cada vez el hash mientras que en el libro ya queda calculado.
 
+#### Invoke
+
+El invoke surge como una optimización que trae el libro porque hasta acá cuando hacíamos `perro.ladrar()` la vm primero hacía el `OP_GET_PROPERTY` que buscaba el método y armaba un bound method nuevo y después el `OP_CALL` lo llamaba y lo tiraba, así que cada vez que se llamaba un método se creaba un bound method solo para eso. Como casi siempre que se lee un método es para llamarlo en el momento el libro agrega el `OP_INVOKE` que básicamente hace las dos cosas juntas.
+
+Teniendo en cuenta lo que hicimos con `this` esto fue más fácil porque cuando llega el `OP_INVOKE` el receptor ya está en el stack abajo de los argumentos que es justo el slot 0 del frame que se va a abrir, entonces no hace falta crear el bound method ni pisar nada. Lo que hace `invoke()` es mirar ese lugar y fijarse que sea una instancia y si no lo es da el error, y si lo es busca el método en la clase y lo llama con el mismo `call` así que la aridad, el stack overflow y demás vienen gratis como con el `init`. Además es la primera instrucción que tiene dos operandos, el nombre del método y la cantidad de argumentos por eso la vm lee los dos y el desensamblador avanza 3 bytes.
+
+Acá aparece un problema que el libro muestra porque en Lox `a.f()` también puede ser un campo que guarda una función y como el `invoke` buscaba solo en los métodos de la clase daba `undefined property`, cuando antes andaba porque el `OP_GET_PROPERTY` mira primero los campos. La idea del libro es que antes de buscar el método se fija si la instancia tiene un campo con ese nombre y si lo tiene lo pone en el lugar del receptor y lo llama con `callValue`, porque en un campo puede haber cualquier cosa inclusive algo que no se puede llamar. Es por esto que un campo sigue tapando a un método igual que en el get, y lo que cuesta es una búsqueda más en los campos antes de cada método.
+
+Un detalle propio de Go es que para saber si el campo existe usamos `valor, ok` y no que sea distinto de `nil`, porque un campo que vale `nil` existe y si no un `a.f()` con `a.f = nil` se iría a buscar un método en vez de dar el error de que no se puede llamar.
+
+Una diferencia con el libro es la velocidad porque en el libro esto hace las llamadas a métodos 7,6 veces más rápidas ya que en C crear el bound method es pedir memoria y después liberarla, y en glox de eso se encarga Go así que cuánto mejoramos podemos verlo en [benchmarks](../benchmarks/benchmarks.md).
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
