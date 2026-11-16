@@ -112,7 +112,7 @@ Como `OP_RETURN` descarta todo lo de la llamada, al terminar el cuerpo de una fu
 
 ### Funciones nativas
 
-Las funciones nativas no están escritas en Lox sino en Go que es el lenguaje con el que hicimos la implementación, y sirven para que un programa pueda hacer cosas que Lox solo no puede, como saber el tiempo que el libro la propone e nosotros tambien implementamos `clock`.
+Las funciones nativas no están escritas en Lox sino en Go, que es el lenguaje con el que hicimos la implementación, y sirven para que un programa pueda hacer cosas que Lox solo no puede, como por ejemplo saber el tiempo. Para esto último el libro la propone, y nosotros tambien implementamos, la función nativa `clock`.
 
 Una nativa no tiene bytecode ni chunk solo la cantidad de argumentos que espera y una función de Go que recibe los argumentos y devuelve un valor. Por eso cuando la VM llama a una nativa no abre un frame, como con una función de Lox, sino que directamente chequea la aridad y ejecuta la función de Go con los argumentos que están en el stack y deja el resultado en lugar de la función y sus argumentos.
 
