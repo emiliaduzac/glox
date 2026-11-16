@@ -212,6 +212,16 @@ Acá hay una diferencia con el libro porque en este se tiene que encargar de lib
 
 Al agregar this la verad que en la vm el cambio es chico porque al llamar a un bound method antes de abrir el frame, pisamos el lugar del stack donde estaba el bound method con el receptor y como ese lugar es el slot 0 del frame nuevo, el método arranca con la instancia ahí y los argumentos después que es lo que el compilador espera para leer `this` como una local. 
 
+#### Init
+
+El `init` surge como necesidad de poder inicializar una instancia porque si no lo tenés lo que venía hasta antes sería una instancia que después tenés que asignarle los campos uno a uno.
+
+Teniendo en cuenta lo que hicimos con `this` agregarle lo del `init` fue más sencillo porque en el bound method teníamos que pisar su lugar en el stack con el receptor pero cuando se llama a una clase eso ya lo veníamos haciendo desde las instancias, porque la vm pone la instancia nueva donde estaba la clase. Ese lugar es el slot 0 del frame, con los argumentos arriba así que lo único que agregamos en `callValue` es que después de crear la instancia se fija si la clase tiene un `init` y si es así lo llama con el mismo `call`. Es por esto que `this` y los parámetros andan igual que en cualquier método y los chequeos son los mismos de aridad, stack overflow y demás que vienen gratis para esto porque es lo mismo que estaba antes.
+
+Si la clase no tiene `init` entonces sigue como venía antes que no abría el frame, pero lo que sí cambia es que ahora se fija que no le hayan pasado argumentos porque no tendría donde ponerlos y si le pasan sale el mismo error que una función, en este caso diciendo esperaba 0 pero obtuvo n. 
+
+Una diferencia con el libro es que el `init` lo guarda en la vm como un string para no crearlo en cada llamada y compararlo por puntero, y tiene que cuidar que su garbage collector no lo libere, y nosotros usamos una constante y el `map` busca por el contenido. Acá aparece la diferencia que nosotros por el tema del `map` se calcula cada vez el hash mientras que en el libro ya queda calculado.
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.

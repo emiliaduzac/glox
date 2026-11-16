@@ -295,6 +295,18 @@ El slot 0 se llama `this` en todo lo que no sea una función común y esto tiene
 
 Siguiendo la idea del libro tenemos el error de compilacion cuando se usa this fuera de una clase, y un detalle con eso es que fijarse si estamos en un método no alcanza por lo de la función adentro de un método, entonces lleva una pila con las clases que se están compilando donde cada una apunta a la de afuera, el libro dice que no es comun pero Lox deja declarar una clase adentro de un método de otra. Y bueno la idea es que si aparece un `this` con la pila vacía, es un error.
 
+### Init
+
+Con la vm llamando al `init` nos aparecía un problema porque el `init` se compila como cualquier método y termina con el `OP_NIL` y el `OP_RETURN` que pone el compilador al final, y el `OP_RETURN` deja lo que devuelve donde el que llamó espera el resultado, entonces `var a = Auto("rojo");` terminaba guardando `nil` en `a` y no la instancia. Lo que hace el libro es resolverlo en el compilador haciendo que el `init` siempre devuelva `this` que ya está en el slot 0, así la vm no tiene que hacer nada distinto.
+
+Teniendo en cuenta lo que hicimos con `this` esto fue sencillo porque agregamos otro tipo de función `TYPE_INITIALIZER` que lo usa `method()` cuando el método se llama `init`, y como no es una función común el slot 0 también se llama `this`. Lo que sí cambia es que `emitReturn()` en vez de emitir el `OP_NIL` emite un `OP_GET_LOCAL 0`, y es por esto que el `return;` sin valor también devuelve `this` porque usa el mismo `emitReturn()` que el final de la función entonces se puede salir antes de un `init` y la instancia no se pierde.
+
+Lo que no se puede es hacer un `return` con un valor adentro del `init` porque se devolvería ese valor y no la instancia, así que igual que en el libro es un error de compilación. Lo levantamos con `report` y no devolviendo el error como pasa con el `return` en el script, porque el código está bien escrito y solo rompe una regla del lenguaje así que sigue compilando y muestra los demás errores.
+
+Un detalle es que cada compilador mira su tipo entonces si hay una función adentro del `init` esa sigue siendo `TYPE_FUNCTION` y puede hacer `return 1;` sin problema porque ese return es de la función y no del `init`. Y otra cosa es que el `init` se puede llamar como cualquier método.
+
+Una diferencia con el libro es que para saber si el método se llama `init` en C tienen que comparar el largo y los bytes porque el token apunta al código y nosotros como el lexema ya es un `string` lo comparamos con `==`. 
+
 Una diferencia con el libro es que guarda la clase actual en una variable global y nosotros en `parserState` que es lo que ya comparten por puntero todos los compiladores (ver [Funciones](#funciones)), así un método que tiene su propio compilador ve la misma clase que la declaración de afuera. Pero la diferencia más grande es cuándo se saca la clase de la pila porque el libro lo hace al final de la declaración y le funciona, porque en C cuando hay un error de sintaxis lo reporta y la función sigue de largo hasta el final. En glox un error de sintaxis corta la función con `return err`, así que con una clase con error nunca se llegaría a esa última línea entoences la clase quedaría en la pila y un `this` suelto más abajo ya no daría error. Por eso la sacamos con un `defer`, que se ejecuta siempre al salir de la función sea como sea y así el resultado es el mismo que en el libro aunque lo hayamos hecho de otra forma.
 
 ## Tests
