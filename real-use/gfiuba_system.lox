@@ -1,15 +1,15 @@
+class Alumno {
+    init(nombre, nota) {
+        this.nombre = nombre;
+        this.nota = nota;
+    }
+}
+
 class Nodo {
     init(nombre, nota) {
         var alumno = Alumno(nombre, nota);
         this.dato = alumno;
         this.proximo = nil;
-    }
-}
-
-class Alumno {
-    init(nombre, nota) {
-        this.nombre = nombre;
-        this.nota = nota;
     }
 }
 
@@ -65,7 +65,18 @@ class ListadoAlumnos {
         var actual = this.primero;
         var puesto = 1;
         while (actual != nil) {
-            print str(puesto) + ". " + actual.dato.nombre + ": " + str(actual.dato.nota);
+            var medalla = "";
+            if (puesto == 1) {
+                var medalla = "🥇";
+            }
+            if (puesto == 2) {
+                var medalla = "🥈";
+            }
+            if (puesto == 3) {
+                var medalla = "🥉";
+            }
+
+            print medalla + str(puesto) + ". " + actual.dato.nombre + ": " + str(actual.dato.nota);
             actual = actual.proximo;
             puesto = puesto + 1;
         }
@@ -91,7 +102,7 @@ fun bubbleSortReverse(lista) {
 print "Bienvenido al sistema de organización de notas GFIUBA";
 print " ";
 print "- El sistema le permitirá ingresar tantos alumnos como desee, y obtendrá un ranking de los 5 con mejor nota";
-print "- Para dejar de ingresar alumnos, alcanza con ingresar un string vacio o CtrlD";
+print "- Para dejar de ingresar alumnos, alcanza con ingresar un string vacio o Ctrl+D";
 print " ";
 
 
@@ -109,8 +120,8 @@ while (ingresoNombre != nil and ingresoNombre != "") {
     }
 
     var notaNumerica = num(ingresoNota);
-    if (notaNumerica == nil or notaNumerica < 0 or notaNumerica > 10) {
-        print "Debe ingresar una nota numerica, entre 0 y 10s";
+    if (notaNumerica == nil or notaNumerica < 1 or notaNumerica > 10) {
+        print "Debe ingresar una nota numerica, entre 1 y 10s";
         continue;
     }
 
