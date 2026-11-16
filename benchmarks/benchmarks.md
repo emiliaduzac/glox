@@ -84,6 +84,10 @@ Para correr **todas** las mediciones:
 
 Los gráficos se generan con los scripts de hyperfine (plot_whisker y plot_benchmark_comparison, con uvx), a partir de los JSON que están en `benchmarks/resultados/`.
 
+### Cambios respecto de la entrega 1
+
+En los benchmarks de la entrega 1 medimos con `time`, ejecutando cada programa 5 veces a mano, y comparamos glox con `go run`, que incluía compilar glox en cada ejecución. Además, los programas eran más cortos, así que el arranque del proceso pesaba mucho en la medición. En esta entrega pasamos a hyperfine, con más corridas y binarios compilados, y aumentamos los tamaños. Con programas más largos, el arranque pesa menos en la medición, así que dejamos de medir por separado el tiempo de ejecución con nuestra función nativa `clock()` (que solo estaba en glox).
+
 ## Programas
 
 Usamos tres programas, cada uno enfocado en una parte distinta del lenguaje. `fibonacci` y `minsky` corren en las 7 implementaciones, así que solo usan lo que todas soportan: no usan `%`, `break` ni `continue`, ni clases.
