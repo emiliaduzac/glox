@@ -10,6 +10,7 @@ También resolvimos otros desafíos que iba proponiendo el libro. Estos los fuim
 - [Break](#break)
 - [Aridad de funciones nativas](5-bytecode_and_vm.md#funciones-nativas)
 - [Reutilizar constantes de nombres repetidos](6-compiler.md#nombres-repetidos)
+- [Funciones nativas](#funciones-nativas)
 
 
 ## Continue
@@ -135,3 +136,7 @@ go test ./internal/compiler -run '^TestCompile(Continue|Break|LoopsAreClosed)$'
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm" 5-break-continue
 ```
+
+## Funciones nativas
+
+Al igual que para la primer entrega, implementamos la función nativa `clock()`, pero esta vez también sumamos `input()`, con la intención de poder usarla para nuestro programa de uso real de glox. Como indica el nombre, esta función permite al usuario ingresar valores por consola.
