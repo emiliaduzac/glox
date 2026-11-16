@@ -261,3 +261,44 @@ print "--- QUICKSORT LISTA YA ORDENADA ---";
 var ordenadaQuickSort = armarListaOrdenada(50);
 var ordenada = armarListaOrdenada(50);
 verificar(sonIguales(quickSort(ordenadaQuickSort), ordenada));
+
+// BUBBLESORT
+
+fun bubbleSort(lista) {
+    for (var i = 0; i < lista.cantidad; i = i + 1) {
+        var actual = lista.primero;
+        while (actual != nil and actual.proximo != nil) {
+            if (actual.dato > actual.proximo.dato) {
+                var aux = actual.dato;
+                actual.dato = actual.proximo.dato;
+                actual.proximo.dato = aux;
+            }
+            actual = actual.proximo;
+        }
+    }
+    return lista;
+}
+
+// BUBBLESORT TESTS
+
+print " ";
+print "********** BUBBLESORT **********";
+print " ";
+
+print "--- BUBBLESORT CON LISTA DESORDENADA ---";
+var desordenadaBubbleSort = armarListaDesordenada(50);
+var esperada = armarListaOrdenada(50);
+verificar(sonIguales(bubbleSort(desordenadaBubbleSort), esperada));
+
+print "--- BUBBLESORT CON UNA LISTA VACIA ---";
+verificar(estaVacia(quickSort(crearLista())));
+
+print "--- BUBBLESORT CON REPETIDOS ---";
+var conRepetidosBubbleSort = armarListaConRepetidos();
+var esperadaConRepetidos = armarListaConRepetidosOrdenada();
+verificar(sonIguales(bubbleSort(conRepetidosBubbleSort), esperadaConRepetidos));
+
+print "--- BUBBLESORT LISTA YA ORDENADA ---";
+var ordenadaBubbleSort = armarListaOrdenada(50);
+var ordenada = armarListaOrdenada(50);
+verificar(sonIguales(bubbleSort(ordenadaBubbleSort), ordenada));
