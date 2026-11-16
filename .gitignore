@@ -48,3 +48,11 @@ Desktop.ini
 # Local planning docs
 docs/plans/
 docs/reviews/
+
+# Benchmarks
+benchmarks/otros
+glox
+glox-parcial
+benchmarks/go/*/fibonacci
+benchmarks/go/*/minsky
+benchmarks/go/*/fizzbuzz
