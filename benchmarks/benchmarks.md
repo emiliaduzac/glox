@@ -80,10 +80,22 @@ Hacemos cuatro comparaciones:
 
 ## Programas
 
-Usamos tres programas, cada uno enfocado en una parte distinta del lenguaje. Como tienen que correr en las 7 implementaciones, solo usan lo que todas soportan: no usamos `%`, `break` ni `continue`, ni clases.
+Usamos tres programas, cada uno enfocado en una parte distinta del lenguaje. `fibonacci` y `minsky` corren en las 7 implementaciones, así que solo usan lo que todas soportan: no usan `%`, `break` ni `continue`, ni clases.
 
 - `fibonacci.lox`: fibonacci recursivo (n = 30). Pone a prueba llamadas a funciones y recursión.
 - `minsky.lox`: simula una máquina de registros con un `while` (n = <n>). Pone a prueba ciclos, asignaciones y condicionales.
-- `fizzbuzz.lox`: FizzBuzz acumulando en un string (n = <n>). Pone a prueba ciclos, condicionales y concatenación de strings.
+- `fizzbuzz.lox`: FizzBuzz acumulando en un string (n = <n>). Pone a prueba ciclos, condicionales, el operador `%` y concatenación de strings.
 
-Los tamaños los elegimos para que la implementación más rápida (clox) tarde lo suficiente como para que su arranque pese poco y la más lenta (plox) no tarde tanto como para que medirla sea ilógico. <algunos a definir todavia>
+El operador `%` es una extensión de la cátedra: lo tienen glox, plox y ploxb, pero no existe en el Lox del libro, así que clox y jlox no lo soportan. Por eso `fizzbuzz` solo se compara entre las implementaciones que lo tienen.
+
+Los tamaños los elegimos para que la implementación más rápida (clox) tarde lo suficiente como para que su arranque pese poco y la más lenta (plox) no tarde tanto como para que medirla sea ilógico.
+
+## Hipótesis
+
+Antes de medir, definimos algunas hipótesis que esperamos ver en los resultados:
+
+1. **clox va a ser la más rápida entre las implementaciones de Lox**: es bytecode (gana a las versiones AST) y está escrita en C (gana a las demás versiones de bytecode)
+2. **Bytecode le va a ganar a tree-walk** en los dos lenguajes en los que tenemos ambas versiones: glox VM contra glox TW (entrega 1) en Go, y ploxb contra plox en Python. La razón para implementar esta segunda versión fue para mejorar la velocidad, por lo que sería esperable que se cumpla.
+3. **Las implementaciones en Python van a ser las más lentas**, porque son un intérprete corriendo sobre otro intérprete.
+4. **glox VM y golox van a estar cerca**: ambos son bytecode compilers de Lox. Nos resulta interesante ver que diferencias podrían mostrar. Si las hay, deberían ser optimizaciones que alguno de los dos agregó, o decisiones de diseño.
+5. **Compilar Go en cada corrida (`go run`) suma un costo fijo**. Ya lo vimos en los benchmarks de la primer entrega, donde sumaba unos 40 a 50 ms. Esperamos que se mantenga igual, porque ese costo depende de compilar glox y no del programa.
