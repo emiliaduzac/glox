@@ -151,4 +151,27 @@ Las implementaciones en Python fueron las más lentas por mucho, entre 68x y 122
 
 ### Evolución de glox
 
+**tree-walk vs bytecode**
+
+| Programa | Entrega 1 (ms) | glox VM (ms) | Factor | Memoria entrega 1 (MB) | Memoria glox VM (MB) |
+|---|---|---|---|---|---|
+| `fibonacci` | **497.30** ± 4.01 | **253.83** ± 1.44 | 1.96x más rápido | 11.90 | 9.45 |
+| `minsky` | **52.57** ± 5.05 | **32.72** ± 0.27 | 1.61x más rápido | 9.21 | 5.45 |
+| `fizzbuzz` | **297.47** ± 6.68 | **341.11** ± 5.01 | 1.15x más lento | 36.95 | 19.40 |
+
+**bytecode: binario vs go run** (con `fibonacci.lox`)
+
+| Forma de ejecutar | Tiempo (ms) | Memoria (MB) |
+|---|---|---|
+| binario (`./glox --vm`) | **257.48** ± 3.63 | 9.41 |
+| `go run ./cmd --vm` | **299.12** ± 13.32 | 23.43 |
+
+**Análisis**
+
+En `fibonacci` y `minsky`, la versión con bytecode es entre 1.61x y 1.96x más rápida que el tree-walk de la entrega 1, lo que confirma la hipótesis. Como contamos en la VM, esta recorre una secuencia plana de instrucciones en lugar de recorrer el árbol de forma recursiva y accede a las variables locales por su posición en el stack en vez de buscarlas en el heap. La excepción es `fizzbuzz`, donde la entrega 1 fue más rápida, como mencionamos en la comparación anterior.
+
+Otro detalle a destacar es que, en los 3 programas, la versión VM usa menos memoria (entre 1.26x y 1.90x menos), incluso en `fizzbuzz`, donde es más lenta.
+
+Por último, se mantiene la conclusión de la entrega 1: `go run` suma un costo fijo, el de **compilar glox**. En este caso fueron 41.6 ms, dentro de los 40 a 50 ms que medimos en la entrega anterior.
+
 ### Lox contra otros lenguajes
