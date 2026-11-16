@@ -59,14 +59,6 @@ fun largo(lista) {
     return lista.cantidad;
 }
 
-fun iterar(lista, visitar) {
-    var actual = lista.primero;
-    while (actual != nil) {
-        if (!visitar(actual.dato)) break;
-        actual = actual.proximo;
-    }
-}
-
 // HELPERS PARA LOS TESTS
 
 fun sonIguales(a, b) {
