@@ -2018,6 +2018,84 @@ func TestOpClass(t *testing.T) {
 	})
 }
 
+func TestOpInherit(t *testing.T) {
+	inherit := func(chunk *c.Chunk, superclass, subclass any) {
+		writeConstant(chunk, superclass)
+		writeConstant(chunk, subclass)
+		chunk.Write(byte(c.OP_INHERIT), line)
+	}
+
+	t.Run("La subclase recibe los métodos de la superclase", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		animal.methods["comer"] = newClosure(c.NewFunction())
+		animal.methods["dormir"] = newClosure(c.NewFunction())
+		perro := newClass("Perro")
+		inherit(chunk, animal, perro)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(perro.methods), 2)
+		utils.AssertValue(t, perro.methods["comer"], animal.methods["comer"])
+		utils.AssertValue(t, perro.methods["dormir"], animal.methods["dormir"])
+	})
+
+	t.Run("Saca la subclase y deja la superclase en el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		inherit(chunk, animal, newClass("Perro"))
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], animal)
+	})
+
+	t.Run("Un método propio pisa al heredado", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		ruido := newClosure(c.NewFunction())
+		animal.methods["hacerRuido"] = ruido
+		perro := newClass("Perro")
+		ladrar := c.NewFunction()
+		inherit(chunk, animal, perro)
+		writeConstant(chunk, perro)
+		writeClosure(chunk, ladrar)
+		chunk.Write(byte(c.OP_METHOD), line)
+		chunk.Write(byte(chunk.AddConstant("hacerRuido")), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, perro.methods["hacerRuido"].function, ladrar)
+		utils.AssertValue(t, animal.methods["hacerRuido"], ruido)
+	})
+
+	t.Run("Error si la superclase no es una clase", func(t *testing.T) {
+		tests := []struct {
+			name       string
+			superclass any
+		}{
+			{"un número", 48.0},
+			{"nil", nil},
+			{"una función", newClosure(c.NewFunction())},
+			{"una instancia", newInstance(newClass("Animal"))},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				inherit(chunk, test.superclass, newClass("Perro"))
+
+				err := run(vm, chunk)
+
+				utils.AssertErrorMessage(t, err, "superclass must be a class")
+			})
+		}
+	})
+}
+
 func TestOpMethod(t *testing.T) {
 	writeMethod := func(chunk *c.Chunk, name string, method *c.Function) {
 		writeClosure(chunk, method)
@@ -2362,6 +2440,120 @@ func TestOpGetProperty(t *testing.T) {
 				utils.AssertErrorMessage(t, err, "only instances have properties")
 			})
 		}
+	})
+}
+
+func TestOpGetSuper(t *testing.T) {
+	getSuper := func(chunk *c.Chunk, receiver *instance, superclass *class, name string) {
+		writeConstant(chunk, receiver)
+		writeConstant(chunk, superclass)
+		index := chunk.AddConstant(name)
+		chunk.Write(byte(c.OP_GET_SUPER), line)
+		chunk.Write(byte(index), line)
+	}
+
+	t.Run("Deja el método de la superclase atado a la instancia", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		animal.methods["hacerRuido"] = newClosure(c.NewFunction())
+		perro := newClass("Perro")
+		perro.methods["hacerRuido"] = newClosure(c.NewFunction())
+		firulais := newInstance(perro)
+		getSuper(chunk, firulais, animal, "hacerRuido")
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		bound, isBound := stackValues(vm)[0].(*boundMethod)
+		utils.AssertValue(t, isBound, true)
+		utils.AssertValue(t, bound.receiver, any(firulais))
+		utils.AssertValue(t, bound.method, animal.methods["hacerRuido"])
+	})
+
+	t.Run("Error si la superclase no tiene ese método", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		getSuper(chunk, newInstance(newClass("Perro")), newClass("Animal"), "ladrar")
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "undefined property 'ladrar'")
+	})
+}
+
+func TestOpSuperInvoke(t *testing.T) {
+	superInvoke := func(chunk *c.Chunk, superclass *class, name string, argCount byte) {
+		writeConstant(chunk, superclass)
+		index := chunk.AddConstant(name)
+		chunk.Write(byte(c.OP_SUPER_INVOKE), line)
+		chunk.Write(byte(index), line)
+		chunk.Write(argCount, line)
+	}
+	returnConstant := func(value any) func(body *c.Chunk) {
+		return func(body *c.Chunk) {
+			writeConstant(body, value)
+			body.Write(byte(c.OP_RETURN), line)
+		}
+	}
+	returnLocal := func(slot byte) func(body *c.Chunk) {
+		return func(body *c.Chunk) {
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(slot, line)
+			body.Write(byte(c.OP_RETURN), line)
+		}
+	}
+
+	t.Run("Llama al método de la superclase y no al de la instancia", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		animal.methods["presentarse"] = newMethod("presentarse", 0, returnConstant("soy un animal"))
+		perro := newClass("Perro")
+		perro.methods["presentarse"] = newMethod("presentarse", 0, returnConstant("soy un perro"))
+		writeConstant(chunk, newInstance(perro))
+		superInvoke(chunk, animal, "presentarse", 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], "soy un animal")
+	})
+
+	t.Run("El método recibe la instancia y los argumentos", func(t *testing.T) {
+		firulais := newInstance(newClass("Perro"))
+		tests := []struct {
+			name     string
+			slot     byte
+			expected any
+		}{
+			{"la instancia", 0, firulais},
+			{"el argumento", 1, "hueso"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				animal := newClass("Animal")
+				animal.methods["comer"] = newMethod("comer", 1, returnLocal(test.slot))
+				writeConstant(chunk, firulais)
+				writeConstant(chunk, "hueso")
+				superInvoke(chunk, animal, "comer", 1)
+
+				err := run(vm, chunk)
+
+				utils.AssertNoError(t, err)
+				utils.AssertValue(t, stackValues(vm)[0], test.expected)
+			})
+		}
+	})
+
+	t.Run("Error si la superclase no tiene ese método", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, newInstance(newClass("Perro")))
+		superInvoke(chunk, newClass("Animal"), "ladrar", 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "undefined property 'ladrar'")
 	})
 }
 

@@ -25,7 +25,7 @@ Los valores que usa el programa se guardan aparte, en un **pool de constantes**,
 La VM simula el comportamiento de una CPU, y será la encargada de ejecutar nuestro código. Se compone de:
 
 - **instruction pointer**: indica la siguiente instrucción a ejecutar. Como es una secuencia lineal, simplemente va avanzando, salvo cuando una instrucción de salto lo mueve. Con las funciones cada llamada tiene el suyo, y la VM usa el de la llamada que se está ejecutando.
-- **stack**: guarda los valores con los que trabaja la VM. Inicialmente eran los valores temporales que producen las instrucciones en runtime, como el resultado de `1 + 2`. Esos valores son usados por instrucciones que trabajan siempre sobre el tope del stack (por ejemplo `OP_ADD` o `OP_PRINT`). Luego, incorporamos las variables locales, cuyos valores también viven en el stack. A diferencia de los anteriores, no se acceden desde el tope, sino por su índice (con `OP_GET_LOCAL` y `OP_SET_LOCAL`). El compilador conoce ese índice porque lleva la cuenta de en qué posición queda cada variable, y lo emite como operando de esas instrucciones. Con las funciones, en el stack también viven la función que se está ejecutando (desde closures, el closure que la envuelve) o la instancia si es un método, y sus argumentos. Y si una función interna usa una variable local de la función que la envuelve, esa variable sigue viviendo en el stack mientras la función de afuera está activa, y recién cuando sale de él se mueve al heap (ver [Closures](#closures)).
+- **stack**: guarda los valores con los que trabaja la VM. Inicialmente eran los valores temporales que producen las instrucciones en runtime, como el resultado de `1 + 2`. Esos valores son usados por instrucciones que trabajan siempre sobre el tope del stack (por ejemplo `OP_ADD` o `OP_PRINT`). Luego, incorporamos las variables locales, cuyos valores también viven en el stack. A diferencia de los anteriores, no se acceden desde el tope, sino por su índice (con `OP_GET_LOCAL` y `OP_SET_LOCAL`). El compilador conoce ese índice porque lleva la cuenta de en qué posición queda cada variable, y lo emite como operando de esas instrucciones. Con las funciones, en el stack también viven la función que se está ejecutando (desde closures, el closure que la envuelve) o la instancia si es un método, y sus argumentos, y en la función donde se declara una subclase también vive su superclase, como la variable local super. Y si una función interna usa una variable local de la función que la envuelve, esa variable sigue viviendo en el stack mientras la función de afuera está activa, y recién cuando sale de él se mueve al heap (ver [Closures](#closures)).
 
 Al igual que el intérprete, la VM es la que ejecuta el programa. La diferencia está en cómo lo recorre: el intérprete recorría el árbol de forma recursiva, mientras que la VM ejecuta las instrucciones en un único ciclo, ya que son un array lineal.
 
@@ -233,6 +233,28 @@ Acá aparece un problema que el libro muestra porque en Lox `a.f()` también pue
 Un detalle propio de Go es que para saber si el campo existe usamos `valor, ok` y no que sea distinto de `nil`, porque un campo que vale `nil` existe y si no un `a.f()` con `a.f = nil` se iría a buscar un método en vez de dar el error de que no se puede llamar.
 
 Una diferencia con el libro es la velocidad porque en el libro esto hace las llamadas a métodos 7,6 veces más rápidas ya que en C crear el bound method es pedir memoria y después liberarla, y en glox de eso se encarga Go así que cuánto mejoramos podemos verlo en [benchmarks](../benchmarks/benchmarks.md).
+
+#### Herencia
+
+Cuando llegamos a herencia la idea principal es asociar conceptos y lo que sabemos de POO, ahora particularmente para nosotros acá la idea es reutilizar métodos tal cual vienen de la superclase o capaz cambiando la implementación particular. Podemos tener un animal que hace ruido como en los test, pero cuando perro hereda de animal para él hacer ruido es ladrar. Con esta idea es que surgen los primeros comportamientos que hemos agregado sobre herencia siguiendo el libro.
+
+Ahora si el compilador le avisa a la vm con el `OP_INHERIT` que una clase hereda de otra, y cuando llega en el tope del stack está la subclase y abajo la superclase, y básicamente lo que hace la vm es copiar todos los métodos de la superclase a la subclase y sacar la subclase del stack. Ahora bien esto es así en el caso feliz digamos pero hay particularidades y casos bordes en todo esto. Por ejemplo que si bien se copian, la idea es que si la subclase o clase hija como queramos decirle, tiene su método definido, este tiene prioridad y debe quedar ese. En el ejemplo es esto de que si bien un animal puede tener implementado el hacer ruido, viene el perro y dice bueno yo soy un animal y mi hacer ruido es ladrar, y básicamente esto en nuestro glox sale por el orden, porque cuando llega el `OP_INHERIT` el perro todavía no tiene ningún método así que se copian todos los del animal, y recién después se agregan los del perro con el `OP_METHOD`, entonces su hacer ruido pisa al que se copió y queda el ladrar.
+
+Un caso borde que se detecta en runtime es el de que una superclase en sí es una variable, así que recién la vm detecta ahí si es una clase y si no lo es levanta el error de que solo se puede heredar de una clase.
+
+El libro habla de un copy-down inheritance que en si es que copia de una sola vez cuando se declara la clase, entonces su método heredado se encuentra con una sola búsqueda como si fuera propio, esa es la motivación de hacerlo así, frente a por ejemplo tener que ir subiendo por todas las superclases hasta encontrarlo. Y el detalle es que se pude copiar asi tambien y usar esto porque en lox las clases no cambian depsues de declararse.
+
+#### Super
+
+En la vm super se resuelve con las intrucciones OP_GET_SUPER cuando se lee el metodo y con OP_SUPER_INVOKE cuando se la llama en el momento, pero para las dos el compilador dela la sueprclase arriba en el stack.
+
+**Acceder a un método de la superclase**
+
+En glox el OP_GET_SUPER lee el nombre del método de las constantes, saca la superclase del stack con pop y se la pasa a bindMethod, que es el mismo que usa el get, y con eso busca el método en esa superclase, arma el bound method con la instancia que quedó en el tope y la reemplaza. Como busca en la superclase y no en la clase de la instancia se saltea el que pisó la clase hija y llega al de la superclase, y como la herencia es por copia también encuentra los que la superclase heredó de más arriba. Aca no mira los campos primero porque no se heredan y con super siempre se busca un método, y como reusamos bindMethod, si el método no existe da el mismo error.
+
+**Llamar a un método de la superclase**
+
+Aca pasaba lo mismo que antes del invoke, la vm armaba un bound method solo para llamarlo y tirarlo, así que el libro agrega el OP_SUPER_INVOKE que hace las dos cosas juntas. En glox lo que ahcemos es leer el nombre y la cantidad de argumentos, sacar la superclase con pop y lo que queda es justo una llamada a método común, con la instancia en el slot 0 y los argumentos después, así que se la pasamos a invokeFromClass, el mismo que usa el invoke, y la aridad, el stack overflow y demás chequeos siguen siendo los mismos de ahi. Como se abre un frame nuevo después tenemos que actualizar el frame. El libro dice que acá tiene todavía más sentido que en el invoke común porque con super nunca hay que mirar los campos.
 
 ### Diferencias con el libro
 

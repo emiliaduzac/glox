@@ -281,7 +281,7 @@ Una diferencia con el libro que ya mencionamos en [Nombres repetidos](#nombres-r
 
 Al agregar los métodos nos aparece el problema de que una clase puede tener varios métodos y eso tiene que llegar a la vm como una serie de instrucciones de bytecode y no como un nodo del árbol que recorría antes el tree-walk. En el libro habla de que para el programador declarar una clase es una sola cosa, pero para nosotros el compilador lo emite como una serie de instrucciones que la vm ejecuta de a una.
 
-Primero tenemos ya el OP_CLASS que crea la clase vacía, después se guarda en su variable y se vuelve a agregar en el stack porque la vm la necesita ahí para agregarle los métodos. Si la clase es global al guardarla con OP_DEFINE_GLOBAL sale del stack y por eso hay que volver a cargarla, y si es local queda en su slot. Después por cada método se emite el OP_CLOSURE que deja el closure del método arriba de la clase en el stack y le sigue el OP_METHOD que lo guarda en la clase con su nombre y lo saca del stack, así la clase sigue quedando arriba para el siguiente. Y al final un OP_POP que saca a la clase, que ya quedó guardada en su variable con sus métodos.
+Primero tenemos ya el OP_CLASS que crea la clase vacía, después se guarda en su variable y se vuelve a agregar en el stack porque la vm la necesita ahí para agregarle los métodos. Si la clase es global al guardarla con OP_DEFINE_GLOBAL sale del stack y por eso hay que volver a cargarla, y si es local queda en su slot. Después por cada método se emite el OP_CLOSURE que deja el closure del método arriba de la clase en el stack y le sigue el OP_METHOD que lo guarda en la clase con su nombre y lo saca del stack, así la clase sigue quedando arriba para el siguiente. Y al final un OP_POP que saca a la clase, que ya quedó guardada en su variable con sus métodos. Si la clase hereda de otra, antes de los métodos se emite además el `OP_INHERIT`, con la carga de la superclase y de la subclase, y al final sale también la variable super como contamos en [Herencia](#herencia).
 
 Además para agregarle métodos a la clase la vm necesita tener la clase a mano pero el compilador no puede saber si es global o local y por ende dónde queda, por eso usa el nombre para volver a cargarla con el namedVariable, que es el mismo que para una variable, y eso genera la instrucción que corresponda según el caso.
 
@@ -313,7 +313,43 @@ Una diferencia con el libro es que para saber si el método se llama `init` en C
 
 En el compilador lo del invoke está en `dot()` porque después de leer el nombre ahora se fija si viene un `(` y si es así compila los argumentos con el mismo `argumentList()` de las llamadas y emite el `OP_INVOKE` con el nombre y la cantidad de argumentos, en vez del `OP_GET_PROPERTY` y el `OP_CALL` que salían antes (para qué sirve lo contamos en la [vm](5-bytecode_and_vm.md#invoke)). Esto va después de fijarse si es una asignación así que `a.x = 1` sigue siendo un set como antes.
 
-Un detalle es que solo se optimiza cuando el `(` viene justo después del nombre, entonces `(a.m)()` sigue compilando como antes porque los paréntesis cierran el `a.m` antes de la llamada y lo mismo con `var m = a.m; m();`, que siguen pasando por el bound method. Y bueno como `this` es una local más, un `this.m()` adentro de un método también usa el `OP_INVOKE`.
+Un detalle es que solo se optimiza cuando el `(` viene justo después del nombre, entonces `(a.m)()` sigue compilando como antes porque los paréntesis cierran el `a.m` antes de la llamada y lo mismo con `var m = a.m; m();`, que siguen pasando por el bound method. Y como `this` es una local más, un `this.m()` adentro de un método también usa el `OP_INVOKE`, y con `super.m()` pasa algo parecido con el `OP_SUPER_INVOKE`, como contamos en [Super](#super).
+
+### Herencia
+
+En el compilador lo de la herencia básicamente es ver que después venga un < para indicarlo y después el nombre de la superclase. Entonces el nombre de la superclase se lee como una variable más, así puede ser global, local o un upvalue y el compilador no tiene que saber dónde está, se carga la subclase y se emite el OP_INHERIT para avisarle a la vm.
+
+Un detalle importante acá es el orden porque el OP_INHERIT se emite antes de compilar los métodos de la subclase y por esto es que cuando la vm copia los métodos de la superclase a la subclase todavía la subclase no tiene ninguno propio que después lo agrega con el OP_METHOD siguiente, esto lo explicamos más en la parte de la vm con un ejemplo y todo.
+
+Al compilador le toca detectar errores siguiendo un poco la idea del libro entonces por ejemplo nos fijamos que una clase no puede heredar de ella misma, básicamente miramos los lexemas de una y otra y como es un string comparamos y si es el caso levantamos el error con report porque en sí el código está bien escrito, pero el problema es que rompe una regla de lenguaje para Lox, así conseguimos algo que ya hemos explicado en el manejo de errores de poder mostrar también otros errores si es que los hay.
+
+Pero un error que chequeamos y ya es de sintaxis es si no viene el nombre depsues del < por lo que ahi si devolvemos directamente el error. lo que no puede saber el compilador es si realmente es una clase lo indicado como superclase, eso recien lo ve la vm en runtime.
+
+#### Superclase como variable local
+
+Después de copiar los métodos ya no necesitamos la superclase para heredar pero si la vamos a necesitar para super, porque no se resuelve con la superclase de la instancia sino con la de la clase donde está escrito. El libro lo muestra con una clase A, una B que hereda de A y una C que hereda de B, donde un super.metodo() escrito adentro de B va a A aunque la instancia sea de C, así que básicamente cada subclase tiene que guardarse su superclase en algún lado.
+
+Entonces aprovechamos que la superclase ya está en el stack porque la cargamos antes del OP_INHERIT, y en vez de tirarla al final la dejamos en una variable local llamada super. Para eso cada subclase abre su propio scope, la agrega  y cuando termina la clase el scope se cierra y la variable sale del stack con su OP_POP como cualquier local. Es una palabra reservada y no puede chocar con ninguna variable del que programa.
+
+Un detalle importante es que cada subclase abre su propio scope porque todas usan el mismo nombre, así que si declaramos dos subclases en el mismo bloque y no tuvieran cada una el suyo, las dos variables super chocarían y daría error de que la variable ya existe.
+
+Una diferencia con el libro es que nosotros en glox un error de sintaxis corta la función con return err, así que el scope nunca se cerraría haceindo que lo que venga después en el programa se compilaría como local y saldrían errores falsos, por ejemplo un var a; var a; diría que la variable ya existe. Es el mismo problema que tuvimos con la pila de clases en this y lo resolvemos igual que ahi es decir con un defer.
+
+#### Super
+
+Super aparece por la necesidad de querer llamar al método de la superclase aunque la clase hija lo haya pisado. Siempre viene acompañado con el punto y el nombre del método entonces nos fijamos si están, y si falta entonces ahí es un error de sintaxis y devolvemos el error.
+
+**Acceder a un método de la superclase**
+
+El compilador carga this, super y emite el OP_GET_SUPER con el nombre del método porque la vm lo necesita para saber sobre qué instancia, en qué superclase buscar y qué método. Como super es la variable local que guardamos en cada subclase, se resuelve con la superclase de la clase donde está escrito y los dos se cargan como cualquier variable, así que si el super está en una función adentro de un método llegan como upvalues con lo que ya teníamos de closures. Sin paréntesis termina dando el método atado a la instancia como un bound method.
+
+Usar super afuera de una clase o en una clase que no hereda de nadie es un error de compilación, y para saber si la clase tiene superclase la pila de clases lo guarda. Lo levantamos con report porque el código está bien escrito y solo rompe una regla del lenguaje, así que se sigue compilando y se muestran los demás errores.
+
+**Llamar a un método de la superclase**
+
+Si después del nombre viene un ( el método se llama en el momento, así que igual que con el invoke compilamos los argumentos y emitimos OP_SUPER_INVOKE con el nombre y la cantidad de argumentos en vez de armar un bound method que se usaría una sola vez. La superclase se carga después de los argumentos así queda arriba de todo, que es donde la espera la vm para sacarla.
+
+Una diferencia con el libro es que en C la función que compila esto se llama super_ porque si no choca con un nombre del lenguaje, y en Go no tenemos esta situación. Otra es que el libro tiene que inventar el token super porque en C un token apunta al código fuente, y nosotros como el lexema ya es un string lo armamos una sola vez y lo reusamos.
 
 ## Tests
 
@@ -333,4 +369,10 @@ python3 real-tests/script.py "go run ./cmd --vm" 6-classes
 
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm" 7-methods
+```
+
+> Para la herencia y super agregamos los tests ([9-inheritance](../real-tests/9-inheritance.lox)), que también corren solo con la VM.
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm" 9-inheritance
 ```
