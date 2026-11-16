@@ -36,7 +36,7 @@ Todo esto puede encontrarse en [`sorting_lists.lox`](sorting_lists.lox)
 
 Como otro caso de uso, y con la intención de poner a prueba glox en un programa un poco más real y divertido, implementamos un sistema de ranking de notas.
 
-El mismo permite ingresar alumnos y sus notas hasta que el usuario no quiera ingresar más (ingresando un nombre vacío o con Ctrl+D), mediante la función nativa `input(mensaje)`. Se valida que la nota esté dentro de un rango válido (1 a 10) y al finalizar, se utiliza el algoritmo de ordenamiento `bubbleSortReverse` para ordenar los alumnos ingresados según sus notas. El programa imprime por pantalla los 5 alumnos con mejores notas y el promedio obtenido por los mismos.
+El mismo permite ingresar alumnos y sus notas hasta que el usuario no quiera ingresar más (dejando vacío el nombre o la nota, o con Ctrl+D), mediante la función nativa `input(mensaje)`. Se valida que la nota esté dentro de un rango válido (1 a 10) y al finalizar, se utiliza el algoritmo de ordenamiento `bubbleSortReverse` para ordenar los alumnos ingresados según sus notas. El programa imprime por pantalla los 5 alumnos con mejores notas y el promedio obtenido por los mismos.
 
 Para esto, implementamos las siguientes clases, basandonos en la implementación que realizamos para los algoritmos de ordenamiento y lista enlazada:
 
@@ -44,7 +44,9 @@ Para esto, implementamos las siguientes clases, basandonos en la implementación
 - `Nodo`: es un nodo de una lista enlazada, solo que en su `dato` se almacena un `Alumno`
 - `ListadoAlumnos`: lista enlazada, tal cual en el caso de uso 1.
 
-Los métodos del `ListadoAlumnos` son los mismos que los de la `Lista`, solo que tuvimos que copiarlos para poder mantener archivos separados (en glox aún no soportamos importar código de otro archivo). Solo adaptamos algunos casos para el uso concreto que le damos, como al imprimir, usar los puestos para agregar una medalla de premio. A su vez, adaptamos el algoritmo de ordenamiento `bubbleSort` para que use las notas de los alumnos (antes usaba el `dato` de un nodo, que debía ser un número para ordenarlo), y también para que ordene en el orden inverso, ya que nos interesan las mejores notas. Este algoritmo, en caso de empate, se queda con el último elemento.
+Los métodos del `ListadoAlumnos` son los mismos que los de la `Lista`, solo adaptamos algunos casos para el uso concreto que le damos, Por ejemplo, al imprimir usamos los puestos del ranking para agregar una medalla de premio, y `borrarPrimero` devuelve el nodo completo en vez de solo su `dato`.
+
+A su vez, adaptamos el algoritmo de ordenamiento `bubbleSort` para que use las notas de los alumnos (antes usaba el `dato` de un nodo, que debía ser un número para ordenarlo), y también para que ordene en el orden inverso, ya que nos interesan las mejores notas. En caso de empate, el bubble sort no intercambia los elementos así que se respeta el orden de la lista. Como los alumnos se cargan con `insertarPrimero`, entre notas iguales queda primero el último ingresado.
 
 Por último, el programa usa las otras funciones nativas que agregamos: `str` para imprimir las notas númericas, y `num` para convertir el ingreso del usuario a una nota numérica. Además, hacemos uso de los extras agregados `break` y `continue`, que nos facilitan el control de flujo en el ciclo principal del programa. Podemos seguir pidiendo notas cuando un ingreso es inválido o dejar de pedir ingresos cuando el usuario quiere finalizar.
 
