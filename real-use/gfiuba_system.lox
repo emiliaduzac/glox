@@ -95,56 +95,66 @@ fun bubbleSortReverse(lista) {
     return lista;
 }
 
+fun cargarAlumnos() {
+    var alumnos = ListadoAlumnos();
+    var mensajeNombre = "> Ingrese el nombre de otro alumno: ";
+    var mensajeNota = "> Ingrese la nota del alumno: ";
 
-print "Bienvenido al sistema de organización de notas GFIUBA";
-print " ";
-print "- El sistema le permitirá ingresar tantos alumnos como desee, y obtendrá un ranking de los 5 con mejor nota";
-print "- Para dejar de ingresar alumnos, alcanza con ingresar un string vacio o Ctrl+D";
-print " ";
+    var ingresoNombre = input("> Ingrese el nombre del primer alumno: ");
 
+    while (ingresoNombre != nil and ingresoNombre != "") {
+        var ingresoNota = input(mensajeNota);
 
-var alumnos = ListadoAlumnos();
-var mensajeNombre = "> Ingrese el nombre de otro alumno: ";
-var mensajeNota = "> Ingrese la nota del alumno: ";
+        if (ingresoNota == nil or ingresoNota == "") {
+            break;
+        }
 
-var ingresoNombre = input("> Ingrese el nombre del primer alumno: ");
+        var notaNumerica = num(ingresoNota);
+        if (notaNumerica == nil or notaNumerica < 1 or notaNumerica > 10) {
+            print "Debe ingresar una nota numerica, entre 1 y 10";
+            continue;
+        }
 
-while (ingresoNombre != nil and ingresoNombre != "") {
-    var ingresoNota = input(mensajeNota);
-
-    if (ingresoNota == nil or ingresoNota == "") {
-        break;
+        alumnos.insertarPrimero(ingresoNombre, notaNumerica);
+        ingresoNombre = input(mensajeNombre);
     }
 
-    var notaNumerica = num(ingresoNota);
-    if (notaNumerica == nil or notaNumerica < 1 or notaNumerica > 10) {
-        print "Debe ingresar una nota numerica, entre 1 y 10";
-        continue;
+    return alumnos;
+}
+
+fun mostrarRanking(alumnos) {
+    var top5 = ListadoAlumnos();
+    var suma = 0;
+
+    while (top5.largo() < 5 and alumnos.largo() > 0) {
+        var elem = alumnos.borrarPrimero();
+        top5.insertarUltimo(elem.dato.nombre, elem.dato.nota);
+        suma = suma + elem.dato.nota;
     }
 
-    alumnos.insertarPrimero(ingresoNombre, notaNumerica);
-    ingresoNombre = input(mensajeNombre);
+    print " ";
+    if (top5.estaVacia()) {
+        print "No se ingresaron alumnos";
+    } else {
+        print "-- TOP 5 ALUMNOS DE GFIUBA: --";
+        top5.imprimir();
+        print " ";
+
+        var promedio = suma / top5.largo();
+        print "El promedio de los alumnos del top: " + str(promedio);
+    }
 }
 
-var ordenados = bubbleSortReverse(alumnos);
-
-var top5 = ListadoAlumnos();
-var suma = 0;
-
-while (top5.largo() < 5 and ordenados.largo() > 0) {
-    var elem = ordenados.borrarPrimero();
-    top5.insertarUltimo(elem.dato.nombre, elem.dato.nota);
-    suma = suma + elem.dato.nota;
-}
-
-print " ";
-if (top5.estaVacia()) {
-    print "No se ingresaron alumnos";
-} else {
-    print "-- TOP 5 ALUMNOS DE GFIUBA: --";
-    top5.imprimir();
+fun main() {
+    print "¡Bienvenido al sistema de organización de notas GFIUBA!";
+    print " ";
+    print "- El sistema le permitirá ingresar tantos alumnos como desee, y obtendrá un ranking de los 5 con mejor nota.";
+    print "- Para dejar de ingresar alumnos, alcanza con ingresar un string vacio o Ctrl+D.";
     print " ";
 
-    var promedio = suma / top5.largo();
-    print "El promedio de los alumnos del top: " + str(promedio);
+    var alumnos = cargarAlumnos();
+    var ordenados = bubbleSortReverse(alumnos);
+    mostrarRanking(ordenados);
 }
+
+main();

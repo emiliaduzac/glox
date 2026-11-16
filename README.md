@@ -11,7 +11,6 @@ Implementación de una variante propia del lenguaje [Lox](https://craftinginterp
 - [Cómo correr lox](#cómo-correr-lox)
 - [Tests unitarios](#tests-unitarios)
 - [Tests de la cátedra](#tests-de-la-cátedra)
-- [To Do List](#to-do-list)
 
 ## Integrantes
 
@@ -20,7 +19,7 @@ Implementación de una variante propia del lenguaje [Lox](https://craftinginterp
 
 ## Documentación de la implementación
 
-Como la implementación será desarrollada en etapas, decidimos separar la documentación en un documento por etapa, para facilitar su lectura y comprensión. Toda la documentación técnica se encuentra bajo la carpeta **docs**, y la de los **extras** y **benchmarks** en sus propias carpetas.
+Como la implementación será desarrollada en etapas, decidimos separar la documentación en un documento por etapa, para facilitar su lectura y comprensión. Toda la documentación técnica se encuentra bajo la carpeta **docs**, y la de los **casos de uso real** y **benchmarks** en sus respectivas carpetas.
 
 > Indice de documentación
 
@@ -32,7 +31,7 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Compiler](docs/6-compiler.md)
 - [Extras propios](docs/7-extra.md)
 - [Benchmarks](benchmarks/benchmarks.md)
-- [Uso Real de Glox](real-use/uso_real.md)
+- [Casos de uso reales con Glox](real-use/uso_real.md)
 
 ## Cómo correr lox
 
@@ -104,7 +103,7 @@ Para ejecutar los tests de la cátedra en el modo **tree walking interpreter**:
 python3 real-tests/script.py "go run ./cmd"
 ```
 
-Para la segunda implementación: **bytecode compiler**:
+Para la segunda implementación, **bytecode compiler**:
 
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm"
@@ -112,19 +111,4 @@ python3 real-tests/script.py "go run ./cmd --vm"
 
 En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERROR`). En caso de haber errores, aparecerá el error obtenido por Glox.
 
-Los tests `5-break-continue`, `6-classes`, `7-methods`, `8-natives` y `9-inheritance` solo pasan con el **bytecode compiler**, porque el tree walking interpreter no tiene `break` ni `continue` ni clases.
-
-## To Do List
-
-- [X] Chunk y VM
-- [X] Compilador base, expresiones
-- [X] statements, variables globales 
-- [X] bloques y variables locales
-- [X] Control de flujo
-- [X] Funciones
-- [X] Closures
-- [X] Clases
-- [x] Herencia
-- [x] Extra propio
-- [X] Uso real del lenguaje
-- [X] Benchmarks contra la entrega parcial, mejorar la que teniamos y documentación final
+Los tests `5-break-continue`, `6-classes`, `7-methods`, `8-natives` y `9-inheritance` solo pasan con el **bytecode compiler**, porque el tree walking interpreter no tiene las implementaciones necesarias.

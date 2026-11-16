@@ -1,16 +1,16 @@
 ## Extra
 
-Como extra, decidimos incorporar **break** y **continue** a los ciclos. Como vimos en clase, cuando queremos agregar funcionalidad nueva, tenemos que ir en el orden correspondiente: _scanner → compiler → VM_.
+Como extra, decidimos incorporar **break** y **continue** a los ciclos, más funciones nativas y otros desafíos que iba proponiendo el libro. Estos últimos los fuimos explicando en la doc de la VM o del compilador, pero los mencionamos acá para resaltarlos.
 
-También resolvimos otros desafíos que iba proponiendo el libro. Estos los fuimos explicando en la doc de la VM o del compilador, pero los mencionamos acá para resaltarlos.
+Para `break` y `continue`, como vimos en clase, al agregar funcionalidad nueva tenemos que ir en el orden correspondiente: _scanner → compiler → VM_.
 
 ### Índice
 
-- [Continue](#continue)
-- [Break](#break)
-- [Funciones nativas](#funciones-nativas)
-- [Aridad de funciones nativas](5-bytecode_and_vm.md#funciones-nativas)
-- [Reutilizar constantes de nombres repetidos](6-compiler.md#nombres-repetidos)
+1. [Continue](#continue)
+2. [Break](#break)
+3. [Funciones nativas](#funciones-nativas)
+4. [Aridad de funciones nativas](5-bytecode_and_vm.md#funciones-nativas)
+5. [Reutilizar constantes de nombres repetidos](6-compiler.md#nombres-repetidos)
 
 ## Continue
 
@@ -93,6 +93,8 @@ Algo parecido pasa con un `return` dentro de un ciclo. No hace falta sacar las v
 
 En la VM tampoco hace falta ningún cambio.
 
+Con closures hubo un cambio más: si alguna de las variables locales que se sacan antes de saltar fue capturada por una función interna, en vez de `OP_POP` se emite `OP_CLOSE_UPVALUE`, igual que al cerrar un bloque.
+
 ### Limitaciones y posibles mejoras
 
 - **Es una extensión de Lox.** Lox no tiene `break` ni `continue`, así que un programa que los use puede no funcionar en otras implementaciones del lenguaje.
@@ -140,13 +142,13 @@ python3 real-tests/script.py "go run ./cmd --vm" 5-break-continue
 
 Al igual que para la primer entrega, implementamos la función nativa `clock()`, pero esta vez también sumamos otras más, con la intención de poder usarla para nuestro programa de uso real de glox. Se destaca que estas funciones solamente están implementadas para la versión **bytecode compiler**, no para el tree walk.
 
-- `input(mensaje)`: ingresar valores por consola. En este caso, el marcar la aridad forzó a que, al tener aridad 1, input siempre debe recibir un mensaje: no se puede usar `input()`.
-- `str(value)`: convierte a string
-- `num(value)`: convierte a número
+- `input(mensaje)`: imprime el mensaje y lee una línea de la consola. Si no hay más entrada (por ejemplo, con Ctrl+D), devuelve `nil`. Al tener aridad 1, y dado que implementamos la validación de aridad, siempre debe recibir un mensaje, no se puede usar `input()`.
+- `str(valor)`: convierte cualquier valor a string
+- `num(valor)`: convierte un string a número. Si no es un número válido, o si no recibe un string, devuelve `nil`.
 
 Para cada una bastó con agregar su función nativa en Go, y sumarla a la tabla de nativas.
 
-> A pesar de que se verán en uso en el programa de caso real, incorporamos algunos tests para las mismas:
+> A pesar de que se verán en uso en el programa de caso real, incorporamos algunos real-tests para las mismas ([8-natives](../real-tests/8-natives.lox)):
 
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm" 8-natives.lox

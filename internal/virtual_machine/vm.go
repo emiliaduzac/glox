@@ -317,10 +317,10 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			function := constant.(*c.Function)
 			cl := newClosure(function)
+			vm.push(cl)
 			if err := vm.fillUpvalues(cl, frame); err != nil {
 				return err
 			}
-			vm.push(cl)
 
 		case c.OP_CLASS:
 			name, err := vm.readString()
