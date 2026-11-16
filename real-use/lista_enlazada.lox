@@ -89,6 +89,39 @@ fun verificar(condicion) {
     }
 }
 
+var desordenadaMergeSort = crearLista();
+var desordenadaQuickSort = crearLista();
+var esperada = crearLista();
+
+for (var i = 0; i < 10; i = i + 1) {
+    insertarUltimo(desordenadaMergeSort, (i * 7) % 10);
+    insertarUltimo(desordenadaQuickSort, (i * 7) % 10);
+    insertarUltimo(esperada, i);
+}
+
+var conRepetidosMergeSort = crearLista();
+insertarUltimo(conRepetidosMergeSort, 3);
+insertarUltimo(conRepetidosMergeSort, 1);
+insertarUltimo(conRepetidosMergeSort, 3);
+var conRepetidosQuickSort = crearLista();
+insertarUltimo(conRepetidosQuickSort, 3);
+insertarUltimo(conRepetidosQuickSort, 1);
+insertarUltimo(conRepetidosQuickSort, 3);
+
+var esperadaConRepetidos = crearLista();
+insertarUltimo(esperadaConRepetidos, 1);
+insertarUltimo(esperadaConRepetidos, 3);
+insertarUltimo(esperadaConRepetidos, 3);
+
+var ordenadaMergeSort = crearLista();
+var ordenadaQuickSort = crearLista();
+var ordenada2 = crearLista();
+for (var i = 0; i < 10; i = i + 1) {
+    insertarUltimo(ordenadaMergeSort, i);
+    insertarUltimo(ordenadaQuickSort, i);
+    insertarUltimo(ordenada2, i);
+}
+
 // MERGESORT
 
 fun mergeSort(lista) {
@@ -136,52 +169,78 @@ fun merge(izquierda, derecha) {
     return resultado;
 }
 
-var desordenada = crearLista();
-var esperada = crearLista();
-
-for (var i = 0; i < 10; i = i + 1) {
-    insertarUltimo(desordenada, (i * 7) % 10);
-    insertarUltimo(esperada, i);
-}
-
-var conRepetidos = crearLista();
-insertarUltimo(conRepetidos, 3);
-insertarUltimo(conRepetidos, 1);
-insertarUltimo(conRepetidos, 3);
-
-var esperadaConRepetidos = crearLista();
-insertarUltimo(esperadaConRepetidos, 1);
-insertarUltimo(esperadaConRepetidos, 3);
-insertarUltimo(esperadaConRepetidos, 3);
-
-var ordenada1 = crearLista();
-var ordenada2 = crearLista();
-for (var i = 0; i < 10; i = i + 1) {
-    insertarUltimo(ordenada1, i);
-    insertarUltimo(ordenada2, i);
-}
-
 // MERGESORT TESTS
 
-print "********** MERGSORT **********";
+print "********** MERGESORT **********";
 print " ";
 
 print "--- MERGESORT CON LISTA DESORDENADA [0, 7, 4, 1, 8, 5, 2, 9, 6, 3] ---";
-var res = mergeSort(desordenada);
+var res = mergeSort(desordenadaMergeSort);
 verificar(sonIguales(res, esperada));
 
 print "--- MERGESORT CON UNA LISTA VACIA [] ---";
 verificar(estaVacia(mergeSort(crearLista())));
 
 print "--- MERGESORT CON REPETIDOS [3, 1, 3] ---";
-var res = mergeSort(conRepetidos);
+var res = mergeSort(conRepetidosMergeSort);
 verificar(sonIguales(res, esperadaConRepetidos));
 
-print "--- MERGESORT LISTA YA ORDENADA [1, 2, 3, 4, 5, 6, 7, 8, 9] ---";
-var res = mergeSort(ordenada1);
+print "--- MERGESORT LISTA YA ORDENADA [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] ---";
+var res = mergeSort(ordenadaMergeSort);
 verificar(sonIguales(res, ordenada2));
 
 // QUICKSORT
+
+fun quickSort(lista) {
+    if (lista.cantidad <= 1) return lista;
+
+    var pivote = borrarPrimero(lista);
+
+    var menores = crearLista();
+    var mayores = crearLista();
+    while (!estaVacia(lista)) {
+        var elemento = borrarPrimero(lista);
+        if (elemento < pivote) {
+            insertarUltimo(menores, elemento);
+        } else {
+            insertarUltimo(mayores, elemento);
+        }
+    }
+
+    var quickMenores = quickSort(menores); 
+    var quickMayores = quickSort(mayores);
+
+    var listaOrdenada = crearLista();
+    while (!estaVacia(quickMenores)) {
+        var elem = borrarPrimero(quickMenores);
+        insertarUltimo(listaOrdenada, elem);
+    }
+    insertarUltimo(listaOrdenada, pivote);
+    while (!estaVacia(quickMayores)) {
+        var elem = borrarPrimero(quickMayores);
+        insertarUltimo(listaOrdenada, elem);
+    }
+
+    return listaOrdenada;
+}
+
+// QUICKSORT TESTS
+
 print " ";
 print "********** QUICKSORT **********";
 print " ";
+
+print "--- QUICKSORT CON LISTA DESORDENADA [0, 7, 4, 1, 8, 5, 2, 9, 6, 3] ---";
+var res = quickSort(desordenadaQuickSort);
+verificar(sonIguales(res, esperada));
+
+print "--- QUICKSORT CON UNA LISTA VACIA [] ---";
+verificar(estaVacia(quickSort(crearLista())));
+
+print "--- QUICKSORT CON REPETIDOS [3, 1, 3] ---";
+var res = quickSort(conRepetidosQuickSort);
+verificar(sonIguales(res, esperadaConRepetidos));
+
+print "--- QUICKSORT LISTA YA ORDENADA [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] ---";
+var res = quickSort(ordenadaQuickSort);
+verificar(sonIguales(res, ordenada2));
