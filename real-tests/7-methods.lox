@@ -1,0 +1,191 @@
+print "--- UN METODO SE LLAMA CON SUS ARGUMENTOS Y DEVUELVE UN VALOR ---";
+class Calculator {
+    add(a, b) {
+        return a + b;
+    }
+}
+var calculator = Calculator();
+
+if (calculator.add(2, 3) == 5) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- THIS ES LA INSTANCIA SOBRE LA QUE SE LLAMA EL METODO ---";
+class Counter {
+    increment() {
+        this.value = this.value + 1;
+    }
+}
+var counter = Counter();
+counter.value = 0;
+var otherCounter = Counter();
+otherCounter.value = 10;
+counter.increment();
+counter.increment();
+otherCounter.increment();
+
+if (counter.value == 2 and otherCounter.value == 11) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN METODO PUEDE LLAMAR A OTRO METODO CON THIS ---";
+class Rectangle {
+    area() {
+        return this.width * this.height;
+    }
+    double() {
+        return this.area() * 2;
+    }
+}
+var rectangle = Rectangle();
+rectangle.width = 2;
+rectangle.height = 3;
+
+if (rectangle.double() == 12) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN METODO GUARDADO EN UNA VARIABLE RECUERDA SU INSTANCIA ---";
+class Dog {
+    bark() {
+        return this.name + " ladra";
+    }
+}
+var dog = Dog();
+dog.name = "Firulais";
+var bark = dog.bark;
+dog = nil;
+
+if (bark() == "Firulais ladra") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UNA FUNCION ADENTRO DE UN METODO USA EL THIS DEL METODO ---";
+class Greeter {
+    greeting() {
+        fun inner() {
+            return "hola " + this.name;
+        }
+        return inner;
+    }
+}
+var greeter = Greeter();
+greeter.name = "Ana";
+var greet = greeter.greeting();
+
+if (greet() == "hola Ana") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- INIT RECIBE LOS ARGUMENTOS Y DEJA LOS CAMPOS LISTOS ---";
+class Point {
+    init(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+var point = Point(1, 2);
+
+if (point.x == 1 and point.y == 2) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- LLAMAR A LA CLASE DEVUELVE LA INSTANCIA AUNQUE INIT TERMINE CON RETURN ---";
+class Account {
+    init(balance) {
+        this.balance = 0;
+        if (balance < 0) return;
+        this.balance = balance;
+    }
+}
+var account = Account(-5);
+var otherAccount = Account(100);
+
+if (account.balance == 0 and otherAccount.balance == 100) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- LLAMAR A INIT A MANO LA VUELVE A INICIALIZAR Y DEVUELVE LA MISMA INSTANCIA ---";
+class Size {
+    init(width) {
+        this.width = width;
+    }
+}
+var size = Size(1);
+var sameSize = size.init(5);
+
+if (sameSize == size and size.width == 5) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN METODO QUE DEVUELVE THIS SE PUEDE ENCADENAR ---";
+class Car {
+    init() {
+        this.speed = 0;
+    }
+    accelerate(amount) {
+        this.speed = this.speed + amount;
+        return this;
+    }
+}
+var car = Car();
+
+if (car.accelerate(10).accelerate(20).speed == 30) {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN CAMPO TAPA A UN METODO CON EL MISMO NOMBRE ---";
+fun honk() {
+    return "del campo";
+}
+class Horn {
+    sound() {
+        return "del metodo";
+    }
+}
+var horn = Horn();
+var before = horn.sound();
+horn.sound = honk;
+
+if (before == "del metodo" and horn.sound() == "del campo") {
+    print "OK";
+} else {
+    print "ERROR";
+}
+
+print "--- UN METODO DE OTRA INSTANCIA GUARDADO EN UN CAMPO SIGUE USANDO SU INSTANCIA ---";
+class Cat {
+    meow() {
+        return this.name + " maulla";
+    }
+}
+class Kid {}
+var cat = Cat();
+cat.name = "Michi";
+var kid = Kid();
+kid.name = "Juan";
+kid.makeNoise = cat.meow;
+
+if (kid.makeNoise() == "Michi maulla") {
+    print "OK";
+} else {
+    print "ERROR";
+}
