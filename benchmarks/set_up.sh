@@ -32,3 +32,8 @@ git checkout -
 
 # 6. glox actual -> tree-walk y bytecode
 go build -o glox ./cmd
+
+# 7. programas en Go nativo
+go build -o benchmarks/go/fibonacci/fibonacci ./benchmarks/go/fibonacci
+go build -o benchmarks/go/minsky/minsky ./benchmarks/go/minsky
+go build -o benchmarks/go/fizzbuzz/fizzbuzz ./benchmarks/go/fizzbuzz

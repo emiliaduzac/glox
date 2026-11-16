@@ -53,3 +53,6 @@ docs/reviews/
 benchmarks/otros
 glox
 glox-parcial
+benchmarks/go/*/fibonacci
+benchmarks/go/*/minsky
+benchmarks/go/*/fizzbuzz

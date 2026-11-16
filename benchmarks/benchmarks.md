@@ -83,7 +83,7 @@ Hacemos cuatro comparaciones:
 Usamos tres programas, cada uno enfocado en una parte distinta del lenguaje. `fibonacci` y `minsky` corren en las 7 implementaciones, así que solo usan lo que todas soportan: no usan `%`, `break` ni `continue`, ni clases.
 
 - `fibonacci.lox`: fibonacci recursivo (n = 30). Pone a prueba llamadas a funciones y recursión.
-- `minsky.lox`: simula una máquina de registros con un `while` (n = <n>). Pone a prueba ciclos, asignaciones y condicionales.
+- `minsky.lox`: simula una máquina de registros con un `while` (n = 200000). Pone a prueba ciclos, asignaciones y condicionales.
 - `fizzbuzz.lox`: FizzBuzz acumulando en un string (n = <n>). Pone a prueba ciclos, condicionales, el operador `%` y concatenación de strings.
 
 El operador `%` es una extensión de la cátedra: lo tienen glox, plox y ploxb, pero no existe en el Lox del libro, así que clox y jlox no lo soportan. Por eso `fizzbuzz` solo se compara entre las implementaciones que lo tienen.
