@@ -335,6 +335,22 @@ Un detalle importante es que cada subclase abre su propio scope porque todas usa
 
 Una diferencia con el libro es que nosotros en glox un error de sintaxis corta la función con return err, así que el scope nunca se cerraría haceindo que lo que venga después en el programa se compilaría como local y saldrían errores falsos, por ejemplo un var a; var a; diría que la variable ya existe. Es el mismo problema que tuvimos con la pila de clases en this y lo resolvemos igual que ahi es decir con un defer.
 
+#### Super
+
+Super aparece por la necesidad de querer llamar al método de la superclase aunque la clase hija lo haya pisado. Siempre viene acompañado con el punto y el nombre del método entonces nos fijamos si están, y si falta entonces ahí es un error de sintaxis y devolvemos el error.
+
+**Acceder a un método de la superclase**
+
+El compilador carga this, super y emite el OP_GET_SUPER con el nombre del método porque la vm lo necesita para saber sobre qué instancia, en qué superclase buscar y qué método. Como super es la variable local que guardamos en cada subclase, se resuelve con la superclase de la clase donde está escrito y los dos se cargan como cualquier variable, así que si el super está en una función adentro de un método llegan como upvalues con lo que ya teníamos de closures. Sin paréntesis termina dando el método atado a la instancia como un bound method.
+
+Usar super afuera de una clase o en una clase que no hereda de nadie es un error de compilación, y para saber si la clase tiene superclase la pila de clases lo guarda. Lo levantamos con report porque el código está bien escrito y solo rompe una regla del lenguaje, así que se sigue compilando y se muestran los demás errores.
+
+**Llamar a un método de la superclase**
+
+Si después del nombre viene un ( el método se llama en el momento, así que igual que con el invoke compilamos los argumentos y emitimos OP_SUPER_INVOKE con el nombre y la cantidad de argumentos en vez de armar un bound method que se usaría una sola vez. La superclase se carga después de los argumentos así queda arriba de todo, que es donde la espera la vm para sacarla.
+
+Una diferencia con el libro es que en C la función que compila esto se llama super_ porque si no choca con un nombre del lenguaje, y en Go no tenemos esta situación. Otra es que el libro tiene que inventar el token super porque en C un token apunta al código fuente, y nosotros como el lexema ya es un string lo armamos una sola vez y lo reusamos.
+
 ## Tests
 
 > Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:

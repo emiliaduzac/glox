@@ -244,6 +244,17 @@ Un caso borde que se detecta en runtime es el de que una superclase en sí es un
 
 El libro habla de un copy-down inheritance que en si es que copia de una sola vez cuando se declara la clase, entonces su método heredado se encuentra con una sola búsqueda como si fuera propio, esa es la motivación de hacerlo así, frente a por ejemplo tener que ir subiendo por todas las superclases hasta encontrarlo. Y el detalle es que se pude copiar asi tambien y usar esto porque en lox las clases no cambian depsues de declararse.
 
+#### Super
+
+En la vm super se resuelve con las intrucciones OP_GET_SUPER cuando se lee el metodo y con OP_SUPER_INVOKE cuando se la llama en el momento, pero para las dos el compilador dela la sueprclase arriba en el stack.
+
+**Acceder a un método de la superclase**
+
+En glox el OP_GET_SUPER lee el nombre del método de las constantes, saca la superclase del stack con pop y se la pasa a bindMethod, que es el mismo que usa el get, y con eso busca el método en esa superclase, arma el bound method con la instancia que quedó en el tope y la reemplaza. Como busca en la superclase y no en la clase de la instancia se saltea el que pisó la clase hija y llega al de la superclase, y como la herencia es por copia también encuentra los que la superclase heredó de más arriba. Aca no mira los campos primero porque no se heredan y con super siempre se busca un método, y como reusamos bindMethod, si el método no existe da el mismo error.
+
+**Llamar a un método de la superclase**
+
+Aca pasaba lo mismo que antes del invoke, la vm armaba un bound method solo para llamarlo y tirarlo, así que el libro agrega el OP_SUPER_INVOKE que hace las dos cosas juntas. En glox lo que ahcemos es leer el nombre y la cantidad de argumentos, sacar la superclase con pop y lo que queda es justo una llamada a método común, con la instancia en el slot 0 y los argumentos después, así que se la pasamos a invokeFromClass, el mismo que usa el invoke, y la aridad, el stack overflow y demás chequeos siguen siendo los mismos de ahi. Como se abre un frame nuevo después tenemos que actualizar el frame. El libro dice que acá tiene todavía más sentido que en el invoke común porque con super nunca hay que mirar los campos.
 
 ### Diferencias con el libro
 
