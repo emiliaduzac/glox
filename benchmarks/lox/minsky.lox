@@ -29,9 +29,4 @@ fun minsky_even(n) {
   return r0;
 }
 
-var start = clock();
-var result = minsky_even(20000);
-var end = clock();
-
-print result;
-print end - start;
+print minsky_even(200000);

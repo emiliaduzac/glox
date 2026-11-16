@@ -12,9 +12,5 @@ fun fizzbuzz(n) {
   return res;
 }
 
-var start = clock();
-var result = fizzbuzz(5000);
-var end = clock();
-
+fizzbuzz(100000);
 print "done";
-print end - start;
