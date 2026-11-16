@@ -36,16 +36,16 @@ func clockNative(_ []any) any {
 
 var input = bufio.NewScanner(os.Stdin)
 
-func inputNative(value []any) any {
-	fmt.Print(utils.Stringify(value[0]))
+func inputNative(args []any) any {
+	fmt.Print(utils.Stringify(args[0]))
 	if !input.Scan() {
 		return nil
 	}
 	return input.Text()
 }
 
-func strNative(value []any) any {
-	return utils.Stringify(value[0])
+func strNative(args []any) any {
+	return utils.Stringify(args[0])
 }
 
 func numNative(args []any) any {

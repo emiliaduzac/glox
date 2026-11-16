@@ -34,7 +34,7 @@ if (num(str(42)) == 42) {
 }
 
 print "--- INPUT DEVUELVE NIL SI NO HAY ENTRADA ---";
-if (input() == nil) {
+if (input("ingrese") == nil) {
     print "OK";
 } else {
     print "ERROR";
