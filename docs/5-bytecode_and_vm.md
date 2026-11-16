@@ -290,6 +290,14 @@ Otra diferencia de como trabajan es que la versión del libro usa la técnica **
 
 Según la [documentación de Go](https://go.dev/doc/gc-guide), esto reduce las pausas, pero a cambio suele tener menor rendimiento total que uno stop-the-world, porque el garbage collector usa CPU mientras el programa corre. Aun así, la misma documentación aclara que menos pausas no implica necesariamente menos rendimiento, y que el garbage collector de Go fue mejorando con el tiempo en los dos aspectos. En los benchmarks no lo medimos por separado, así que no sabemos cuánto influye en la diferencia de velocidad con clox. Creemos que en programas cortos como los que ejecutamos el impacto es bajo, porque reservan poca memoria y el garbage collector tiene poco trabajo.
 
+## Optimizaciones
+
+El libro aplica algunas optimizaciones que nosotros no aplicamos en glox:
+
+- **Búsqueda en la tabla de hash**: el libro mide su clox y se da cuenta de que su forma de calcular los hashes (usando `%`) era muy lenta, por lo que la mejora. En glox no aplica, porque usamos el `map` de Go y eso lo resuelve Go internamente.
+
+- En C un valor no guarda su tipo, por eso clox necesita agregarlo a mano, inicialmente con el truco de _tagged union_. Pero esa versión reserva más bits de los que se necesitan: cada valor ocupa 16 bytes, aunque para el tipo alcancen menos bits. Para optimizarlo, el libro usa **NaN boxing**. En Go no aplicamos ninguno de los dos: guardamos todo como `any`, que también reserva más memoria de la necesaria. Para optimizarlo tendríamos que dejar de usar `any`, lo que implicaría cambiar cómo se representan los valores en toda la VM y trabajar a más bajo nivel. Consideramos que ese cambio no se justificaba para el alcance de este trabajo, y preferimos mantener la simplicidad (y otros beneficios) que nos da apoyarnos en Go.
+
 ## Tests
 
 Para la VM implementamos una serie de tests unitarios, validando que la ejecución de cada instrucción tenga su efecto esperado. Para correrlos:
