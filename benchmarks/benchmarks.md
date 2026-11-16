@@ -168,10 +168,36 @@ Las implementaciones en Python fueron las más lentas por mucho, entre 68x y 122
 
 **Análisis**
 
-En `fibonacci` y `minsky`, la versión con bytecode es entre 1.61x y 1.96x más rápida que el tree-walk de la entrega 1, lo que confirma la hipótesis. Como contamos en la VM, esta recorre una secuencia plana de instrucciones en lugar de recorrer el árbol de forma recursiva y accede a las variables locales por su posición en el stack en vez de buscarlas en el heap. La excepción es `fizzbuzz`, donde la entrega 1 fue más rápida, como mencionamos en la comparación anterior.
+En `fibonacci` y `minsky`, la versión con bytecode es entre 1.61x y 1.96x más rápida que el tree-walk de la entrega 1, lo que confirma la hipótesis. Como contamos en la VM, esta recorre una secuencia plana de instrucciones en lugar de recorrer el árbol de forma recursiva y accede a las variables locales por su posición en el stack en vez de buscarlas por nombre en un `Environment`. La excepción es `fizzbuzz`, donde la entrega 1 fue más rápida, como mencionamos en la comparación anterior.
 
 Otro detalle a destacar es que, en los 3 programas, la versión VM usa menos memoria (entre 1.26x y 1.90x menos), incluso en `fizzbuzz`, donde es más lenta.
 
 Por último, se mantiene la conclusión de la entrega 1: `go run` suma un costo fijo, el de **compilar glox**. En este caso fueron 41.6 ms, dentro de los 40 a 50 ms que medimos en la entrega anterior.
 
 ### Lox contra otros lenguajes
+
+**Go**
+
+| | `fibonacci` (ms) | `minsky` (ms) | `fizzbuzz` (ms) |
+|---|---|---|---|
+| Go nativo | **3.58** ± 2.10 | **1.64** ± 0.20 | **255.21** ± 12.82 |
+| golox | 202.09 (56.4x) | 29.09 (17.7x) | — |
+| glox | 253.83 (70.9x) | 32.72 (20.0x) | 341.11 (1.34x) |
+
+**Python**
+
+| | `fibonacci` (ms) | `minsky` (ms) | `fizzbuzz` (ms) |
+|---|---|---|---|
+| Python nativo | **70.87** ± 19.32 | **19.21** ± 1.51 | **20.83** ± 0.44 |
+| ploxb | 17300.09 (244.1x) | 2788.06 (145.1x) | 1893.95 (90.9x) |
+| plox | 27720.15 (391.1x) | 3992.82 (207.9x) | 2701.40 (129.7x) |
+
+**Análisis**
+
+Como esperábamos, el lenguaje nativo es más rápido en los dos casos y por una gran diferencia que se nota mucho más en Python: las implementaciones de Lox en Go son entre 18x y 71x más lentas que Go en `fibonacci` y `minsky`, mientras que en Python son entre 90x y 391x más lentas.
+
+Además, Python nativo le gana a glox en los tres programas. Es decir, incluso un intérprete hecho en un lenguaje compilado como Go pierde contra un lenguaje interpretado. Esto tiene sentido, ya que CPython también compila el programa a bytecode y lo ejecuta en una VM, como glox, pero está hecho en C y optimizado y sostenido constantemente.
+
+El caso raro es `fizzbuzz`: Go nativo es solo 1.34x más rápido que glox, y Python nativo es 12x más rápido que Go, aunque los dos programas hacen lo mismo. Algo que pensamos es que en Go puede estar afectando que los strings son inmutables, entonces cada concatenación genera una copia.
+
+## Conclusiones
