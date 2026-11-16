@@ -72,17 +72,21 @@ Para asegurarnos de que esto se cumpla, cuando termina el script la VM verifica 
 
 ## Manejo de errores
 
-Acá llegó un gran cambio frente al tree-walk de la primera parte: al detectar un error, cortaba y mostraba solo ese. Si había varios, el programador corregía el primero, volvía a correr y recién ahí veía el siguiente, que ya estaba desde antes. En esta segunda parte la idea es seguir compilando después de un error, para mostrarlos todos juntos y poder corregirlos de una vez.
+En nuestra versión del tree walking interpreter, al detectar un error cortábamos la ejecución y mostrabamos directamente ese. Si habían varios errores en el programa, el programador veía solo el primero, y al corregirlo y correr nuevamente, se eneteraba del siguiente, aunque este estuviera de antes.
+
+En esta segunda parte, la idea es mejorar esto: seguir compilando aún después de un error para mostrarlos todos juntos y permitirle al programador corregirlos todos de una vez.
 
 Seguir después de un error trae un detalle: el compilador queda parado en una línea rota, y si sigue leyendo desde ahí, levantaría errores falsos. Para eso está la **sincronización**: avanza hasta que termina el statement (un `;`) o empieza uno nuevo (por ejemplo, un `var` o un `print`), y recién desde ahí sigue compilando.
 
-Al principio pensamos en aprovechar algo típico de Go: cortar el statement con el error y devolverlo hacia arriba. El problema apareció con las variables locales: al sincronizar, lo hacíamos dos veces, una dentro del scope y otra al salir, y eso generaba un error falso de que faltaba un `}`. Ahí decidimos pegarnos más al libro con la idea del _flag_ de modo pánico, pero en vez de mostrar el error en el momento, lo guardamos. El flag se prende cuando hay un error, mientras está prendido los errores nuevos se ignoran, y se apaga cuando se sincroniza y arranca un statement nuevo. Así cada error aparece una sola vez y donde corresponde.
+Al principio pensamos en aprovechar algo típico de Go: cortar el statement con el error y devolverlo hacia arriba, donde se acumulaban todos y mostraban al final. El problema apareció con las variables locales: al sincronizar, lo hacíamos dos veces: una dentro del scope y otra al salir, y eso generaba un error falso de que faltaba un `}`. Ahí decidimos pegarnos más al libro con la idea del _flag_ de modo pánico, pero en vez de mostrar el error en el momento, lo guardamos. El flag se prende cuando hay un error y mientras está prendido los errores nuevos se ignoran. Una vez que se sinctoniza, se apaga el flag y arranca un statement nuevo. Así cada error aparece una sola vez y donde corresponde.
 
 Otra diferencia con el libro es que, en C, reportar un error no corta la función: sigue leyendo tokens. En Go, en cambio, devolver un error corta la función en ese punto. Por eso tenemos dos caminos:
-  - cuando el código está mal escrito y no se puede seguir leyendo (por ejemplo, falta un `)`), devolvemos el error y se sincroniza.
-  - cuando el código está bien escrito pero rompe una regla del lenguaje (como redeclarar una variable local en el mismo scope), lo reportamos con `report` y seguimos compilando normalmente.
+  - cuando el código está mal escrito y no se puede seguir leyendo (por ejemplo, falta un `)`), **devolvemos el error y se sincroniza.**
+  - cuando el código está bien escrito pero rompe una regla del lenguaje (como redeclarar una variable local en el mismo scope), **lo reportamos con `report` y seguimos compilando normalmente.**
 
 Al terminar de compilar, si hubieron errores, se devuelven todos juntos en un solo error. Además, en ese caso no se devuelve el chunk: el bytecode generado puede estar incompleto (por ejemplo, con saltos sin completar), así que la VM no llega a ejecutar nada.
+
+Vale la pena mencionar que este cambio aplica solamente al compiler, no al scanner.
 
 ## Variables globales
 
