@@ -32,6 +32,7 @@ Como la implementación será desarrollada en etapas, decidimos separar la docum
 - [Compiler](docs/6-compiler.md)
 - [Extras propios](docs/7-extra.md)
 - [Benchmarks](docs/z-benchmarks.md)
+- [Uso Real](real-use/uso_real.md)
 
 ## Cómo correr lox
 
@@ -123,5 +124,5 @@ En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERRO
 - [X] Clases
 - [ ] Herencia
 - [x] Extra propio
-- [ ] Uso real del lenguaje
+- [X] Uso real del lenguaje
 - [ ] Benchmarks contra la entrega parcial, mejorar la que teniamos y documentación final
