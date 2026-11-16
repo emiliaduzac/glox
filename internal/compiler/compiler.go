@@ -328,6 +328,21 @@ func (c *Compiler) classDeclaration() error {
 	c.currentClass = &classCompiler{enclosing: c.currentClass}
 	defer func() { c.currentClass = c.currentClass.enclosing }()
 
+	hasSuperclass := false
+	if c.cursor.Match(token.LESS) {
+		if err := c.cursor.Consume(token.IDENTIFIER, "superclass name"); err != nil {
+			return err
+		}
+		if err := c.variable(false); err != nil {
+			return err
+		}
+		if err := c.namedVariable(className, false); err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_INHERIT))
+		hasSuperclass = true
+	}
+
 	if err := c.namedVariable(className, false); err != nil {
 		return err
 	}
@@ -343,6 +358,9 @@ func (c *Compiler) classDeclaration() error {
 		return err
 	}
 	c.emit(byte(chunk.OP_POP))
+	if hasSuperclass {
+		c.emit(byte(chunk.OP_POP))
+	}
 	return nil
 }
 

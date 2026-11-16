@@ -2407,3 +2407,36 @@ func TestCompileThisOutsideClass(t *testing.T) {
 		utils.AssertErrorMessage(t, errs[1], "can't use 'this' outside of a class")
 	})
 }
+
+func TestCompileSuperclass(t *testing.T) {
+	t.Run("La herencia se compila con OP_INHERIT antes de los métodos", func(t *testing.T) {
+		chunk := compileSource(t, "class A {} class B < A { m() {} }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_CLASS), 1,
+			byte(c.OP_DEFINE_GLOBAL), 1,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 1,
+			byte(c.OP_INHERIT),
+			byte(c.OP_GET_GLOBAL), 1,
+			byte(c.OP_CLOSURE), 3,
+			byte(c.OP_METHOD), 2,
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[0], "A")
+		utils.AssertValue(t, chunk.Constants[1], "B")
+	})
+
+	t.Run("Error si después de < no viene el nombre de la superclase", func(t *testing.T) {
+		err := compileSourceError(t, "class A {} class B < (A) {}")
+
+		utils.AssertErrorMessage(t, err, "expected superclass name")
+	})
+}
