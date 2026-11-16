@@ -2482,3 +2482,81 @@ func TestCompileSuperclass(t *testing.T) {
 		utils.AssertErrorMessage(t, err, "a class can't inherit from itself")
 	})
 }
+
+func TestCompileSuper(t *testing.T) {
+	t.Run("super dentro de un método emite OP_GET_SUPER", func(t *testing.T) {
+		chunk := compileSource(t, "class A {} class B < A { m() { print super.n; } }")
+
+		method := chunk.Constants[3].(*c.Function)
+		assertBytes(t, &method.Chunk,
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_GET_UPVALUE), 0,
+			byte(c.OP_GET_SUPER), 0,
+			byte(c.OP_PRINT),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, method.Chunk.Constants[0], "n")
+	})
+
+	t.Run("super se resuelve desde una función dentro de un método", func(t *testing.T) {
+		chunk := compileSource(t, "class A {} class B < A { m() { fun f() { super.m; } } }")
+
+		method := chunk.Constants[3].(*c.Function)
+		assertBytes(t, &method.Chunk,
+			byte(c.OP_CLOSURE), 0, 1, 0, 0, 0,
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		function := method.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &function.Chunk,
+			byte(c.OP_GET_UPVALUE), 0,
+			byte(c.OP_GET_UPVALUE), 1,
+			byte(c.OP_GET_SUPER), 0,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Una subclase cuyo método usa super la saca con OP_CLOSE_UPVALUE", func(t *testing.T) {
+		chunk := compileSource(t, "class A {} class B < A { m() { super.m; } }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_CLASS), 1,
+			byte(c.OP_DEFINE_GLOBAL), 1,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 1,
+			byte(c.OP_INHERIT),
+			byte(c.OP_GET_GLOBAL), 1,
+			byte(c.OP_CLOSURE), 3, 1, 1,
+			byte(c.OP_METHOD), 2,
+			byte(c.OP_POP),
+			byte(c.OP_CLOSE_UPVALUE),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Errores de sintaxis en super", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+			errMsg string
+		}{
+			{"sin punto", "class A {} class B < A { m() { super; } }", "expected '.' after 'super'"},
+			{"sin nombre del método", "class A {} class B < A { m() { super.; } }", "expected superclass method name"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, test.errMsg)
+			})
+		}
+	})
+}

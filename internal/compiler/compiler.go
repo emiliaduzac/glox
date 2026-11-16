@@ -45,7 +45,10 @@ type classCompiler struct {
 	enclosing *classCompiler
 }
 
-var superToken = token.Token{TokenType: token.SUPER, Lexeme: "super"}
+var (
+	thisToken  = token.Token{TokenType: token.THIS, Lexeme: "this"}
+	superToken = token.Token{TokenType: token.SUPER, Lexeme: "super"}
+)
 
 type Compiler struct {
 	*parserState
@@ -72,7 +75,7 @@ func newFunctionCompiler(state *parserState, enclosing *Compiler, funcType Funct
 	}
 	slotZero := Local{Depth: 0}
 	if funcType != TYPE_FUNCTION {
-		slotZero.Name = token.Token{TokenType: token.THIS, Lexeme: "this"}
+		slotZero.Name = thisToken
 	}
 	return &Compiler{
 		parserState: state,
@@ -991,6 +994,28 @@ func (c *Compiler) this(_ bool) error {
 		return nil
 	}
 	return c.variable(false)
+}
+
+func (c *Compiler) super(_ bool) error {
+	if err := c.cursor.Consume(token.DOT, "'.' after 'super'"); err != nil {
+		return err
+	}
+	if err := c.cursor.Consume(token.IDENTIFIER, "superclass method name"); err != nil {
+		return err
+	}
+	name, err := c.identifierConstant(c.cursor.Previous())
+	if err != nil {
+		return err
+	}
+
+	if err := c.namedVariable(thisToken, false); err != nil {
+		return err
+	}
+	if err := c.namedVariable(superToken, false); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_GET_SUPER), name)
+	return nil
 }
 
 func (c *Compiler) logicAnd(_ bool) error {

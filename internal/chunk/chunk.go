@@ -52,6 +52,7 @@ const (
 
 	OP_GET_PROPERTY
 	OP_SET_PROPERTY
+	OP_GET_SUPER
 
 	OP_METHOD
 )
@@ -100,6 +101,7 @@ var opCodeNames = map[OpCode]string{
 
 	OP_GET_PROPERTY: "OP_GET_PROPERTY",
 	OP_SET_PROPERTY: "OP_SET_PROPERTY",
+	OP_GET_SUPER:    "OP_GET_SUPER",
 
 	OP_METHOD: "OP_METHOD",
 }
@@ -147,7 +149,7 @@ func (c *Chunk) Disassemble(name string) {
 		fmt.Printf("%04d| %4d ", i, c.Lines[i])
 
 		switch op {
-		case OP_CONSTANT, OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL, OP_CLASS, OP_GET_PROPERTY, OP_SET_PROPERTY, OP_METHOD:
+		case OP_CONSTANT, OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL, OP_CLASS, OP_GET_PROPERTY, OP_SET_PROPERTY, OP_GET_SUPER, OP_METHOD:
 			// Instrucciones con operandos: constantes
 			constantIndex := c.Bytes[i+1]
 			fmt.Printf("%s<%s>\n", op, c.constantString(constantIndex))
