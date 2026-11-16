@@ -2560,3 +2560,39 @@ func TestCompileSuper(t *testing.T) {
 		}
 	})
 }
+
+func TestCompileSuperOutsideSubclass(t *testing.T) {
+	t.Run("Error si se usa super afuera de una clase", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"en el script", "super.m;"},
+			{"en una función", "fun f() { super.m; }"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, "can't use 'super' outside of a class")
+			})
+		}
+	})
+
+	t.Run("Error si se usa super en una clase sin superclase", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"en un método", "class A { m() { super.m; } }"},
+			{"en una clase declarada adentro de una subclase", "class A {} class B < A { m() { class C { n() { super.m; } } } }"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, "can't use 'super' in a class with no superclass")
+			})
+		}
+	})
+}
