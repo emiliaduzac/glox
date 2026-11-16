@@ -208,6 +208,10 @@ Para llamarlo se agrega un caso más en `callValue` que lo que hace ver si lo qu
 
 Acá hay una diferencia con el libro porque en este se tiene que encargar de liberar la memoria del bound method a mano, pero pedirle al garbage collector que deje vivos al receptor y al closure, y demás particularidades, que nosotros de eso no nos encargamos explícitamente como ya hemos nombrado en diferentes partes, pero aca particualrmente seguimos usando el garbage collector de Go y el resultado es el mismo, que mientras siga existiendo el bound method la instancia no se libera.
 
+#### This
+
+Al agregar this la verad que en la vm el cambio es chico porque al llamar a un bound method antes de abrir el frame, pisamos el lugar del stack donde estaba el bound method con el receptor y como ese lugar es el slot 0 del frame nuevo, el método arranca con la instancia ahí y los argumentos después que es lo que el compilador espera para leer `this` como una local. 
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.

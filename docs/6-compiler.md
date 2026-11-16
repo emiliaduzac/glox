@@ -287,6 +287,16 @@ Además para agregarle métodos a la clase la vm necesita tener la clase a mano 
 
 Un detalle sobre métodos es que Lox no tiene declaración de campos para la clase así que todo lo que está entre {} es un método, así que si aparece otra cosa es un error. Se termina compilando con la misma función que para la fun así que termina quedando como un closure y puede usar las variables de afuera.
 
+### This
+
+Con los métodos ya andando faltaba poder usar `this` adentro y en el libro lo resuelve aprovechando el slot 0 de cada función. En una función común ahí queda la función que se está ejecutando pero en un método eso no hace falta, así que la vm pone en ese lugar la instancia sobre la que se llamó y el compilador le pone de nombre `this` a ese slot. Entonces `this` termina siendo una variable local más que se compila con `OP_GET_LOCAL 0`, y como se compila sin poder asignarse, surge que algo como `this = 1` da error igual que pasa con `a + b.c = 3`. Para saber cuándo hacer esto agregamos un tipo de función nuevo, `TYPE_METHOD` que es el que usa `method()` al compilar cada método.
+
+El slot 0 se llama `this` en todo lo que no sea una función común y esto tiene sentido cuando hay una función adentro de un método que usa `this` porque ahí se espera que sea el del método. Como la función no tiene uno el compilador no lo encuentra y lo sigue buscando afuera hasta encontrarlo en el método que lo termina encontrando como un upvalue con lo mismo que ya teníamos de [Closures](#closures). Si la función también tuviera su propio `this`, taparía al del método y se rompería ese caso.
+
+Siguiendo la idea del libro tenemos el error de compilacion cuando se usa this fuera de una clase, y un detalle con eso es que fijarse si estamos en un método no alcanza por lo de la función adentro de un método, entonces lleva una pila con las clases que se están compilando donde cada una apunta a la de afuera, el libro dice que no es comun pero Lox deja declarar una clase adentro de un método de otra. Y bueno la idea es que si aparece un `this` con la pila vacía, es un error.
+
+Una diferencia con el libro es que guarda la clase actual en una variable global y nosotros en `parserState` que es lo que ya comparten por puntero todos los compiladores (ver [Funciones](#funciones)), así un método que tiene su propio compilador ve la misma clase que la declaración de afuera. Pero la diferencia más grande es cuándo se saca la clase de la pila porque el libro lo hace al final de la declaración y le funciona, porque en C cuando hay un error de sintaxis lo reporta y la función sigue de largo hasta el final. En glox un error de sintaxis corta la función con `return err`, así que con una clase con error nunca se llegaría a esa última línea entoences la clase quedaría en la pila y un `this` suelto más abajo ya no daría error. Por eso la sacamos con un `defer`, que se ejecuta siempre al salir de la función sea como sea y así el resultado es el mismo que en el libro aunque lo hayamos hecho de otra forma.
+
 ## Tests
 
 > Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:
