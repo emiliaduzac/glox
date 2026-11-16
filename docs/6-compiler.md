@@ -315,6 +315,16 @@ En el compilador lo del invoke está en `dot()` porque después de leer el nombr
 
 Un detalle es que solo se optimiza cuando el `(` viene justo después del nombre, entonces `(a.m)()` sigue compilando como antes porque los paréntesis cierran el `a.m` antes de la llamada y lo mismo con `var m = a.m; m();`, que siguen pasando por el bound method. Y bueno como `this` es una local más, un `this.m()` adentro de un método también usa el `OP_INVOKE`.
 
+### Herencia
+
+En el compilador lo de la herencia básicamente es ver que después venga un < para indicarlo y después el nombre de la superclase. Entonces el nombre de la superclase se lee como una variable más, así puede ser global, local o un upvalue y el compilador no tiene que saber dónde está, se carga la subclase y se emite el OP_INHERIT para avisarle a la vm.
+
+Un detalle importante acá es el orden porque el OP_INHERIT se emite antes de compilar los métodos de la subclase y por esto es que cuando la vm copia los métodos de la superclase a la subclase todavía la subclase no tiene ninguno propio que después lo agrega con el OP_METHOD siguiente, esto lo explicamos más en la parte de la vm con un ejemplo y todo.
+
+Al compilador le toca detectar errores siguiendo un poco la idea del libro entonces por ejemplo nos fijamos que una clase no puede heredar de ella misma, básicamente miramos los lexemas de una y otra y como es un string comparamos y si es el caso levantamos el error con report porque en sí el código está bien escrito, pero el problema es que rompe una regla de lenguaje para Lox, así conseguimos algo que ya hemos explicado en el manejo de errores de poder mostrar también otros errores si es que los hay.
+
+Pero un error que chequeamos y ya es de sintaxis es si no viene el nombre depsues del < por lo que ahi si devolvemos directamente el error. lo que no puede saber el compilador es si realmente es una clase lo indicado como superclase, eso recien lo ve la vm en runtime.
+
 ## Tests
 
 > Los tests unitarios del compilador se pueden ejecutar de la siguiente forma:

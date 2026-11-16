@@ -234,6 +234,17 @@ Un detalle propio de Go es que para saber si el campo existe usamos `valor, ok` 
 
 Una diferencia con el libro es la velocidad porque en el libro esto hace las llamadas a métodos 7,6 veces más rápidas ya que en C crear el bound method es pedir memoria y después liberarla, y en glox de eso se encarga Go así que cuánto mejoramos podemos verlo en [benchmarks](../benchmarks/benchmarks.md).
 
+#### Herencia
+
+Cuando llegamos a herencia la idea principal es asociar conceptos y lo que sabemos de POO, ahora particularmente para nosotros acá la idea es reutilizar métodos tal cual vienen de la superclase o capaz cambiando la implementación particular. Podemos tener un animal que hace ruido como en los test, pero cuando perro hereda de animal para él hacer ruido es ladrar. Con esta idea es que surgen los primeros comportamientos que hemos agregado sobre herencia siguiendo el libro.
+
+Ahora si el compilador le avisa a la vm con el `OP_INHERIT` que una clase hereda de otra, y cuando llega en el tope del stack está la subclase y abajo la superclase, y básicamente lo que hace la vm es copiar todos los métodos de la superclase a la subclase y sacar la subclase del stack. Ahora bien esto es así en el caso feliz digamos pero hay particularidades y casos bordes en todo esto. Por ejemplo que si bien se copian, la idea es que si la subclase o clase hija como queramos decirle, tiene su método definido, este tiene prioridad y debe quedar ese. En el ejemplo es esto de que si bien un animal puede tener implementado el hacer ruido, viene el perro y dice bueno yo soy un animal y mi hacer ruido es ladrar, y básicamente esto en nuestro glox sale por el orden, porque cuando llega el `OP_INHERIT` el perro todavía no tiene ningún método así que se copian todos los del animal, y recién después se agregan los del perro con el `OP_METHOD`, entonces su hacer ruido pisa al que se copió y queda el ladrar.
+
+Un caso borde que se detecta en runtime es el de que una superclase en sí es una variable, así que recién la vm detecta ahí si es una clase y si no lo es levanta el error de que solo se puede heredar de una clase.
+
+El libro habla de un copy-down inheritance que en si es que copia de una sola vez cuando se declara la clase, entonces su método heredado se encuentra con una sola búsqueda como si fuera propio, esa es la motivación de hacerlo así, frente a por ejemplo tener que ir subiendo por todas las superclases hasta encontrarlo. Y el detalle es que se pude copiar asi tambien y usar esto porque en lox las clases no cambian depsues de declararse.
+
+
 ### Diferencias con el libro
 
 1. **Instruction Pointer**: en el libro se utiliza un puntero al siguiente byte del chunk, que avanza con aritmética de punteros. Como Go no la permite, utilizamos un índice, que el libro descarta por ser más lento.
