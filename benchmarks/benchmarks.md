@@ -92,7 +92,7 @@ Usamos tres programas, cada uno enfocado en una parte distinta del lenguaje. `fi
 - `minsky.lox`: simula una máquina de registros con un `while` (n = 200000). Pone a prueba ciclos, asignaciones y condicionales.
 - `fizzbuzz.lox`: FizzBuzz acumulando en un string (n = 100000). Pone a prueba ciclos, condicionales, el operador `%` y concatenación de strings.
 
-El operador `%` es una extensión de la cátedra: lo tienen glox, plox y ploxb, pero no existe en el Lox del libro, así que clox y jlox no lo soportan. Por eso `fizzbuzz` solo se compara entre las implementaciones que lo tienen.
+El operador `%` es una extensión de la cátedra: lo tienen glox, plox y ploxb, pero no existe en el Lox del libro, así que clox, jlox y golox no lo soportan. Por eso `fizzbuzz` solo se compara entre las implementaciones que lo tienen.
 
 ## Hipótesis
 
@@ -145,11 +145,11 @@ Antes de medir, definimos algunas hipótesis que esperamos ver en los resultados
 
 **Análisis**
 
-Tanto en `fibonacci` como en `minsky`, clox fue la más rápida, lo cual era esperado. Otra cosa que destaca es que golox es siempre más rápido que nuestro glox (entre 1.12x y 1.26x), aunque usa un poco más de memoria. Como ambos son bytecode, están hechos en Go y se basan en el mismo libro, la diferencia podría venir de decisiones de implementación, por ejemplo nosotros nos separamos varias veces del libro apoyándonos en utilidades de Go.
+Tanto en `fibonacci` como en `minsky`, clox fue la más rápida (lo cual era esperado). Otra cosa que destaca es que golox es siempre más rápido que nuestro glox (entre 1.12x y 1.26x), aunque usa un poco más de memoria. Como ambos son bytecode, están hechos en Go y se basan en el mismo libro, la diferencia podría venir de decisiones de implementación, por ejemplo nosotros nos separamos varias veces del libro apoyándonos en utilidades de Go.
 
 También se cumple que ploxb es más rápido que plox, igual que glox VM es más rápido que glox TW: el bytecode ayuda a agilizar, tal como anticipamos al implementar [bytecode](../docs/5-bytecode_and_vm.md). La excepción es `fizzbuzz`, donde la entrega 1 es más rápida, lo cual nos sorprendió mucho y no identificamos bien su causa.
 
-Las implementaciones en Python fueron las más lentas por mucho, entre 68x y 122x más lentas que glox. En cuanto a jlox, en `minsky` que es corto, es 3.35x más lento que glox, mientras que en `fibonacci` que es más largo, su mediana (248.5 ms) es prácticamente igual a la de glox. Es algo parecido a lo que vimos en los benchmarks de la entrega 1 con `go run`: un costo fijo que pesa más cuanto más corto es el programa. En ese caso era compilar glox; acá creemos que es el arranque de la JVM. Además, el JIT de Java que optimiza el código mientras corre, puede ser una razón que ayude.
+Las implementaciones en Python fueron las más lentas por mucho, entre 68x y 122x más lentas que glox. En cuanto a jlox, en `minsky` que es corto, es 3.35x más lento que glox, mientras que en `fibonacci` que es más largo, su mediana (248.5 ms) es prácticamente igual a la de glox. Es algo parecido a lo que vimos en los benchmarks de la entrega 1 con `go run`: un costo fijo que pesa más cuanto más corto es el programa. En ese caso era compilar glox pero acá creemos que es el arranque de la JVM. Además, el JIT de Java que optimiza el código mientras corre, puede ser una razón que ayude.
 
 ### Evolución de glox
 
@@ -200,7 +200,7 @@ Como esperábamos, el lenguaje nativo es más rápido en los dos casos y por una
 
 Además, Python nativo le gana a glox en los tres programas. Es decir, incluso un intérprete hecho en un lenguaje compilado como Go pierde contra un lenguaje interpretado. Esto tiene sentido, ya que CPython también compila el programa a bytecode y lo ejecuta en una VM, como glox, pero está hecho en C y optimizado y sostenido constantemente.
 
-El caso raro es `fizzbuzz`: Go nativo es solo 1.34x más rápido que glox, y Python nativo es 12x más rápido que Go, aunque los dos programas hacen lo mismo. Algo que pensamos es que en Go puede estar afectando que los strings son inmutables, entonces cada concatenación genera una copia.
+El caso raro es `fizzbuzz`: Go nativo es solo 1.34x más rápido que glox, y Python nativo es 12x más rápido que Go. Como los programas en Go y en Python son el mismo algoritmo, la diferencia no viene de que uno haga más trabajo que el otro sino que creemos que viene de como cada lenguaje maneja la concatenación de strings.
 
 ## Conclusiones
 
@@ -214,7 +214,8 @@ El caso raro es `fizzbuzz`: Go nativo es solo 1.34x más rápido que glox, y Pyt
 | 4. glox VM y golox están cerca | si | golox es entre 1.12x y 1.26x más rápido, aunque usa un poco más de memoria |
 | 5. `go run` suma un costo fijo | si | 41.6 ms, dentro de los 40 a 50 ms de la entrega 1 |
 
-![fibonacci con todas las implementaciones](graficos/1-fibonacci.png)
+<img src="graficos/1-fibonacci.png" alt="fibonacci con todas las implementaciones" width="600">
+
 > Figura 1: comparación de las 7 implementaciones de Lox + los 2 lenguajes nativos para fibonacci con n = 30.
 
 Podemos ver claramente como los lenguajes nativos son superiores, y también clox contra las demás implementaciones. Como plox y plob son bastante más lentos, la diferencia que se ve entre ellos es enorme pero entre las demás implementaciones no se nota mucho.
@@ -226,8 +227,10 @@ Podemos ver claramente como los lenguajes nativos son superiores, y también clo
 - **jlox depende mucho del largo del programa**: en `minsky` que es corto es 3.35x más lento que glox, y en `fibonacci` que es más largo su mediana es casi igual. Creemos que se debe al arranque de la JVM y a su JIT.
 - **Python nativo le gana a glox en los tres programas** a pesar de ser interpretado: CPython también es una VM de bytecode, pero hecho en C.
 
-![glox vs python vs go](graficos/2-lenguajes.png)
+<img src="graficos/2-lenguajes.png" alt="glox vs python vs go" width="600">
+
 > Figura 2: comparación entre lenguajes y glox. Vemos que `fizzbuzz` genera que Go sea más lento que Python
 
-![evolución de glox a lo largo de la cursada](graficos/3-evolucion.png)
+<img src="graficos/3-evolucion.png" alt="evolución de glox a lo largo de la cursada" width="600">
+
 > Figura 3: comparación entre glox tree walk y glox bytcode para los 3 programas. Marca lo mencionado: glox VM supera a TW en `minsky` y `fibonacci`, pero no en `fizzbuzz`. Graficamente esta diferencia es muy notoria.
