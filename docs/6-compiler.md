@@ -281,7 +281,7 @@ Una diferencia con el libro que ya mencionamos en [Nombres repetidos](#nombres-r
 
 Al agregar los métodos nos aparece el problema de que una clase puede tener varios métodos y eso tiene que llegar a la vm como una serie de instrucciones de bytecode y no como un nodo del árbol que recorría antes el tree-walk. En el libro habla de que para el programador declarar una clase es una sola cosa, pero para nosotros el compilador lo emite como una serie de instrucciones que la vm ejecuta de a una.
 
-Primero tenemos ya el OP_CLASS que crea la clase vacía, después se guarda en su variable y se vuelve a agregar en el stack porque la vm la necesita ahí para agregarle los métodos. Si la clase es global al guardarla con OP_DEFINE_GLOBAL sale del stack y por eso hay que volver a cargarla, y si es local queda en su slot. Después por cada método se emite el OP_CLOSURE que deja el closure del método arriba de la clase en el stack y le sigue el OP_METHOD que lo guarda en la clase con su nombre y lo saca del stack, así la clase sigue quedando arriba para el siguiente. Y al final un OP_POP que saca a la clase, que ya quedó guardada en su variable con sus métodos.
+Primero tenemos ya el OP_CLASS que crea la clase vacía, después se guarda en su variable y se vuelve a agregar en el stack porque la vm la necesita ahí para agregarle los métodos. Si la clase es global al guardarla con OP_DEFINE_GLOBAL sale del stack y por eso hay que volver a cargarla, y si es local queda en su slot. Después por cada método se emite el OP_CLOSURE que deja el closure del método arriba de la clase en el stack y le sigue el OP_METHOD que lo guarda en la clase con su nombre y lo saca del stack, así la clase sigue quedando arriba para el siguiente. Y al final un OP_POP que saca a la clase, que ya quedó guardada en su variable con sus métodos. Si la clase hereda de otra, antes de los métodos se emite además el `OP_INHERIT`, con la carga de la superclase y de la subclase, y al final sale también la variable super como contamos en [Herencia](#herencia).
 
 Además para agregarle métodos a la clase la vm necesita tener la clase a mano pero el compilador no puede saber si es global o local y por ende dónde queda, por eso usa el nombre para volver a cargarla con el namedVariable, que es el mismo que para una variable, y eso genera la instrucción que corresponda según el caso.
 
@@ -313,7 +313,7 @@ Una diferencia con el libro es que para saber si el método se llama `init` en C
 
 En el compilador lo del invoke está en `dot()` porque después de leer el nombre ahora se fija si viene un `(` y si es así compila los argumentos con el mismo `argumentList()` de las llamadas y emite el `OP_INVOKE` con el nombre y la cantidad de argumentos, en vez del `OP_GET_PROPERTY` y el `OP_CALL` que salían antes (para qué sirve lo contamos en la [vm](5-bytecode_and_vm.md#invoke)). Esto va después de fijarse si es una asignación así que `a.x = 1` sigue siendo un set como antes.
 
-Un detalle es que solo se optimiza cuando el `(` viene justo después del nombre, entonces `(a.m)()` sigue compilando como antes porque los paréntesis cierran el `a.m` antes de la llamada y lo mismo con `var m = a.m; m();`, que siguen pasando por el bound method. Y bueno como `this` es una local más, un `this.m()` adentro de un método también usa el `OP_INVOKE`.
+Un detalle es que solo se optimiza cuando el `(` viene justo después del nombre, entonces `(a.m)()` sigue compilando como antes porque los paréntesis cierran el `a.m` antes de la llamada y lo mismo con `var m = a.m; m();`, que siguen pasando por el bound method. Y como `this` es una local más, un `this.m()` adentro de un método también usa el `OP_INVOKE`, y con `super.m()` pasa algo parecido con el `OP_SUPER_INVOKE`, como contamos en [Super](#super).
 
 ### Herencia
 
@@ -369,4 +369,10 @@ python3 real-tests/script.py "go run ./cmd --vm" 6-classes
 
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm" 7-methods
+```
+
+> Para la herencia y super agregamos los tests ([9-inheritance](../real-tests/9-inheritance.lox)), que también corren solo con la VM.
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm" 9-inheritance
 ```
