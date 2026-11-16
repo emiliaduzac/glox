@@ -65,17 +65,16 @@ class ListadoAlumnos {
         var actual = this.primero;
         var puesto = 1;
         while (actual != nil) {
-            var medalla = "";
+            var medalla = "  ";
             if (puesto == 1) {
-                var medalla = "🥇";
+                medalla = "🥇";
             }
             if (puesto == 2) {
-                var medalla = "🥈";
+                medalla = "🥈";
             }
             if (puesto == 3) {
-                var medalla = "🥉";
+                medalla = "🥉";
             }
-
             print medalla + str(puesto) + ". " + actual.dato.nombre + ": " + str(actual.dato.nota);
             actual = actual.proximo;
             puesto = puesto + 1;
@@ -144,7 +143,7 @@ print " ";
 if (top5.estaVacia()) {
     print "No se ingresaron alumnos";
 } else {
-    print "-- TOP 5 ALUMNOS DE GFIUBA: ";
+    print "-- TOP 5 ALUMNOS DE GFIUBA: --";
     top5.imprimir();
     print " ";
 

@@ -44,7 +44,7 @@ Para esto, implementamos las siguientes clases, basandonos en la implementación
 - `Nodo`: es un nodo de una lista enlazada, solo que en su `dato` se almacena un `Alumno`
 - `ListadoAlumnos`: lista enlazada, tal cual en el caso de uso 1.
 
-Los métodos del `ListadoAlumnos` son los mismos que los de la `Lista`, solo que tuvimos que copiarlos para poder mantener archivos separados (en glox aún no soportamos importar código de otro archivo). A su vez, adaptamos el algoritmo de ordenamiento `bubbleSort` para que use las notas de los alumnos (antes usaba el `dato` de un nodo, que debía ser un número para ordenarlo), y también para que ordene en el orden inverso, ya que nos interesan las mejores notas.
+Los métodos del `ListadoAlumnos` son los mismos que los de la `Lista`, solo que tuvimos que copiarlos para poder mantener archivos separados (en glox aún no soportamos importar código de otro archivo). A su vez, adaptamos el algoritmo de ordenamiento `bubbleSort` para que use las notas de los alumnos (antes usaba el `dato` de un nodo, que debía ser un número para ordenarlo), y también para que ordene en el orden inverso, ya que nos interesan las mejores notas. Este algoritmo, en caso de empate, se queda con el último elemento.
 
 Por último, el programa usa las otras funciones nativas que agregamos: `str` para imprimir las notas númericas, y `num` para convertir el ingreso del usuario a una nota numérica. Además, hacemos uso de los extras agregados `break` y `continue`, que nos facilitan el control de flujo en el ciclo principal del programa. Podemos seguir pidiendo notas cuando un ingreso es inválido o dejar de pedir ingresos cuando el usuario quiere finalizar.
 
@@ -55,3 +55,7 @@ go run ./cmd --vm ./real-use/gfiuba_system.lox
 ```
 
 Todo esto puede encontrarse en [`gfiuba_system.lox`](gfiuba_system.lox)
+
+**Ejemplo de uso**
+
+<img src="ejemplo-uso-gfiuba.png" alt="ejemplo de uso del sistema gfiuba" width="600">
