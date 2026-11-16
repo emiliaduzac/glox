@@ -3,6 +3,7 @@ package virtualmachine
 import (
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"os"
 	"sort"
@@ -309,6 +310,11 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 				return err
 			}
 			vm.push(newClass(name))
+
+		case c.OP_INHERIT:
+			if err := vm.inherit(); err != nil {
+				return err
+			}
 
 		case c.OP_METHOD:
 			name, err := vm.readString()
@@ -772,6 +778,20 @@ func (vm *VirtualMachine) defineMethod(name string) error {
 		return err
 	}
 	klass.(*class).methods[name] = method.(*closure)
+	_, err = vm.pop()
+	return err
+}
+
+func (vm *VirtualMachine) inherit() error {
+	superclass, err := vm.peek(1)
+	if err != nil {
+		return err
+	}
+	subclass, err := vm.peek(0)
+	if err != nil {
+		return err
+	}
+	maps.Copy(subclass.(*class).methods, superclass.(*class).methods)
 	_, err = vm.pop()
 	return err
 }

@@ -2018,6 +2018,62 @@ func TestOpClass(t *testing.T) {
 	})
 }
 
+func TestOpInherit(t *testing.T) {
+	inherit := func(chunk *c.Chunk, superclass, subclass any) {
+		writeConstant(chunk, superclass)
+		writeConstant(chunk, subclass)
+		chunk.Write(byte(c.OP_INHERIT), line)
+	}
+
+	t.Run("La subclase recibe los métodos de la superclase", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		animal.methods["comer"] = newClosure(c.NewFunction())
+		animal.methods["dormir"] = newClosure(c.NewFunction())
+		perro := newClass("Perro")
+		inherit(chunk, animal, perro)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(perro.methods), 2)
+		utils.AssertValue(t, perro.methods["comer"], animal.methods["comer"])
+		utils.AssertValue(t, perro.methods["dormir"], animal.methods["dormir"])
+	})
+
+	t.Run("Saca la subclase y deja la superclase en el stack", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		inherit(chunk, animal, newClass("Perro"))
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], animal)
+	})
+
+	t.Run("Un método propio pisa al heredado", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		animal := newClass("Animal")
+		ruido := newClosure(c.NewFunction())
+		animal.methods["hacerRuido"] = ruido
+		perro := newClass("Perro")
+		ladrar := c.NewFunction()
+		inherit(chunk, animal, perro)
+		writeConstant(chunk, perro)
+		writeClosure(chunk, ladrar)
+		chunk.Write(byte(c.OP_METHOD), line)
+		chunk.Write(byte(chunk.AddConstant("hacerRuido")), line)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, perro.methods["hacerRuido"].function, ladrar)
+		utils.AssertValue(t, animal.methods["hacerRuido"], ruido)
+	})
+}
+
 func TestOpMethod(t *testing.T) {
 	writeMethod := func(chunk *c.Chunk, name string, method *c.Function) {
 		writeClosure(chunk, method)
