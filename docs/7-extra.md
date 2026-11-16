@@ -146,7 +146,7 @@ Al igual que para la primer entrega, implementamos la función nativa `clock()`,
 
 Para cada una bastó con agregar su función nativa en Go, y sumarla a la tabla de nativas.
 
-> A pesar de que se verán en uso en el programa de caso real, incorporamos algunos tests para las mismas:
+> A pesar de que se verán en uso en el programa de caso real, incorporamos algunos real-tests para las mismas ([8-natives](../real-tests/8-natives.lox)):
 
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm" 8-natives.lox
