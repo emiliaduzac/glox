@@ -1,68 +1,64 @@
 // LISTA ENLAZADA 
 
-class Nodo {}
-class Lista {}
-
-fun crearNodo(dato) {
-    var nodo = Nodo();
-    nodo.dato = dato;
-    nodo.proximo = nil;
-    return nodo;
-}
-
-fun crearLista() {
-    var lista = Lista();
-    lista.primero = nil;
-    lista.ultimo = nil;
-    lista.cantidad = 0;
-    return lista;
-}
-
-fun estaVacia(lista) {
-    return lista.cantidad == 0;
-}
-
-fun insertarPrimero(lista, dato) {
-    var nodo = crearNodo(dato);
-    nodo.proximo = lista.primero;
-    if (estaVacia(lista)) lista.ultimo = nodo;
-    lista.primero = nodo;
-    lista.cantidad = lista.cantidad + 1;
-}
-
-fun insertarUltimo(lista, dato) {
-    var nodo = crearNodo(dato);
-    if (estaVacia(lista)) {
-        lista.primero = nodo;
-    } else {
-        lista.ultimo.proximo = nodo;
+class Nodo {
+    init(dato) {
+        this.dato = dato;
+        this.proximo = nil;
     }
-    lista.ultimo = nodo;
-    lista.cantidad = lista.cantidad + 1;
 }
+class Lista {
+    init() {
+        this.primero = nil;
+        this.ultimo = nil;
+        this.cantidad = 0;
+    }
 
-fun borrarPrimero(lista) {
-    if (estaVacia(lista)) return nil;
-    var dato = lista.primero.dato;
-    lista.primero = lista.primero.proximo;
-    if (lista.primero == nil) lista.ultimo = nil;
-    lista.cantidad = lista.cantidad - 1;
-    return dato;
-}
+    estaVacia() {
+        return this.cantidad == 0;
+    }
 
-fun verPrimero(lista) {
-    if (estaVacia(lista)) return nil;
-    return lista.primero.dato;
-}
+    insertarPrimero(dato) {
+        var nodo = Nodo(dato);
+        nodo.proximo = this.primero;
+        if (this.estaVacia()) this.ultimo = nodo;
+        this.primero = nodo;
+        this.cantidad = this.cantidad + 1;
+    }
 
-fun largo(lista) {
-    return lista.cantidad;
+    insertarUltimo(dato) {
+        var nodo = Nodo(dato);
+        if (this.estaVacia()) {
+            this.primero = nodo;
+        } else {
+            this.ultimo.proximo = nodo;
+        }
+        this.ultimo = nodo;
+        this.cantidad = this.cantidad + 1;
+    }
+
+    borrarPrimero() {
+        if (this.estaVacia()) return nil;
+        var dato = this.primero.dato;
+        this.primero = this.primero.proximo;
+        if (this.primero == nil) this.ultimo = nil;
+        this.cantidad = this.cantidad - 1;
+        return dato;
+    }
+
+    verPrimero() {
+        if (this.estaVacia()) return nil;
+        return this.primero.dato;
+    }
+
+    largo() {
+        return this.cantidad;
+    }
 }
 
 // HELPERS PARA LOS TESTS
 
 fun sonIguales(a, b) {
-    if (largo(a) != largo(b)) return false;
+    if (a.largo() != b.largo()) return false;
     var actualA = a.primero;
     var actualB = b.primero;
     while (actualA != nil) {
@@ -82,44 +78,44 @@ fun verificar(condicion) {
 }
 
 fun armarListaDesordenada(cantidad) {
-    var lista = crearLista();
+    var lista = Lista();
 
     for (var i = 0; i < cantidad; i = i + 1) {
-        insertarUltimo(lista, (i * 7) % cantidad);
+        lista.insertarUltimo((i * 7) % cantidad);
     }
 
     return lista;
 }
 
 fun armarListaConRepetidos() {
-    var lista = crearLista();
+    var lista = Lista();
 
-    insertarUltimo(lista, 3);
-    insertarUltimo(lista, 1);
-    insertarUltimo(lista, 3);
-    insertarUltimo(lista, 4);
-    insertarUltimo(lista, 3);
+    lista.insertarUltimo(3);
+    lista.insertarUltimo(1);
+    lista.insertarUltimo(3);
+    lista.insertarUltimo(4);
+    lista.insertarUltimo(3);
 
     return lista;
 }
 
 fun armarListaConRepetidosOrdenada() {
-    var lista = crearLista();
+    var lista = Lista();
 
-    insertarUltimo(lista, 1);
-    insertarUltimo(lista, 3);
-    insertarUltimo(lista, 3);
-    insertarUltimo(lista, 3);
-    insertarUltimo(lista, 4);
+    lista.insertarUltimo(1);
+    lista.insertarUltimo(3);
+    lista.insertarUltimo(3);
+    lista.insertarUltimo(3);
+    lista.insertarUltimo(4);
 
     return lista;
 }
 
 fun armarListaOrdenada(cantidad) {
-    var lista = crearLista();
+    var lista = Lista();
 
     for (var i = 0; i < cantidad; i = i + 1) {
-        insertarUltimo(lista, i);
+        lista.insertarUltimo(i);
     }
 
     return lista;
@@ -129,9 +125,9 @@ fun armarListaOrdenada(cantidad) {
 
 fun mergeSort(lista) {
     // caso base: si tiene 0 o 1 elemento ya está ordenada
-    if (lista.cantidad <= 1) return lista;
+    if (lista.largo() <= 1) return lista;
 
-    var medio = lista.cantidad / 2;
+    var medio = lista.largo() / 2;
     var izquierda = obtenerIzquierda(lista, medio);
     var derecha = lista; // a la original le quedó la otra mitad
 
@@ -142,31 +138,31 @@ fun mergeSort(lista) {
 }
 
 fun obtenerIzquierda(lista, medio) {
-    var izquierda = crearLista();
+    var izquierda = Lista();
     for (var i = 0; i < medio; i = i + 1) {
-        var elem = borrarPrimero(lista);
-        insertarUltimo(izquierda, elem);
+        var elem = lista.borrarPrimero();
+        izquierda.insertarUltimo(elem);
     }
     return izquierda;
 }
 
 fun merge(izquierda, derecha) {
-    var resultado = crearLista();
+    var resultado = Lista();
 
-    while (!estaVacia(izquierda) and !estaVacia(derecha)) {
-        if (verPrimero(izquierda) <= verPrimero(derecha)) {
-            insertarUltimo(resultado, borrarPrimero(izquierda));
+    while (!izquierda.estaVacia() and !derecha.estaVacia()) {
+        if (izquierda.verPrimero() <= derecha.verPrimero()) {
+            resultado.insertarUltimo(izquierda.borrarPrimero());
         } else {
-            insertarUltimo(resultado, borrarPrimero(derecha));
+            resultado.insertarUltimo(derecha.borrarPrimero());
         }
     }
 
     // lo que sobra de una de las dos ya está ordenado
-    while (!estaVacia(izquierda)) {
-        insertarUltimo(resultado, borrarPrimero(izquierda));
+    while (!izquierda.estaVacia()) {
+        resultado.insertarUltimo(izquierda.borrarPrimero());
     }
-    while (!estaVacia(derecha)) {
-        insertarUltimo(resultado, borrarPrimero(derecha));
+    while (!derecha.estaVacia()) {
+        resultado.insertarUltimo(derecha.borrarPrimero());
     }
 
     return resultado;
@@ -183,7 +179,7 @@ var esperada = armarListaOrdenada(50);
 verificar(sonIguales(mergeSort(desordenadaMergeSort), esperada));
 
 print "--- MERGESORT CON UNA LISTA VACIA ---";
-verificar(estaVacia(mergeSort(crearLista())));
+verificar(mergeSort(Lista()).estaVacia());
 
 print "--- MERGESORT CON REPETIDOS ---";
 var conRepetidosMergeSort = armarListaConRepetidos();
@@ -198,33 +194,33 @@ verificar(sonIguales(mergeSort(ordenadaMergeSort), ordenada));
 // QUICKSORT
 
 fun quickSort(lista) {
-    if (lista.cantidad <= 1) return lista;
+    if (lista.largo() <= 1) return lista;
 
-    var pivote = borrarPrimero(lista);
+    var pivote = lista.borrarPrimero();
 
-    var menores = crearLista();
-    var mayores = crearLista();
-    while (!estaVacia(lista)) {
-        var elemento = borrarPrimero(lista);
+    var menores = Lista();
+    var mayores = Lista();
+    while (!lista.estaVacia()) {
+        var elemento = lista.borrarPrimero();
         if (elemento < pivote) {
-            insertarUltimo(menores, elemento);
+            menores.insertarUltimo(elemento);
         } else {
-            insertarUltimo(mayores, elemento);
+            mayores.insertarUltimo(elemento);
         }
     }
 
     var quickMenores = quickSort(menores); 
     var quickMayores = quickSort(mayores);
 
-    var listaOrdenada = crearLista();
-    while (!estaVacia(quickMenores)) {
-        var elem = borrarPrimero(quickMenores);
-        insertarUltimo(listaOrdenada, elem);
+    var listaOrdenada = Lista();
+    while (!quickMenores.estaVacia()) {
+        var elem = quickMenores.borrarPrimero();
+        listaOrdenada.insertarUltimo(elem);
     }
-    insertarUltimo(listaOrdenada, pivote);
-    while (!estaVacia(quickMayores)) {
-        var elem = borrarPrimero(quickMayores);
-        insertarUltimo(listaOrdenada, elem);
+    listaOrdenada.insertarUltimo(pivote);
+    while (!quickMayores.estaVacia()) {
+        var elem = quickMayores.borrarPrimero();
+        listaOrdenada.insertarUltimo(elem);
     }
 
     return listaOrdenada;
@@ -242,7 +238,7 @@ var esperada = armarListaOrdenada(50);
 verificar(sonIguales(quickSort(desordenadaQuickSort), esperada));
 
 print "--- QUICKSORT CON UNA LISTA VACIA ---";
-verificar(estaVacia(quickSort(crearLista())));
+verificar(quickSort(Lista()).estaVacia());
 
 print "--- QUICKSORT CON REPETIDOS ---";
 var conRepetidosQuickSort = armarListaConRepetidos();
@@ -257,7 +253,7 @@ verificar(sonIguales(quickSort(ordenadaQuickSort), ordenada));
 // BUBBLESORT
 
 fun bubbleSort(lista) {
-    for (var i = 0; i < lista.cantidad; i = i + 1) {
+    for (var i = 0; i < lista.largo(); i = i + 1) {
         var actual = lista.primero;
         while (actual != nil and actual.proximo != nil) {
             if (actual.dato > actual.proximo.dato) {
@@ -283,7 +279,7 @@ var esperada = armarListaOrdenada(50);
 verificar(sonIguales(bubbleSort(desordenadaBubbleSort), esperada));
 
 print "--- BUBBLESORT CON UNA LISTA VACIA ---";
-verificar(estaVacia(quickSort(crearLista())));
+verificar(bubbleSort(Lista()).estaVacia());
 
 print "--- BUBBLESORT CON REPETIDOS ---";
 var conRepetidosBubbleSort = armarListaConRepetidos();

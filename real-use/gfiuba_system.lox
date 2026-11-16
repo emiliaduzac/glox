@@ -1,0 +1,150 @@
+class Alumno {
+    init(nombre, nota) {
+        this.nombre = nombre;
+        this.nota = nota;
+    }
+}
+
+class Nodo {
+    init(nombre, nota) {
+        var alumno = Alumno(nombre, nota);
+        this.dato = alumno;
+        this.proximo = nil;
+    }
+}
+
+class ListadoAlumnos {
+    init() {
+        this.primero = nil;
+        this.ultimo = nil;
+        this.cantidad = 0;
+    }
+
+    estaVacia() {
+        return this.cantidad == 0;
+    }
+
+    insertarPrimero(nombre, nota) {
+        var nodo = Nodo(nombre, nota);
+        nodo.proximo = this.primero;
+        if (this.estaVacia()) this.ultimo = nodo;
+        this.primero = nodo;
+        this.cantidad = this.cantidad + 1;
+    }
+
+    insertarUltimo(nombre, nota) {
+        var nodo = Nodo(nombre, nota);
+        if (this.estaVacia()) {
+            this.primero = nodo;
+        } else {
+            this.ultimo.proximo = nodo;
+        }
+        this.ultimo = nodo;
+        this.cantidad = this.cantidad + 1;
+    }
+
+    borrarPrimero() {
+        if (this.estaVacia()) return nil;
+        var alumno = this.primero;
+        this.primero = this.primero.proximo;
+        if (this.primero == nil) this.ultimo = nil;
+        this.cantidad = this.cantidad - 1;
+        return alumno;
+    }
+
+    verPrimero() {
+        if (this.estaVacia()) return nil;
+        return this.primero;
+    }
+
+    largo() {
+        return this.cantidad;
+    }
+
+    imprimir() {
+        var actual = this.primero;
+        var puesto = 1;
+        while (actual != nil) {
+            var medalla = "  ";
+            if (puesto == 1) {
+                medalla = "🥇";
+            } else if (puesto == 2) {
+                medalla = "🥈";
+            } else if (puesto == 3) {
+                medalla = "🥉";
+            }
+            print medalla + str(puesto) + ". " + actual.dato.nombre + ": " + str(actual.dato.nota);
+            actual = actual.proximo;
+            puesto = puesto + 1;
+        }
+    }
+}
+
+fun bubbleSortReverse(lista) {
+    for (var i = 0; i < lista.largo(); i = i + 1) {
+        var actual = lista.primero;
+        while (actual != nil and actual.proximo != nil) {
+            if (actual.dato.nota < actual.proximo.dato.nota) {
+                var aux = actual.dato;
+                actual.dato = actual.proximo.dato;
+                actual.proximo.dato = aux;
+            }
+            actual = actual.proximo;
+        }
+    }
+    return lista;
+}
+
+
+print "Bienvenido al sistema de organización de notas GFIUBA";
+print " ";
+print "- El sistema le permitirá ingresar tantos alumnos como desee, y obtendrá un ranking de los 5 con mejor nota";
+print "- Para dejar de ingresar alumnos, alcanza con ingresar un string vacio o Ctrl+D";
+print " ";
+
+
+var alumnos = ListadoAlumnos();
+var mensajeNombre = "> Ingrese el nombre de otro alumno: ";
+var mensajeNota = "> Ingrese la nota del alumno: ";
+
+var ingresoNombre = input("> Ingrese el nombre del primer alumno: ");
+
+while (ingresoNombre != nil and ingresoNombre != "") {
+    var ingresoNota = input(mensajeNota);
+
+    if (ingresoNota == nil or ingresoNota == "") {
+        break;
+    }
+
+    var notaNumerica = num(ingresoNota);
+    if (notaNumerica == nil or notaNumerica < 1 or notaNumerica > 10) {
+        print "Debe ingresar una nota numerica, entre 1 y 10";
+        continue;
+    }
+
+    alumnos.insertarPrimero(ingresoNombre, notaNumerica);
+    ingresoNombre = input(mensajeNombre);
+}
+
+var ordenados = bubbleSortReverse(alumnos);
+
+var top5 = ListadoAlumnos();
+var suma = 0;
+
+while (top5.largo() < 5 and ordenados.largo() > 0) {
+    var elem = ordenados.borrarPrimero();
+    top5.insertarUltimo(elem.dato.nombre, elem.dato.nota);
+    suma = suma + elem.dato.nota;
+}
+
+print " ";
+if (top5.estaVacia()) {
+    print "No se ingresaron alumnos";
+} else {
+    print "-- TOP 5 ALUMNOS DE GFIUBA: --";
+    top5.imprimir();
+    print " ";
+
+    var promedio = suma / top5.largo();
+    print "El promedio de los alumnos del top: " + str(promedio);
+}
