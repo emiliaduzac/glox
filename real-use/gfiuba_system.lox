@@ -1,0 +1,102 @@
+class Nodo {
+    init(nombre, nota) {
+        var alumno = Alumno(nombre, nota);
+        this.dato = alumno;
+        this.proximo = nil;
+    }
+}
+
+class Alumno {
+    init(nombre, nota) {
+        this.nombre = nombre;
+        this.nota = nota;
+        this.proximo = nil;
+    }
+}
+
+class ListadoAlumnos {
+    init() {
+        this.primero = nil;
+        this.ultimo = nil;
+        this.cantidad = 0;
+    }
+
+    estaVacia() {
+        return this.cantidad == 0;
+    }
+
+    insertarPrimero(nombre, nota) {
+        var nodo = Nodo(nombre, nota);
+        nodo.proximo = this.primero;
+        if (this.estaVacia()) this.ultimo = nodo;
+        this.primero = nodo;
+        this.cantidad = this.cantidad + 1;
+    }
+
+    insertarUltimo(nombre, nota) {
+        var nodo = Nodo(nombre, nota);
+        if (this.estaVacia()) {
+            this.primero = nodo;
+        } else {
+            this.ultimo.proximo = nodo;
+        }
+        this.ultimo = nodo;
+        this.cantidad = this.cantidad + 1;
+    }
+
+    borrarPrimero() {
+        if (this.estaVacia()) return nil;
+        var alumno = this.primero;
+        this.primero = this.primero.proximo;
+        if (this.primero == nil) this.ultimo = nil;
+        this.cantidad = this.cantidad - 1;
+        return alumno;
+    }
+
+    verPrimero() {
+        if (this.estaVacia()) return nil;
+        return this.primero;
+    }
+
+    largo() {
+        return this.cantidad;
+    }
+
+    imprimir() {
+        var actual = this.primero;
+        var puesto = 1;
+        while (actual != nil) {
+            print actual.dato.nombre + ":";
+            print actual.dato.nota;
+            actual = actual.proximo;
+            puesto = puesto + 1;
+        }
+    }
+}
+
+fun bubbleSortReverse(lista) {
+    for (var i = 0; i < lista.cantidad; i = i + 1) {
+        var actual = lista.primero;
+        while (actual != nil and actual.proximo != nil) {
+            if (actual.dato.nota < actual.proximo.dato.nota) {
+                var aux = actual.dato;
+                actual.dato = actual.proximo.dato;
+                actual.proximo.dato = aux;
+            }
+            actual = actual.proximo;
+        }
+    }
+    return lista;
+}
+
+
+print "Bienvenido al sistema de organizaciónde notas GFIUBA";
+print " ";
+print "El sistema le pemitirá ingresar tantos alumnos como desee, y obtendrá un ranking de los aquellos 10 con mejor nota";
+
+var alumnos = ListadoAlumnos();
+alumnos.insertarUltimo("Emilia", 8);
+alumnos.insertarUltimo("Marcos", 9);
+alumnos.insertarUltimo("Fede", 6);
+
+bubbleSortReverse(alumnos).imprimir();
