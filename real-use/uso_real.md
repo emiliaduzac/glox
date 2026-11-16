@@ -1,10 +1,12 @@
 # Uso real de Glox
 
-Como un caso de uso real de nuestro lenguaje, decidimos implementar los siguientes algoritmos de ordenamiento: **mergesort**, **quicksort** y **bubblesort**. Esto implicó también crear una **lista enlazada** utilizando Glox. Dado que al momento de implementarlo no contábamos con métodos para clases, usamos funciones que editaban el estado de las clases. A futuro, podría mejorarse haciendo que la lista enlazada y el nodo tengan sus propios métodos en vez de ser modificada por fuera.
+## Algoritmos de ordenamiento 
+
+En primer instancia, decidimos implementar los siguientes algoritmos de ordenamiento: **mergesort**, **quicksort** y **bubblesort**. Esto implicó también crear una **lista enlazada** utilizando Glox.
 
 La lista enlazada está compuesta por un `Nodo`, que tiene su `dato` y su `próximo`. Al crear una `Lista`, inicializamos con los campos `primero` y `ultimo` en `nil` y `cantidad` 0. Esto nos sirve ya que en Lox los campos no se declaran, sino que se crean al usarlos. Inicializarlos al crear la lista ayuda a que luego no se genere errores en el primer uso de la lista.
 
-Implementamos las funciones típicas que tendría una lista enlazada:
+Implementamos los métodos típicos que tendría una lista enlazada:
 
 - `estaVacia`: indica si tiene elementos
 - `insertarPrimero`: inserta un nodo en `primero`, y hace que `primero.proximo` sea el anterior `primero`. Además, si la lista estaba vacía pasa a ser el `ultimo` también. Suma 1 a la `cantidad`.
@@ -29,3 +31,5 @@ go run ./cmd --vm ./real-use/sorting_lists.lox
 ```
 
 Todo esto puede encontrarse en [`sorting_lists.lox`](sorting_lists.lox)
+
+## Sistema de notas GFIUBA

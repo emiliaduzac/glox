@@ -73,7 +73,7 @@ class ListadoAlumnos {
 }
 
 fun bubbleSortReverse(lista) {
-    for (var i = 0; i < lista.cantidad; i = i + 1) {
+    for (var i = 0; i < lista.largo(); i = i + 1) {
         var actual = lista.primero;
         while (actual != nil and actual.proximo != nil) {
             if (actual.dato.nota < actual.proximo.dato.nota) {
@@ -123,7 +123,7 @@ var ordenados = bubbleSortReverse(alumnos);
 var top5 = ListadoAlumnos();
 var suma = 0;
 
-while (top5.cantidad < 5 and ordenados.cantidad > 0) {
+while (top5.largo() < 5 and ordenados.largo() > 0) {
     var elem = ordenados.borrarPrimero();
     top5.insertarUltimo(elem.dato.nombre, elem.dato.nota);
     suma = suma + elem.dato.nota;
@@ -137,6 +137,6 @@ if (top5.estaVacia()) {
     top5.imprimir();
     print " ";
 
-    var promedio = suma / top5.cantidad;
+    var promedio = suma / top5.largo();
     print "El promedio de los alumnos del top: " + str(promedio);
 }
