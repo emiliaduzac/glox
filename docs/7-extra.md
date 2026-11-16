@@ -141,7 +141,7 @@ python3 real-tests/script.py "go run ./cmd --vm" 5-break-continue
 
 Al igual que para la primer entrega, implementamos la función nativa `clock()`, pero esta vez también sumamos otras más, con la intención de poder usarla para nuestro programa de uso real de glox.
 
-- `input()`: ingresar valores por consola
+- `input(mensaje)`: ingresar valores por consola
 - `str(value)`: convierte a string
 - `num(value)`: convierte a número
 

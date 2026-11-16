@@ -2,6 +2,7 @@ package virtualmachine
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -23,7 +24,7 @@ func (n *native) String() string {
 func builtinNatives() map[string]*native {
 	return map[string]*native{
 		"clock": {arity: 0, fn: clockNative},
-		"input": {arity: 0, fn: inputNative},
+		"input": {arity: 1, fn: inputNative},
 		"str":   {arity: 1, fn: strNative},
 		"num":   {arity: 1, fn: numNative},
 	}
@@ -35,7 +36,8 @@ func clockNative(_ []any) any {
 
 var input = bufio.NewScanner(os.Stdin)
 
-func inputNative(_ []any) any {
+func inputNative(value []any) any {
+	fmt.Print(utils.Stringify(value[0]))
 	if !input.Scan() {
 		return nil
 	}

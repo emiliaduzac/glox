@@ -10,7 +10,6 @@ class Alumno {
     init(nombre, nota) {
         this.nombre = nombre;
         this.nota = nota;
-        this.proximo = nil;
     }
 }
 
@@ -66,8 +65,7 @@ class ListadoAlumnos {
         var actual = this.primero;
         var puesto = 1;
         while (actual != nil) {
-            print actual.dato.nombre + ":";
-            print actual.dato.nota;
+            print str(puesto) + ". " + actual.dato.nombre + ": " + str(actual.dato.nota);
             actual = actual.proximo;
             puesto = puesto + 1;
         }
@@ -90,13 +88,49 @@ fun bubbleSortReverse(lista) {
 }
 
 
-print "Bienvenido al sistema de organizaciónde notas GFIUBA";
+print "Bienvenido al sistema de organización de notas GFIUBA";
 print " ";
-print "El sistema le pemitirá ingresar tantos alumnos como desee, y obtendrá un ranking de los aquellos 10 con mejor nota";
+print "- El sistema le permitirá ingresar tantos alumnos como desee, y obtendrá un ranking de los 5 con mejor nota";
+print "- Para dejar de ingresar alumnos, alcanza con ingresar un string vacio o CtrlD";
+print " ";
+
 
 var alumnos = ListadoAlumnos();
-alumnos.insertarUltimo("Emilia", 8);
-alumnos.insertarUltimo("Marcos", 9);
-alumnos.insertarUltimo("Fede", 6);
+var mensajeNombre = "> Ingrese el nombre de otro alumno: ";
+var mensajeNota = "> Ingrese la nota del alumno: ";
 
-bubbleSortReverse(alumnos).imprimir();
+var ingresoNombre = input("> Ingrese el nombre del primer alumno: ");
+
+while (ingresoNombre != nil and ingresoNombre != "") {
+    var ingresoNota = input(mensajeNota);
+
+    if (ingresoNota == nil or ingresoNota == "") {
+        break;
+    }
+
+    var notaNumerica = num(ingresoNota);
+    if (notaNumerica == nil) {
+        print "Debe ingresar una nota numerica";
+        continue;
+    }
+
+    alumnos.insertarPrimero(ingresoNombre, notaNumerica);
+    ingresoNombre = input(mensajeNombre);
+}
+
+var ordenados = bubbleSortReverse(alumnos);
+
+var top5 = ListadoAlumnos();
+
+while (top5.cantidad < 5 and ordenados.cantidad > 0) {
+    var elem = ordenados.borrarPrimero();
+    top5.insertarUltimo(elem.dato.nombre, elem.dato.nota);
+}
+
+print " ";
+if (top5.estaVacia()) {
+    print "No se ingresaron alumnos";
+} else {
+    print "-- TOP 5 ALUMNOS DE GFIUBA: ";
+    top5.imprimir();
+}
