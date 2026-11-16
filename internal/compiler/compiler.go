@@ -336,6 +336,9 @@ func (c *Compiler) classDeclaration() error {
 		if err := c.variable(false); err != nil {
 			return err
 		}
+		if className.Lexeme == c.cursor.GetPreviousLexeme() {
+			c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "a class can't inherit from itself"))
+		}
 		if err := c.namedVariable(className, false); err != nil {
 			return err
 		}

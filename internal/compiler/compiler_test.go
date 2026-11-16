@@ -2439,4 +2439,10 @@ func TestCompileSuperclass(t *testing.T) {
 
 		utils.AssertErrorMessage(t, err, "expected superclass name")
 	})
+
+	t.Run("Error si una clase hereda de si misma", func(t *testing.T) {
+		err := compileSourceError(t, "class A < A {}")
+
+		utils.AssertErrorMessage(t, err, "a class can't inherit from itself")
+	})
 }
