@@ -1,0 +1,16 @@
+class Contador {
+  uno() {
+    return 1;
+  }
+}
+
+fun correr(n) {
+  var c = Contador();
+  var total = 0;
+  for (var i = 0; i < n; i = i + 1) {
+    total = total + c.uno();
+  }
+  return total;
+}
+
+print correr(1000000);

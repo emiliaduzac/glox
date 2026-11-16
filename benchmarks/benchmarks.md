@@ -76,12 +76,18 @@ Hacemos cuatro comparaciones:
 1. **glox contra otras implementaciones de Lox**: los mismos programas con las 7 implementaciones.
 2. **La evolución de glox**: la versión tree-walk de la entrega 1 contra la versión final con bytecode. Además, comparamos ejecutar el binario compilado contra `go run`, que compila glox en cada ejecución. Vale la pena mencionar que la versión final sin `--vm` también es tree-walk, pero usamos el tag de la entrega 1 para medir exactamente lo que habíamos entregado
 3. **Lox contra otros lenguajes**: los mismos programas escritos en **Go** y en **Python**. Elegimos esos dos porque son los lenguajes en los que están hechas glox, golox, plox y ploxb.
-4. **Optimización de métodos**: TO DO.
+4. **Optimización de métodos**: medimos cuánto mejora la velocidad la optimización de `OP_INVOKE` que tomamos del libro (ver [Invoke](../docs/5-bytecode_and_vm.md#invoke)). Para eso comparamos dos formas de llamar al mismo método: `c.metodo()`, que usa `OP_INVOKE`, y `(c.metodo)()`, que sigue el camino anterior y crea un bound method en cada llamada. Lo hacemos en glox y en clox, para ver si la mejora es la misma en Go que en C.
 
-Para correr **todas** las mediciones:
+Para correr **las primeras 3** mediciones:
 
 ```bash
 ./benchmarks/run.sh
+```
+
+Para correr **las 4ta** medición (que fue incorporada más tarde):
+
+```bash
+./benchmarks/run_optimization.sh
 ```
 
 Los gráficos se generan con los scripts de hyperfine (plot_whisker y plot_benchmark_comparison, con uvx), a partir de los JSON que están en `benchmarks/resultados/`.
