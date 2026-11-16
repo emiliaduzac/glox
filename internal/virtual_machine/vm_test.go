@@ -2118,18 +2118,55 @@ func TestCallClass(t *testing.T) {
 		second := stackValues(vm)[1].(*instance)
 		utils.AssertValue(t, first != second, true)
 	})
+
+	t.Run("Una clase con init lo llama con la instancia nueva en el slot 0 y los argumentos después", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		var out bytes.Buffer
+		vm.out = &out
+		auto := newClass("Auto")
+		auto.methods["init"] = newMethod("init", 1, func(body *c.Chunk) {
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(0, line)
+			body.Write(byte(c.OP_PRINT), line)
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(1, line)
+			body.Write(byte(c.OP_PRINT), line)
+		})
+		writeConstant(chunk, auto)
+		writeConstant(chunk, "rojo")
+		writeCall(chunk, 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, out.String(), "Auto instance\nrojo\n")
+	})
+
+	t.Run("Error si se llama a una clase con init con otra cantidad de argumentos", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		auto.methods["init"] = newMethod("init", 1, func(body *c.Chunk) {})
+		writeConstant(chunk, auto)
+		writeCall(chunk, 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "expected 1 arguments but got 0")
+	})
+
+	t.Run("Error si se le pasan argumentos a una clase sin init", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, newClass("Auto"))
+		writeConstant(chunk, "rojo")
+		writeCall(chunk, 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "expected 0 arguments but got 1")
+	})
 }
 
 func TestCallBoundMethod(t *testing.T) {
-	newMethod := func(name string, arity int, body func(chunk *c.Chunk)) *closure {
-		function := c.NewFunction()
-		function.Name = name
-		function.Arity = arity
-		body(&function.Chunk)
-		writeReturnNil(&function.Chunk)
-		return newClosure(function)
-	}
-
 	t.Run("Llamar a un bound method ejecuta el código del método", func(t *testing.T) {
 		vm, chunk := setUpVM(t)
 		var out bytes.Buffer

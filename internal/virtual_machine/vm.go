@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	framesMax = 64
-	stackMax  = framesMax * (math.MaxUint8 + 1)
+	framesMax  = 64
+	stackMax   = framesMax * (math.MaxUint8 + 1)
+	initString = "init"
 )
 
 type callFrame struct {
@@ -397,6 +398,12 @@ func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 		return vm.callNative(function, argCount)
 	case *class:
 		vm.stack[len(vm.stack)-argCount-1] = newInstance(function)
+		if initializer, ok := function.methods[initString]; ok {
+			return vm.call(initializer, argCount)
+		}
+		if argCount != 0 {
+			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("expected 0 arguments but got %d", argCount))
+		}
 		return nil
 	default:
 		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
