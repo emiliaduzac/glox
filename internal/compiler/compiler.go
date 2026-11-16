@@ -798,6 +798,14 @@ func (c *Compiler) dot(canAssign bool) error {
 		c.emit(byte(chunk.OP_SET_PROPERTY), name)
 		return nil
 	}
+	if c.cursor.Match(token.LEFT_PAREN) {
+		argCount, err := c.argumentList()
+		if err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_INVOKE), name, argCount)
+		return nil
+	}
 	c.emit(byte(chunk.OP_GET_PROPERTY), name)
 	return nil
 }

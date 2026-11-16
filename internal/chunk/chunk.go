@@ -44,6 +44,7 @@ const (
 	OP_JUMP
 
 	OP_CALL
+	OP_INVOKE
 	OP_CLOSURE
 
 	OP_CLASS
@@ -90,6 +91,7 @@ var opCodeNames = map[OpCode]string{
 	OP_JUMP:          "OP_JUMP",
 
 	OP_CALL:    "OP_CALL",
+	OP_INVOKE:  "OP_INVOKE",
 	OP_CLOSURE: "OP_CLOSURE",
 
 	OP_CLASS: "OP_CLASS",
@@ -175,6 +177,11 @@ func (c *Chunk) Disassemble(name string) {
 			argCount := c.Bytes[i+1]
 			fmt.Printf("%s<%d>\n", op, argCount)
 			i += 2
+
+		case OP_INVOKE:
+			constantIndex, argCount := c.Bytes[i+1], c.Bytes[i+2]
+			fmt.Printf("%s<%s, %d>\n", op, c.constantString(constantIndex), argCount)
+			i += 3
 
 		case OP_JUMP, OP_JUMP_IF_FALSE, OP_LOOP:
 			// Instrucciones con operandos: saltos

@@ -2066,8 +2066,7 @@ func TestCompileGetExpression(t *testing.T) {
 
 		assertExprBytes(t, chunk,
 			byte(c.OP_GET_GLOBAL), 0,
-			byte(c.OP_GET_PROPERTY), 1,
-			byte(c.OP_CALL), 0,
+			byte(c.OP_INVOKE), 1, 0,
 			byte(c.OP_GET_PROPERTY), 2,
 		)
 		utils.AssertValue(t, chunk.Constants[1], "f")
@@ -2337,6 +2336,42 @@ func TestCompileInitializer(t *testing.T) {
 				utils.AssertNoError(t, err)
 			})
 		}
+	})
+}
+
+func TestCompileInvoke(t *testing.T) {
+	t.Run("Llamar a una propiedad se compila como OP_INVOKE con su nombre y la cantidad de argumentos", func(t *testing.T) {
+		chunk := compileSource(t, "a.m(1, 2);")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_CONSTANT), 3,
+			byte(c.OP_INVOKE), 1, 2,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[1], "m")
+	})
+
+	t.Run("Si la propiedad se lee entre paréntesis y después se llama, sigue siendo OP_GET_PROPERTY y OP_CALL", func(t *testing.T) {
+		chunk := compileSource(t, "(a.m)();")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_PROPERTY), 1,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta cerrar los argumentos de la llamada", func(t *testing.T) {
+		err := compileSourceError(t, "a.m(1;")
+
+		utils.AssertErrorMessage(t, err, "')' after arguments")
 	})
 }
 

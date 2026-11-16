@@ -277,6 +277,20 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			frame = vm.currentFrame()
 
+		case c.OP_INVOKE:
+			method, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			argCount, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			if err := vm.invoke(method, int(argCount)); err != nil {
+				return err
+			}
+			frame = vm.currentFrame()
+
 		case c.OP_CLOSURE:
 			constant, err := vm.readConstant()
 			if err != nil {
@@ -408,6 +422,26 @@ func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 	default:
 		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
 	}
+}
+
+func (vm *VirtualMachine) invoke(name string, argCount int) error {
+	receiver, err := vm.peek(argCount)
+	if err != nil {
+		return err
+	}
+	instance, ok := receiver.(*instance)
+	if !ok {
+		return errors.NewLoxError(vm.currentLine(), "only instances have methods")
+	}
+	return vm.invokeFromClass(instance.class, name, argCount)
+}
+
+func (vm *VirtualMachine) invokeFromClass(klass *class, name string, argCount int) error {
+	method, ok := klass.methods[name]
+	if !ok {
+		return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
+	}
+	return vm.call(method, argCount)
 }
 
 func (vm *VirtualMachine) bindMethod(klass *class, name string) error {

@@ -2457,3 +2457,111 @@ func TestOpSetProperty(t *testing.T) {
 		}
 	})
 }
+
+func TestOpInvoke(t *testing.T) {
+	invoke := func(chunk *c.Chunk, name string, argCount byte) {
+		index := chunk.AddConstant(name)
+		chunk.Write(byte(c.OP_INVOKE), line)
+		chunk.Write(byte(index), line)
+		chunk.Write(argCount, line)
+	}
+	returnLocal := func(slot byte) func(body *c.Chunk) {
+		return func(body *c.Chunk) {
+			body.Write(byte(c.OP_GET_LOCAL), line)
+			body.Write(slot, line)
+			body.Write(byte(c.OP_RETURN), line)
+		}
+	}
+
+	t.Run("Ejecuta el método y deja lo que devuelve en el lugar del receptor y los argumentos", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		auto.methods["velocidad"] = newMethod("velocidad", 1, func(body *c.Chunk) {
+			writeConstant(body, 120.0)
+			body.Write(byte(c.OP_RETURN), line)
+		})
+		writeConstant(chunk, newInstance(auto))
+		writeConstant(chunk, "rojo")
+		invoke(chunk, "velocidad", 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], 120.0)
+	})
+
+	t.Run("El receptor queda en el slot 0 del método", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		auto.methods["yo"] = newMethod("yo", 1, returnLocal(0))
+		receptor := newInstance(auto)
+		writeConstant(chunk, receptor)
+		writeConstant(chunk, "rojo")
+		invoke(chunk, "yo", 1)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, len(stackValues(vm)), 1)
+		utils.AssertValue(t, stackValues(vm)[0], receptor)
+	})
+
+	t.Run("Los argumentos quedan en los slots que siguen en el orden en que se pasaron", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		auto.methods["segundo"] = newMethod("segundo", 2, returnLocal(2))
+		writeConstant(chunk, newInstance(auto))
+		writeConstant(chunk, "rojo")
+		writeConstant(chunk, "azul")
+		invoke(chunk, "segundo", 2)
+
+		err := run(vm, chunk)
+
+		utils.AssertNoError(t, err)
+		utils.AssertValue(t, stackValues(vm)[0], "azul")
+	})
+
+	t.Run("Error si el receptor no es una instancia", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			receiver any
+		}{
+			{"un número", 1.0},
+			{"una clase", newClass("Auto")},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				vm, chunk := setUpVM(t)
+				writeConstant(chunk, test.receiver)
+				invoke(chunk, "acelerar", 0)
+
+				err := run(vm, chunk)
+
+				utils.AssertErrorMessage(t, err, "only instances have methods")
+			})
+		}
+	})
+
+	t.Run("Error si la clase no tiene un método con ese nombre", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		writeConstant(chunk, newInstance(newClass("Auto")))
+		invoke(chunk, "volar", 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "undefined property 'volar'")
+	})
+
+	t.Run("Error si se invoca con otra cantidad de argumentos que los parámetros del método", func(t *testing.T) {
+		vm, chunk := setUpVM(t)
+		auto := newClass("Auto")
+		auto.methods["acelerar"] = newMethod("acelerar", 1, func(body *c.Chunk) {})
+		writeConstant(chunk, newInstance(auto))
+		invoke(chunk, "acelerar", 0)
+
+		err := run(vm, chunk)
+
+		utils.AssertErrorMessage(t, err, "expected 1 arguments but got 0")
+	})
+}
