@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	framesMax = 64
-	stackMax  = framesMax * (math.MaxUint8 + 1)
+	framesMax  = 64
+	stackMax   = framesMax * (math.MaxUint8 + 1)
+	initString = "init"
 )
 
 type callFrame struct {
@@ -276,6 +277,20 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			frame = vm.currentFrame()
 
+		case c.OP_INVOKE:
+			method, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			argCount, err := vm.readByte()
+			if err != nil {
+				return err
+			}
+			if err := vm.invoke(method, int(argCount)); err != nil {
+				return err
+			}
+			frame = vm.currentFrame()
+
 		case c.OP_CLOSURE:
 			constant, err := vm.readConstant()
 			if err != nil {
@@ -295,6 +310,15 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			}
 			vm.push(newClass(name))
 
+		case c.OP_METHOD:
+			name, err := vm.readString()
+			if err != nil {
+				return err
+			}
+			if err := vm.defineMethod(name); err != nil {
+				return err
+			}
+
 		case c.OP_GET_PROPERTY:
 			object, err := vm.peek(0)
 			if err != nil {
@@ -308,14 +332,14 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 			if err != nil {
 				return err
 			}
-			value, ok := instance.fields[name]
-			if !ok {
-				return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
-			}
-			if _, err := vm.pop(); err != nil {
+			if value, ok := instance.fields[name]; ok {
+				if _, err := vm.pop(); err != nil {
+					return err
+				}
+				vm.push(value)
+			} else if err := vm.bindMethod(instance.class, name); err != nil {
 				return err
 			}
-			vm.push(value)
 
 		case c.OP_SET_PROPERTY:
 			object, err := vm.peek(1)
@@ -379,16 +403,66 @@ func (vm *VirtualMachine) Run(function *c.Function) (err error) {
 
 func (vm *VirtualMachine) callValue(callee any, argCount int) error {
 	switch function := callee.(type) {
+	case *boundMethod:
+		vm.stack[len(vm.stack)-argCount-1] = function.receiver
+		return vm.call(function.method, argCount)
 	case *closure:
 		return vm.call(function, argCount)
 	case *native:
 		return vm.callNative(function, argCount)
 	case *class:
 		vm.stack[len(vm.stack)-argCount-1] = newInstance(function)
+		if initializer, ok := function.methods[initString]; ok {
+			return vm.call(initializer, argCount)
+		}
+		if argCount != 0 {
+			return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("expected 0 arguments but got %d", argCount))
+		}
 		return nil
 	default:
 		return errors.NewLoxError(vm.currentLine(), "can only call functions and classes")
 	}
+}
+
+func (vm *VirtualMachine) invoke(name string, argCount int) error {
+	receiver, err := vm.peek(argCount)
+	if err != nil {
+		return err
+	}
+	instance, ok := receiver.(*instance)
+	if !ok {
+		return errors.NewLoxError(vm.currentLine(), "only instances have methods")
+	}
+	if value, ok := instance.fields[name]; ok {
+		vm.stack[len(vm.stack)-argCount-1] = value
+		return vm.callValue(value, argCount)
+	}
+	return vm.invokeFromClass(instance.class, name, argCount)
+}
+
+func (vm *VirtualMachine) invokeFromClass(klass *class, name string, argCount int) error {
+	method, ok := klass.methods[name]
+	if !ok {
+		return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
+	}
+	return vm.call(method, argCount)
+}
+
+func (vm *VirtualMachine) bindMethod(klass *class, name string) error {
+	method, ok := klass.methods[name]
+	if !ok {
+		return errors.NewLoxError(vm.currentLine(), fmt.Sprintf("undefined property '%s'", name))
+	}
+	receiver, err := vm.peek(0)
+	if err != nil {
+		return err
+	}
+	bound := newBoundMethod(receiver, method)
+	if _, err := vm.pop(); err != nil {
+		return err
+	}
+	vm.push(bound)
+	return nil
 }
 
 func (vm *VirtualMachine) call(cl *closure, argCount int) error {
@@ -686,4 +760,18 @@ func (vm *VirtualMachine) closeUpvalues(last int) {
 		up.location = &up.closed
 		vm.openUpvalues = up.next
 	}
+}
+
+func (vm *VirtualMachine) defineMethod(name string) error {
+	method, err := vm.peek(0)
+	if err != nil {
+		return err
+	}
+	klass, err := vm.peek(1)
+	if err != nil {
+		return err
+	}
+	klass.(*class).methods[name] = method.(*closure)
+	_, err = vm.pop()
+	return err
 }

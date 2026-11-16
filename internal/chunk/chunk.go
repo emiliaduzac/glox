@@ -44,12 +44,15 @@ const (
 	OP_JUMP
 
 	OP_CALL
+	OP_INVOKE
 	OP_CLOSURE
 
 	OP_CLASS
 
 	OP_GET_PROPERTY
 	OP_SET_PROPERTY
+
+	OP_METHOD
 )
 
 var opCodeNames = map[OpCode]string{
@@ -88,12 +91,15 @@ var opCodeNames = map[OpCode]string{
 	OP_JUMP:          "OP_JUMP",
 
 	OP_CALL:    "OP_CALL",
+	OP_INVOKE:  "OP_INVOKE",
 	OP_CLOSURE: "OP_CLOSURE",
 
 	OP_CLASS: "OP_CLASS",
 
 	OP_GET_PROPERTY: "OP_GET_PROPERTY",
 	OP_SET_PROPERTY: "OP_SET_PROPERTY",
+
+	OP_METHOD: "OP_METHOD",
 }
 
 func (op OpCode) String() string {
@@ -139,7 +145,7 @@ func (c *Chunk) Disassemble(name string) {
 		fmt.Printf("%04d| %4d ", i, c.Lines[i])
 
 		switch op {
-		case OP_CONSTANT, OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL, OP_CLASS, OP_GET_PROPERTY, OP_SET_PROPERTY:
+		case OP_CONSTANT, OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL, OP_CLASS, OP_GET_PROPERTY, OP_SET_PROPERTY, OP_METHOD:
 			// Instrucciones con operandos: constantes
 			constantIndex := c.Bytes[i+1]
 			fmt.Printf("%s<%s>\n", op, c.constantString(constantIndex))
@@ -171,6 +177,11 @@ func (c *Chunk) Disassemble(name string) {
 			argCount := c.Bytes[i+1]
 			fmt.Printf("%s<%d>\n", op, argCount)
 			i += 2
+
+		case OP_INVOKE:
+			constantIndex, argCount := c.Bytes[i+1], c.Bytes[i+2]
+			fmt.Printf("%s<%s, %d>\n", op, c.constantString(constantIndex), argCount)
+			i += 3
 
 		case OP_JUMP, OP_JUMP_IF_FALSE, OP_LOOP:
 			// Instrucciones con operandos: saltos

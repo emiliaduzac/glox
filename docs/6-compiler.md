@@ -119,7 +119,7 @@ De esta forma, no necesita generar una instrucción como `OP_DEFINE_GLOBAL`, ya 
 
 Al finalizar el bloque, resta uno a la profundidad y elimina de su stack falso las variables locales de ese bloque. Además, emite un `OP_POP` por cada una, para asegurarnos de que al terminar un bloque, el stack de la VM quede sin sus variables.
 
-Un detalle más sobre las variables locales es que puede haber como máximo 255 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255, y el slot 0 queda reservado para la función.
+Un detalle más sobre las variables locales es que puede haber como máximo 255 a la vez, ya que el operando de `OP_GET_LOCAL` y `OP_SET_LOCAL` ocupa un solo byte, que va de 0 a 255, y el slot 0 queda reservado para la función, o para la instancia si es un método.
 
 ## Control de flujo
 
@@ -178,7 +178,7 @@ Para los ciclos necesitamos saltar hacia **atrás**, para volver a ejecutar una 
 
 Un cambio importante al llegar a funciones es que el compilador ya no escribe en un chunk suelto, sino en **el chunk de una función**. Por eso `Compile` pasa a devolver una función. El programa completo se trata como una función implícita: el script, así que el compilador siempre está compilando dentro de una función y la VM siempre ejecuta una. Esto no cambia a las globales: aunque el script sea una función, las variables declaradas en el nivel de arriba siguen siendo globales y no locales del script. Además, el compilador guarda si lo que está compilando es el script o una función, lo que permite, por ejemplo, dar error con un `return` fuera de una función.
 
-Algo importante que se agrega con todo esto es que el índice 0 de la ventana de cada función queda reservado para que la VM ponga la función que se está ejecutando (desde closures, su closure). Como el operando de una local es de un byte, hay 256 lugares, y al ocupar el 0 quedan 255 para variables locales. Esto pasa a ser una **limitación conocida** de esta versión, porque el tree-walk no tiene este límite.
+Algo importante que se agrega con todo esto es que el índice 0 de la ventana de cada función queda reservado para que la VM ponga la función que se está ejecutando (desde closures, su closure) o la instancia si es un método. Como el operando de una local es de un byte, hay 256 lugares, y al ocupar el 0 quedan 255 para variables locales. Esto pasa a ser una **limitación conocida** de esta versión, porque el tree-walk no tiene este límite.
 
 ### Una funcion con su propio chunk
 
@@ -208,7 +208,7 @@ Para que el compilador pueda reconocer la llamada, el `(` pasa a ser un operador
 
 ### Return
 
-El return es un statement que, si tiene una expresión, la compila y emite un `OP_RETURN`, y si no, devuelve `nil`: emite un `OP_NIL` y un `OP_RETURN`, igual que lo que se agrega al final de cada función. Acá hay una diferencia importante con el tree-walk: allá el recorrido era recursivo, y para salir de varias llamadas anidadas usamos el truco de que el `ReturnValue` suba como si fuera un error. En la VM eso no hace falta, porque el bytecode es una secuencia plana y el return es una instrucción más, que corta la llamada y vuelve al frame anterior.
+El return es un statement que, si tiene una expresión, la compila y emite un `OP_RETURN`, y si no, devuelve `nil`: emite un `OP_NIL` y un `OP_RETURN`, igual que lo que se agrega al final de cada función, salvo en el `init` que emite un `OP_GET_LOCAL 0` para devolver `this` como contamos en [Init](#init). Acá hay una diferencia importante con el tree-walk: allá el recorrido era recursivo, y para salir de varias llamadas anidadas usamos el truco de que el `ReturnValue` suba como si fuera un error. En la VM eso no hace falta, porque el bytecode es una secuencia plana y el return es una instrucción más, que corta la llamada y vuelve al frame anterior.
 
 Un return fuera de una función no tiene sentido, porque no hay nada de dónde salir. Para detectarlo, el compilador se fija si lo que está compilando es el script, y si es así, da un error. Ese error no corta la compilación, sino que sigue leyendo para avisar si hay más errores, porque el código está bien escrito y solo rompe una regla del lenguaje. Con esto nos acoplamos al libro, que dice que se podría permitir, pero elige que sea un error.
 
@@ -273,9 +273,47 @@ Agregamos el **punto**, que es un operador infijo: a la izquierda tiene una expr
 
 El punto tiene la misma precedencia que los paréntesis de una llamada, así que se lee de izquierda a derecha: en algo como `a.f().x`, se aplican en el orden en que aparecen. Además, tiene más precedencia que el `-`, así que en `-a.x` primero se lee `a.x` y después se niega.
 
-Para distinguir el set del get, `dot()` se fija si se puede asignar y si viene un `=`. Si es así, compila el valor y emite `OP_SET_PROPERTY`. Si no, es un get y emite `OP_GET_PROPERTY`. Acá también se usa `canAssign`, y lo necesitamos por el ejemplo del libro: sin el `a + b.c = 3` se leería como `a + (b.c = 3)`, que la gramática no permite. Con `canAssign`, `dot()` deja el `=` sin consumir, y el error lo termina dando `parsePrecedence` cuando lo encuentra. En cambio, en `f().x = 1` `canAssign` es verdadero y la asignación funciona. Como la asignación deja el valor en el stack, también se puede encadenar, como en `a.x = a.y = 1`.
+Para distinguir el set del get, `dot()` se fija si se puede asignar y si viene un `=`. Si es así, compila el valor y emite `OP_SET_PROPERTY`. Si viene un `(` es una llamada y emite `OP_INVOKE` como contamos en [Invoke](#invoke), y si no, es un get y emite `OP_GET_PROPERTY`. Acá también se usa `canAssign`, y lo necesitamos por el ejemplo del libro: sin el `a + b.c = 3` se leería como `a + (b.c = 3)`, que la gramática no permite. Con `canAssign`, `dot()` deja el `=` sin consumir, y el error lo termina dando `parsePrecedence` cuando lo encuentra. En cambio, en `f().x = 1` `canAssign` es verdadero y la asignación funciona. Como la asignación deja el valor en el stack, también se puede encadenar, como en `a.x = a.y = 1`.
 
 Una diferencia con el libro que ya mencionamos en [Nombres repetidos](#nombres-repetidos) es que, cuando aparece un nombre, el libro agrega una constante nueva y nosotros reutilizamos la que ya existe, y acá se vuelve a aprovechar. Esto ayuda a no llegar tan rápido al límite de 256 constantes por función. Pasa tanto en `a.x + a.x`, que usa la misma constante para la `x`, como en `x.x` si `x` es global: la variable y el campo comparten la constante, porque se guarda por nombre.
+
+### Métodos
+
+Al agregar los métodos nos aparece el problema de que una clase puede tener varios métodos y eso tiene que llegar a la vm como una serie de instrucciones de bytecode y no como un nodo del árbol que recorría antes el tree-walk. En el libro habla de que para el programador declarar una clase es una sola cosa, pero para nosotros el compilador lo emite como una serie de instrucciones que la vm ejecuta de a una.
+
+Primero tenemos ya el OP_CLASS que crea la clase vacía, después se guarda en su variable y se vuelve a agregar en el stack porque la vm la necesita ahí para agregarle los métodos. Si la clase es global al guardarla con OP_DEFINE_GLOBAL sale del stack y por eso hay que volver a cargarla, y si es local queda en su slot. Después por cada método se emite el OP_CLOSURE que deja el closure del método arriba de la clase en el stack y le sigue el OP_METHOD que lo guarda en la clase con su nombre y lo saca del stack, así la clase sigue quedando arriba para el siguiente. Y al final un OP_POP que saca a la clase, que ya quedó guardada en su variable con sus métodos.
+
+Además para agregarle métodos a la clase la vm necesita tener la clase a mano pero el compilador no puede saber si es global o local y por ende dónde queda, por eso usa el nombre para volver a cargarla con el namedVariable, que es el mismo que para una variable, y eso genera la instrucción que corresponda según el caso.
+
+Un detalle sobre métodos es que Lox no tiene declaración de campos para la clase así que todo lo que está entre {} es un método, así que si aparece otra cosa es un error. Se termina compilando con la misma función que para la fun así que termina quedando como un closure y puede usar las variables de afuera.
+
+### This
+
+Con los métodos ya andando faltaba poder usar `this` adentro y en el libro lo resuelve aprovechando el slot 0 de cada función. En una función común ahí queda la función que se está ejecutando pero en un método eso no hace falta, así que la vm pone en ese lugar la instancia sobre la que se llamó y el compilador le pone de nombre `this` a ese slot. Entonces `this` termina siendo una variable local más que se compila con `OP_GET_LOCAL 0`, y como se compila sin poder asignarse, surge que algo como `this = 1` da error igual que pasa con `a + b.c = 3`. Para saber cuándo hacer esto agregamos un tipo de función nuevo, `TYPE_METHOD` que es el que usa `method()` al compilar cada método, salvo el `init` que usa `TYPE_INITIALIZER` como contamos en [Init](#init).
+
+El slot 0 se llama `this` en todo lo que no sea una función común y esto tiene sentido cuando hay una función adentro de un método que usa `this` porque ahí se espera que sea el del método. Como la función no tiene uno el compilador no lo encuentra y lo sigue buscando afuera hasta encontrarlo en el método que lo termina encontrando como un upvalue con lo mismo que ya teníamos de [Closures](#closures). Si la función también tuviera su propio `this`, taparía al del método y se rompería ese caso.
+
+Siguiendo la idea del libro tenemos el error de compilacion cuando se usa this fuera de una clase, y un detalle con eso es que fijarse si estamos en un método no alcanza por lo de la función adentro de un método, entonces lleva una pila con las clases que se están compilando donde cada una apunta a la de afuera, el libro dice que no es comun pero Lox deja declarar una clase adentro de un método de otra. Y bueno la idea es que si aparece un `this` con la pila vacía, es un error.
+
+Una diferencia con el libro es que guarda la clase actual en una variable global y nosotros en `parserState` que es lo que ya comparten por puntero todos los compiladores (ver [Funciones](#funciones)), así un método que tiene su propio compilador ve la misma clase que la declaración de afuera. Pero la diferencia más grande es cuándo se saca la clase de la pila porque el libro lo hace al final de la declaración y le funciona, porque en C cuando hay un error de sintaxis lo reporta y la función sigue de largo hasta el final. En glox un error de sintaxis corta la función con `return err`, así que con una clase con error nunca se llegaría a esa última línea entoences la clase quedaría en la pila y un `this` suelto más abajo ya no daría error. Por eso la sacamos con un `defer`, que se ejecuta siempre al salir de la función sea como sea y así igual que en el libro la clase siempre sale de la pila. Lo que sí cambia son los errores que salen después porque el libro sigue leyendo la clase rota y nosotros la cortamos, que es lo que ya contamos en [Manejo de errores](#manejo-de-errores).
+
+### Init
+
+Con la vm llamando al `init` nos aparecía un problema porque el `init` se compila como cualquier método y termina con el `OP_NIL` y el `OP_RETURN` que pone el compilador al final, y el `OP_RETURN` deja lo que devuelve donde el que llamó espera el resultado, entonces `var a = Auto("rojo");` terminaba guardando `nil` en `a` y no la instancia. Lo que hace el libro es resolverlo en el compilador haciendo que el `init` siempre devuelva `this` que ya está en el slot 0, así la vm no tiene que hacer nada distinto.
+
+Teniendo en cuenta lo que hicimos con `this` esto fue sencillo porque agregamos otro tipo de función `TYPE_INITIALIZER` que lo usa `method()` cuando el método se llama `init`, y como no es una función común el slot 0 también se llama `this`. Lo que sí cambia es que `emitReturn()` en vez de emitir el `OP_NIL` emite un `OP_GET_LOCAL 0`, y es por esto que el `return;` sin valor también devuelve `this` porque usa el mismo `emitReturn()` que el final de la función entonces se puede salir antes de un `init` y la instancia no se pierde.
+
+Lo que no se puede es hacer un `return` con un valor adentro del `init` porque se devolvería ese valor y no la instancia, así que igual que en el libro es un error de compilación. Lo levantamos con `report` y no devolviendo el error como pasa con el `return` en el script, porque el código está bien escrito y solo rompe una regla del lenguaje así que sigue compilando y muestra los demás errores.
+
+Un detalle es que cada compilador mira su tipo entonces si hay una función adentro del `init` esa sigue siendo `TYPE_FUNCTION` y puede hacer `return 1;` sin problema porque ese return es de la función y no del `init`. Y otra cosa es que el `init` se puede llamar como cualquier método.
+
+Una diferencia con el libro es que para saber si el método se llama `init` en C tienen que comparar el largo y los bytes porque el token apunta al código y nosotros como el lexema ya es un `string` lo comparamos con `==`. 
+
+### Invoke
+
+En el compilador lo del invoke está en `dot()` porque después de leer el nombre ahora se fija si viene un `(` y si es así compila los argumentos con el mismo `argumentList()` de las llamadas y emite el `OP_INVOKE` con el nombre y la cantidad de argumentos, en vez del `OP_GET_PROPERTY` y el `OP_CALL` que salían antes (para qué sirve lo contamos en la [vm](5-bytecode_and_vm.md#invoke)). Esto va después de fijarse si es una asignación así que `a.x = 1` sigue siendo un set como antes.
+
+Un detalle es que solo se optimiza cuando el `(` viene justo después del nombre, entonces `(a.m)()` sigue compilando como antes porque los paréntesis cierran el `a.m` antes de la llamada y lo mismo con `var m = a.m; m();`, que siguen pasando por el bound method. Y bueno como `this` es una local más, un `this.m()` adentro de un método también usa el `OP_INVOKE`.
 
 ## Tests
 
@@ -289,4 +327,10 @@ go test ./internal/compiler
 
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm" 6-classes
+```
+
+> Para los métodos, `this`, los inicializadores y el invoke agregamos los tests ([7-methods](../real-tests/7-methods.lox)), que también corren solo con la VM.
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm" 7-methods
 ```

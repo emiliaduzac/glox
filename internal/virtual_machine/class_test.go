@@ -2,12 +2,22 @@ package virtualmachine
 
 import (
 	"testing"
+	c "tp-lox/internal/chunk"
 	"tp-lox/internal/utils"
 )
 
 func TestClassString(t *testing.T) {
 	t.Run("Una clase se imprime con su nombre", func(t *testing.T) {
 		utils.AssertValue(t, utils.Stringify(newClass("Auto")), "Auto")
+	})
+}
+
+func TestNewClass(t *testing.T) {
+	t.Run("Una clase nueva arranca sin métodos y con su tabla para guardarlos", func(t *testing.T) {
+		auto := newClass("Auto")
+
+		utils.AssertValue(t, len(auto.methods), 0)
+		utils.AssertValue(t, auto.methods != nil, true)
 	})
 }
 
@@ -20,5 +30,26 @@ func TestInstanceString(t *testing.T) {
 func TestNewInstance(t *testing.T) {
 	t.Run("Una instancia nueva arranca sin campos", func(t *testing.T) {
 		utils.AssertValue(t, len(newInstance(newClass("Auto")).fields), 0)
+	})
+}
+
+func TestNewBoundMethod(t *testing.T) {
+	t.Run("Un bound method guarda la instancia y el método de donde salió", func(t *testing.T) {
+		auto := newInstance(newClass("Auto"))
+		acelerar := newClosure(c.NewFunction())
+		bound := newBoundMethod(auto, acelerar)
+
+		utils.AssertValue(t, bound.receiver, any(auto))
+		utils.AssertValue(t, bound.method, acelerar)
+	})
+}
+
+func TestBoundMethodString(t *testing.T) {
+	t.Run("Un bound method se imprime igual que la función del método", func(t *testing.T) {
+		acelerar := c.NewFunction()
+		acelerar.Name = "acelerar"
+		bound := newBoundMethod(newInstance(newClass("Auto")), newClosure(acelerar))
+
+		utils.AssertValue(t, utils.Stringify(bound), "<fn acelerar>")
 	})
 }

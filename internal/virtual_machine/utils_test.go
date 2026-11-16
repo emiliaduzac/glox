@@ -94,3 +94,12 @@ func newPrintUpvalue() *c.Function {
 	writeReturnNil(&mostrar.Chunk)
 	return mostrar
 }
+
+func newMethod(name string, arity int, body func(chunk *c.Chunk)) *closure {
+	function := c.NewFunction()
+	function.Name = name
+	function.Arity = arity
+	body(&function.Chunk)
+	writeReturnNil(&function.Chunk)
+	return newClosure(function)
+}

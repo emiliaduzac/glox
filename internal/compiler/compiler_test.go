@@ -1954,7 +1954,14 @@ func TestCompileClassDeclaration(t *testing.T) {
 	t.Run("Una clase se crea con OP_CLASS y se define como variable global", func(t *testing.T) {
 		chunk := compileSource(t, "class A {}")
 
-		assertBytes(t, chunk, byte(c.OP_CLASS), 0, byte(c.OP_DEFINE_GLOBAL), 0, byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
 		utils.AssertValue(t, chunk.Constants[0], "A")
 	})
 
@@ -1963,6 +1970,8 @@ func TestCompileClassDeclaration(t *testing.T) {
 
 		assertBytes(t, chunk,
 			byte(c.OP_CLASS), 0,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_POP),
 			byte(c.OP_GET_LOCAL), 1,
 			byte(c.OP_PRINT),
 			byte(c.OP_POP),
@@ -1983,8 +1992,12 @@ func TestCompileClassDeclaration(t *testing.T) {
 		assertBytes(t, chunk,
 			byte(c.OP_CLASS), 0,
 			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_POP),
 			byte(c.OP_CLASS), 0,
 			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_POP),
 			byte(c.OP_NIL),
 			byte(c.OP_RETURN),
 		)
@@ -1999,7 +2012,7 @@ func TestCompileClassDeclaration(t *testing.T) {
 			{"sin nombre", "class {}", "expected class name"},
 			{"sin llave que abre", "class A", "'{' before class body"},
 			{"sin llave que cierra", "class A {", "expected '}' after class body"},
-			{"el cuerpo no tiene declaraciones válidas", "class A { var x; }", "expected '}' after class body"},
+			{"el cuerpo tiene algo que no es un método", "class A { var x; }", "expected method name"},
 		}
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
@@ -2053,8 +2066,7 @@ func TestCompileGetExpression(t *testing.T) {
 
 		assertExprBytes(t, chunk,
 			byte(c.OP_GET_GLOBAL), 0,
-			byte(c.OP_GET_PROPERTY), 1,
-			byte(c.OP_CALL), 0,
+			byte(c.OP_INVOKE), 1, 0,
 			byte(c.OP_GET_PROPERTY), 2,
 		)
 		utils.AssertValue(t, chunk.Constants[1], "f")
@@ -2173,5 +2185,225 @@ func TestCompileSetExpression(t *testing.T) {
 		err := compileSourceError(t, "a + b.c = 3;")
 
 		utils.AssertErrorMessage(t, err, "invalid assignment target")
+	})
+}
+
+func TestCompileMethodDeclaration(t *testing.T) {
+	t.Run("Un método se compila como closure y se agrega a la clase con OP_METHOD y su nombre", func(t *testing.T) {
+		chunk := compileSource(t, "class A { m() {} }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CLOSURE), 2,
+			byte(c.OP_METHOD), 1,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[0], "A")
+		utils.AssertValue(t, chunk.Constants[1], "m")
+		utils.AssertValue(t, utils.Stringify(chunk.Constants[2]), "<fn m>")
+	})
+
+	t.Run("Los métodos se agregan en el orden en que se declaran", func(t *testing.T) {
+		chunk := compileSource(t, "class A { a() {} b() {} }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_DEFINE_GLOBAL), 0,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CLOSURE), 2,
+			byte(c.OP_METHOD), 1,
+			byte(c.OP_CLOSURE), 4,
+			byte(c.OP_METHOD), 3,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[1], "a")
+		utils.AssertValue(t, chunk.Constants[3], "b")
+	})
+
+	t.Run("En una clase local los métodos se agregan a la clase leída de su slot", func(t *testing.T) {
+		chunk := compileSource(t, "{ class A { m() {} } }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_CLOSURE), 2,
+			byte(c.OP_METHOD), 1,
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si un método está mal escrita", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+			errMsg string
+		}{
+			{"falta el paréntesis después del nombre", "class A { m {} }", "'(' after function name"},
+			{"falta cerrar los parámetros", "class A { m(a {} }", "')' after parameters"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, test.errMsg)
+			})
+		}
+	})
+}
+
+func TestCompileThis(t *testing.T) {
+	t.Run("this dentro de un método lee la varaible local del slot 0", func(t *testing.T) {
+		chunk := compileSource(t, "class A { m() { print this; } }")
+
+		method := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &method.Chunk, byte(c.OP_GET_LOCAL), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("Una función dentro de un método captura this como upvalue", func(t *testing.T) {
+		chunk := compileSource(t, "class A { m() { fun f() { print this; } } }")
+
+		method := chunk.Constants[2].(*c.Function)
+		inner := method.Chunk.Constants[0].(*c.Function)
+		assertBytes(t, &inner.Chunk, byte(c.OP_GET_UPVALUE), 0, byte(c.OP_PRINT), byte(c.OP_NIL), byte(c.OP_RETURN))
+		assertBytes(t, &method.Chunk,
+			byte(c.OP_CLOSURE), 0, 1, 0,
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si se asigna a this", func(t *testing.T) {
+		err := compileSourceError(t, "class A { m() { this = 1; } }")
+
+		utils.AssertErrorMessage(t, err, "invalid assignment target")
+	})
+}
+
+func TestCompileInitializer(t *testing.T) {
+	t.Run("init devuelve this", func(t *testing.T) {
+		chunk := compileSource(t, "class A { init() {} }")
+
+		init := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &init.Chunk, byte(c.OP_GET_LOCAL), 0, byte(c.OP_RETURN))
+	})
+
+	t.Run("Un return sin valor en init también devuelve this", func(t *testing.T) {
+		chunk := compileSource(t, "class A { init() { return; } }")
+
+		init := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &init.Chunk,
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_RETURN),
+			byte(c.OP_GET_LOCAL), 0,
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Un método que no se llama init sigue devolviendo nil", func(t *testing.T) {
+		chunk := compileSource(t, "class A { m() {} }")
+
+		method := chunk.Constants[2].(*c.Function)
+		assertBytes(t, &method.Chunk, byte(c.OP_NIL), byte(c.OP_RETURN))
+	})
+
+	t.Run("Error si init devuelve un valor", func(t *testing.T) {
+		err := compileSourceError(t, "class A { init() { return 1; } }")
+
+		utils.AssertErrorMessage(t, err, "can't return a value from an initializer")
+	})
+
+	t.Run("Fuera de init se puede devolver un valor", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"en un método que no es init", "class A { m() { return 1; } }"},
+			{"en una función adentro de init", "class A { init() { fun f() { return 1; } } }"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertNoError(t, err)
+			})
+		}
+	})
+}
+
+func TestCompileInvoke(t *testing.T) {
+	t.Run("Llamar a una propiedad se compila como OP_INVOKE con su nombre y la cantidad de argumentos", func(t *testing.T) {
+		chunk := compileSource(t, "a.m(1, 2);")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_CONSTANT), 2,
+			byte(c.OP_CONSTANT), 3,
+			byte(c.OP_INVOKE), 1, 2,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+		utils.AssertValue(t, chunk.Constants[1], "m")
+	})
+
+	t.Run("Si la propiedad se lee entre paréntesis y después se llama, sigue siendo OP_GET_PROPERTY y OP_CALL", func(t *testing.T) {
+		chunk := compileSource(t, "(a.m)();")
+
+		assertBytes(t, chunk,
+			byte(c.OP_GET_GLOBAL), 0,
+			byte(c.OP_GET_PROPERTY), 1,
+			byte(c.OP_CALL), 0,
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Error si falta cerrar los argumentos de la llamada", func(t *testing.T) {
+		err := compileSourceError(t, "a.m(1;")
+
+		utils.AssertErrorMessage(t, err, "')' after arguments")
+	})
+}
+
+func TestCompileThisOutsideClass(t *testing.T) {
+	t.Run("Error si se usa this afuera de una clase", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			source string
+		}{
+			{"en el script", "print this;"},
+			{"en una función", "fun f() { print this; }"},
+			{"después de que terminó la clase", "class A { m() {} } print this;"},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				err := compileSourceError(t, test.source)
+
+				utils.AssertErrorMessage(t, err, "can't use 'this' outside of a class")
+			})
+		}
+	})
+
+	t.Run("Una clase declarada dentro de un método deja que se siga usando this de la clase de afuera", func(t *testing.T) {
+		err := compileSourceError(t, "class A { m() { class B {} print this; } }")
+
+		utils.AssertNoError(t, err)
+	})
+
+	t.Run("Si la clase tiene un error de sintaxis, this después de la clase sigue siendo un error", func(t *testing.T) {
+		errs := compileErrors(t, "class A { m( } print this;")
+
+		utils.AssertValue(t, len(errs), 2)
+		utils.AssertErrorMessage(t, errs[1], "can't use 'this' outside of a class")
 	})
 }

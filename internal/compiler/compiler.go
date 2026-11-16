@@ -19,12 +19,15 @@ type FunctionType int
 const (
 	TYPE_FUNCTION FunctionType = iota
 	TYPE_SCRIPT
+	TYPE_METHOD
+	TYPE_INITIALIZER
 )
 
 type parserState struct {
-	cursor    *token.TokenCursor
-	errs      []error
-	panicMode bool
+	cursor       *token.TokenCursor
+	errs         []error
+	panicMode    bool
+	currentClass *classCompiler
 }
 
 type Loop struct {
@@ -36,6 +39,10 @@ type Loop struct {
 type Upvalue struct {
 	index   byte
 	isLocal bool
+}
+
+type classCompiler struct {
+	enclosing *classCompiler
 }
 
 type Compiler struct {
@@ -61,12 +68,16 @@ func newFunctionCompiler(state *parserState, enclosing *Compiler, funcType Funct
 	if funcType != TYPE_SCRIPT {
 		function.Name = state.cursor.GetPreviousLexeme()
 	}
+	slotZero := Local{Depth: 0}
+	if funcType != TYPE_FUNCTION {
+		slotZero.Name = token.Token{TokenType: token.THIS, Lexeme: "this"}
+	}
 	return &Compiler{
 		parserState: state,
 		enclosing:   enclosing,
 		function:    function,
 		funcType:    funcType,
-		locals:      []Local{{Depth: 0}},
+		locals:      []Local{slotZero},
 		identifiers: map[string]byte{},
 	}
 }
@@ -287,6 +298,9 @@ func (c *Compiler) returnStatement() error {
 		c.emitReturn()
 		return nil
 	}
+	if c.funcType == TYPE_INITIALIZER {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't return a value from an initializer"))
+	}
 	if err := c.expression(); err != nil {
 		return err
 	}
@@ -301,7 +315,8 @@ func (c *Compiler) classDeclaration() error {
 	if err := c.cursor.Consume(token.IDENTIFIER, "class name"); err != nil {
 		return err
 	}
-	nameConstant, err := c.identifierConstant(c.cursor.Previous())
+	className := c.cursor.Previous()
+	nameConstant, err := c.identifierConstant(className)
 	if err != nil {
 		return err
 	}
@@ -310,10 +325,25 @@ func (c *Compiler) classDeclaration() error {
 	c.emit(byte(chunk.OP_CLASS), nameConstant)
 	c.defineVariable(nameConstant)
 
+	c.currentClass = &classCompiler{enclosing: c.currentClass}
+	defer func() { c.currentClass = c.currentClass.enclosing }()
+
+	if err := c.namedVariable(className, false); err != nil {
+		return err
+	}
 	if err := c.cursor.Consume(token.LEFT_BRACE, "'{' before class body"); err != nil {
 		return err
 	}
-	return c.cursor.Consume(token.RIGHT_BRACE, "'}' after class body")
+	for !c.cursor.Check(token.RIGHT_BRACE) && !c.cursor.Check(token.EOF) {
+		if err := c.method(); err != nil {
+			return err
+		}
+	}
+	if err := c.cursor.Consume(token.RIGHT_BRACE, "'}' after class body"); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_POP))
+	return nil
 }
 
 func (c *Compiler) funDeclaration() error {
@@ -375,6 +405,25 @@ func (c *Compiler) compileFunction(funcType FunctionType) error {
 		}
 		c.emit(isLocal, upvalue.index)
 	}
+	return nil
+}
+
+func (c *Compiler) method() error {
+	if err := c.cursor.Consume(token.IDENTIFIER, "method name"); err != nil {
+		return err
+	}
+	constant, err := c.identifierConstant(c.cursor.Previous())
+	if err != nil {
+		return err
+	}
+	funcType := TYPE_METHOD
+	if c.cursor.GetPreviousLexeme() == "init" {
+		funcType = TYPE_INITIALIZER
+	}
+	if err := c.compileFunction(funcType); err != nil {
+		return err
+	}
+	c.emit(byte(chunk.OP_METHOD), constant)
 	return nil
 }
 
@@ -585,7 +634,11 @@ func (c *Compiler) emit(bytes ...byte) {
 }
 
 func (c *Compiler) emitReturn() {
-	c.emit(byte(chunk.OP_NIL))
+	if c.funcType == TYPE_INITIALIZER {
+		c.emit(byte(chunk.OP_GET_LOCAL), 0)
+	} else {
+		c.emit(byte(chunk.OP_NIL))
+	}
 	c.emit(byte(chunk.OP_RETURN))
 }
 
@@ -745,6 +798,14 @@ func (c *Compiler) dot(canAssign bool) error {
 		c.emit(byte(chunk.OP_SET_PROPERTY), name)
 		return nil
 	}
+	if c.cursor.Match(token.LEFT_PAREN) {
+		argCount, err := c.argumentList()
+		if err != nil {
+			return err
+		}
+		c.emit(byte(chunk.OP_INVOKE), name, argCount)
+		return nil
+	}
 	c.emit(byte(chunk.OP_GET_PROPERTY), name)
 	return nil
 }
@@ -899,6 +960,14 @@ func (c *Compiler) addUpvalue(index byte, isLocal bool) int {
 
 func (c *Compiler) variable(canAssign bool) error {
 	return c.namedVariable(c.cursor.Previous(), canAssign)
+}
+
+func (c *Compiler) this(_ bool) error {
+	if c.currentClass == nil {
+		c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "can't use 'this' outside of a class"))
+		return nil
+	}
+	return c.variable(false)
 }
 
 func (c *Compiler) logicAnd(_ bool) error {
