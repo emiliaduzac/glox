@@ -124,5 +124,5 @@ En cualquier caso, se mostrará por cada archivo su estado general (`OK` / `ERRO
 - [X] Clases
 - [ ] Herencia
 - [x] Extra propio
-- [ ] Uso real del lenguaje
+- [X] Uso real del lenguaje
 - [ ] Benchmarks contra la entrega parcial, mejorar la que teniamos y documentación final
