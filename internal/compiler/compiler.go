@@ -45,6 +45,8 @@ type classCompiler struct {
 	enclosing *classCompiler
 }
 
+var superToken = token.Token{TokenType: token.SUPER, Lexeme: "super"}
+
 type Compiler struct {
 	*parserState
 	enclosing   *Compiler
@@ -328,7 +330,6 @@ func (c *Compiler) classDeclaration() error {
 	c.currentClass = &classCompiler{enclosing: c.currentClass}
 	defer func() { c.currentClass = c.currentClass.enclosing }()
 
-	hasSuperclass := false
 	if c.cursor.Match(token.LESS) {
 		if err := c.cursor.Consume(token.IDENTIFIER, "superclass name"); err != nil {
 			return err
@@ -339,11 +340,15 @@ func (c *Compiler) classDeclaration() error {
 		if className.Lexeme == c.cursor.GetPreviousLexeme() {
 			c.report(errors.NewLoxError(c.cursor.GetPreviousLine(), "a class can't inherit from itself"))
 		}
+		c.beginScope()
+		defer c.endScope()
+		c.addLocal(superToken)
+		c.defineVariable(0)
+
 		if err := c.namedVariable(className, false); err != nil {
 			return err
 		}
 		c.emit(byte(chunk.OP_INHERIT))
-		hasSuperclass = true
 	}
 
 	if err := c.namedVariable(className, false); err != nil {
@@ -361,9 +366,6 @@ func (c *Compiler) classDeclaration() error {
 		return err
 	}
 	c.emit(byte(chunk.OP_POP))
-	if hasSuperclass {
-		c.emit(byte(chunk.OP_POP))
-	}
 	return nil
 }
 

@@ -2434,6 +2434,42 @@ func TestCompileSuperclass(t *testing.T) {
 		utils.AssertValue(t, chunk.Constants[1], "B")
 	})
 
+	t.Run("Dos subclases en el mismo bloque guardan cada una su superclase", func(t *testing.T) {
+		chunk := compileSource(t, "{ class A {} class B < A {} class C < A {} }")
+
+		assertBytes(t, chunk,
+			byte(c.OP_CLASS), 0,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_POP),
+			byte(c.OP_CLASS), 1,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_GET_LOCAL), 2,
+			byte(c.OP_INHERIT),
+			byte(c.OP_GET_LOCAL), 2,
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_CLASS), 2,
+			byte(c.OP_GET_LOCAL), 1,
+			byte(c.OP_GET_LOCAL), 3,
+			byte(c.OP_INHERIT),
+			byte(c.OP_GET_LOCAL), 3,
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_POP),
+			byte(c.OP_NIL),
+			byte(c.OP_RETURN),
+		)
+	})
+
+	t.Run("Un error de sintaxis en una subclase no deja abierto su scope", func(t *testing.T) {
+		errs := compileErrors(t, "class A {} class B < A { m( } var a; var a;")
+
+		utils.AssertValue(t, len(errs), 1)
+		utils.AssertErrorMessage(t, errs[0], "expected parameter name")
+	})
+
 	t.Run("Error si después de < no viene el nombre de la superclase", func(t *testing.T) {
 		err := compileSourceError(t, "class A {} class B < (A) {}")
 
