@@ -328,3 +328,9 @@ go test ./internal/compiler
 ```bash
 python3 real-tests/script.py "go run ./cmd --vm" 6-classes
 ```
+
+> Para los métodos, `this`, los inicializadores y el invoke agregamos los tests ([7-methods](../real-tests/7-methods.lox)), que también corren solo con la VM.
+
+```bash
+python3 real-tests/script.py "go run ./cmd --vm" 7-methods
+```
